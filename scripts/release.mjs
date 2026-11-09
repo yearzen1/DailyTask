@@ -51,12 +51,21 @@ function bumpJson(relativePath, mutate) {
 }
 
 // 用 npm version 而不是手改 package.json，确保 package-lock 同步。
-run(npm, [
-  "version",
-  version,
-  "--no-git-tag-version",
-  "--ignore-scripts",
-]);
+// 版本已在当前分支 bump 过（例如发版 PR 里改了版本号）时跳过，避免 npm 报 "Version not changed"。
+const packageJsonPath = join(root, "package.json");
+const currentVersion = JSON.parse(
+  readFileSync(packageJsonPath, "utf8"),
+).version;
+if (currentVersion === version) {
+  console.log(`package.json 已是 ${version}，跳过 npm version`);
+} else {
+  run(npm, [
+    "version",
+    version,
+    "--no-git-tag-version",
+    "--ignore-scripts",
+  ]);
+}
 bumpJson("src-tauri/tauri.conf.json", (conf) => {
   conf.version = version;
 });
