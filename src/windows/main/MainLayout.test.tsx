@@ -32,7 +32,7 @@ describe("MainLayout", () => {
     vi.useRealTimers();
   });
 
-  it("switches between all six views", async () => {
+  it("switches between all six views", () => {
     render(<MainLayout />);
 
     expect(screen.getByRole("heading", { name: "今日" })).toBeInTheDocument();
@@ -46,20 +46,8 @@ describe("MainLayout", () => {
       ["今日", "今日"],
     ]) {
       fireEvent.click(screen.getByRole("button", { name: label }));
-      expect(
-        await screen.findByRole("heading", { name: heading }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: heading })).toBeInTheDocument();
     }
-  });
-
-  it("renders a view that is loaded on demand", async () => {
-    render(<MainLayout />);
-
-    fireEvent.click(screen.getByRole("button", { name: "统计" }));
-
-    expect(
-      await screen.findByRole("heading", { name: "统计" }),
-    ).toBeInTheDocument();
   });
 
   it("marks the active nav item", () => {

@@ -19,7 +19,6 @@
 | `npm run lint` | ESLint |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run docs:check` | 文档链接/状态头校验 |
-| `npm run perf:memory` | 按角色统计 DailyTask 进程内存 |
 | `npm run tauri build` | 安装包 + updater 签名 |
 | `npm run tauri` | Tauri CLI 透传 |
 
@@ -29,14 +28,6 @@
 cd src-tauri
 cargo check
 ```
-
-只跑 `cargo build --release` 不会启用 `custom-protocol`，二进制运行时会去连 `devUrl`（`localhost:1420`）。手动做生产构建要带该 feature：
-
-```bash
-cargo build --release --features tauri/custom-protocol
-```
-
-日常发版仍用 `npm run tauri build`，CLI 会自动处理。
 
 ## 发版
 

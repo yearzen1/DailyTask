@@ -3,6 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import App from "./App";
 
+vi.mock("./windows/main/useMainWindowBridge", () => ({
+  useMainWindowBridge: () => undefined,
+}));
+
 vi.mock("./app/useUpdateCheck", () => ({
   useUpdateCheck: () => undefined,
 }));

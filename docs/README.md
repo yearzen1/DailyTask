@@ -40,7 +40,6 @@
 - [领域函数](reference/domain-functions.md)
 - [任务表](reference/grid.md)
 - [窗口与托盘](reference/windows-and-tray.md)
-- [内存与进程](reference/memory-and-processes.md)
 - [国际化](reference/i18n.md)
 - [开发约定](reference/conventions.md)
 - [命令](reference/commands.md)

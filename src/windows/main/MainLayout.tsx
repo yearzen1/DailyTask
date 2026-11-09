@@ -1,6 +1,4 @@
 import {
-  Suspense,
-  lazy,
   useEffect,
   useRef,
   useState,
@@ -21,14 +19,12 @@ import {
   sanitizeNavOrder,
   writeNavOrder,
 } from "./navOrder";
+import Manage from "./views/Manage";
+import Settings from "./views/Settings";
+import Stats from "./views/Stats";
+import TaskGrid from "./views/TaskGrid";
 import Today from "./views/Today";
-
-// 今日页是默认视图，保持同步加载避免首屏闪一次占位；其余按需分包。
-const Manage = lazy(() => import("./views/Manage"));
-const Settings = lazy(() => import("./views/Settings"));
-const Stats = lazy(() => import("./views/Stats"));
-const TaskGrid = lazy(() => import("./views/TaskGrid"));
-const Todos = lazy(() => import("./views/Todos"));
+import Todos from "./views/Todos";
 
 const NAV_BY_VIEW: Record<
   ViewName,
@@ -289,15 +285,7 @@ export function MainLayout() {
       </aside>
 
       <section className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden p-6">
-        <Suspense
-          fallback={
-            <p className="text-sm text-[var(--color-text-muted)]">
-              {t("app.loading")}
-            </p>
-          }
-        >
-          {renderView(currentView)}
-        </Suspense>
+        {renderView(currentView)}
       </section>
     </div>
   );

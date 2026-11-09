@@ -20,14 +20,10 @@
 dailytask.db
 dailytask.db-wal
 dailytask.db-shm
-widget-visible
 backup\
   dailytask-YYYYMMDD.db
   pre-update-<version>.db
 ```
-
-`widget-visible` 内容为 `1` / `0`，记录挂件上次是否显示；缺失按 `1` 处理。见
-[内存与进程](memory-and-processes.md)。
 
 ## 安装与产物
 

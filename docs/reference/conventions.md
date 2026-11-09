@@ -28,7 +28,6 @@ Doc → Check → Code → Sync
 | `db` | SQL、repository | UI、事件 API |
 | `stores` | Zustand、调用 db | import 其他 store、直接 JSX |
 | `windows` | 页面、交互 | 直接 import db、手写事件名 |
-| `app` | 应用级 hook（托盘进度/文案、更新检查），主窗与挂件共用 | 直接 import db |
 | `ui` | 通用组件 | 业务 store 深耦合 |
 
 ESLint zone 规则在 `eslint.config.js`，`npm run lint` 会拦截越界。

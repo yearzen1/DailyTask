@@ -64,7 +64,7 @@ flowchart LR
 - **读**：启动时一次性加载 tasks / checkins / todos / settings；派生值现算不落库。
 - **派生**：今日进度、格子投影、streak 由 `domain/*` + `stores/selectors/*` 计算。
 - **启动顺序**：`app/init.ts` 串行加载 settings → tasks → checkins → todos，全部就绪前不渲染业务视图。
-- **跨窗口**：主窗与挂件是两套 WebView，Zustand 不共享，靠类型化事件同步。
+- **跨窗口**：主窗与挂件使用同一套前端；挂件作为常驻桌面入口保留，主窗关闭时销毁较大的主 WebView，数据从 SQLite 重新加载。
 - **权限边界**：只有 `db/*` 允许出现 SQL；`domain/*` 不 import Tauri / React / db。
 
 ## 4. store 划分

@@ -38,21 +38,23 @@ describe("widget window config", () => {
     });
   });
 
-  it("creates a borderless, transparent, always-on-top widget", () => {
+  it("creates the widget on demand instead of keeping a second WebView alive", () => {
     const widget = readJson("src-tauri/tauri.conf.json").app.windows.find(
       (window) => window.label === "widget",
     );
+    const rust = readFileSync(
+      resolve(process.cwd(), "src-tauri/src/lib.rs"),
+      "utf8",
+    );
 
-    expect(widget).toMatchObject({
-      width: CAPSULE_WIDTH,
-      height: CAPSULE_HEIGHT,
-      url: "index.html?window=widget",
-      resizable: false,
-      decorations: false,
-      transparent: true,
-      alwaysOnTop: true,
-      skipTaskbar: true,
-    });
+    expect(widget).toBeUndefined();
+    expect(rust).toContain('WIDGET_WINDOW,\n            WebviewUrl::App("index.html?window=widget".into())');
+    expect(rust).toContain(`.inner_size(${CAPSULE_WIDTH}.0, ${CAPSULE_HEIGHT}.0)`);
+    expect(rust).toContain(".resizable(false)");
+    expect(rust).toContain(".decorations(false)");
+    expect(rust).toContain(".transparent(true)");
+    expect(rust).toContain(".always_on_top(true)");
+    expect(rust).toContain(".skip_taskbar(true)");
   });
 
   it("grants the widget window the same capabilities as main", () => {

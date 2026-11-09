@@ -12,7 +12,6 @@ import {
 import { nextCellState } from "../../domain/settle";
 import type { CellState, CheckinStatus } from "../../domain/types";
 import { emitWidgetExpand } from "../../shared/events";
-import { useTrayProgress } from "../../app/useTrayProgress";
 import { useCheckinsStore } from "../../stores/checkinsStore";
 import {
   useTodayData,
@@ -49,8 +48,6 @@ type GroupKey = keyof typeof EXPANDED_GROUPS;
  * 标题与进度固定，中间内容滚动；高度预算见 docs/reference/windows-and-tray.md（内容区 240px）。
  */
 export function Widget() {
-  // 主窗隐藏时会被销毁，托盘进度改由挂件继续更新。
-  useTrayProgress();
   const t = useT();
   const data = useTodayData();
   const setStatus = useCheckinsStore((state) => state.setStatus);

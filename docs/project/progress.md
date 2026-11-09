@@ -1,9 +1,9 @@
-# DailyTask 开发进度 · v0.1.13
+# DailyTask 开发进度 · v0.1.14
 
 > 类型：项目记录
 > 状态：迭代中
-> 当前版本：v0.1.13
-> 本轮：2026-11-09 内存优化（挂件 / 主窗按需销毁、视图分包），共 3 项，完成 **3/3**
+> 当前版本：v0.1.14
+> 本轮：2026-11-09 保留桌面挂件，共 1 项，完成 **1/1**
 > 相关：changelog.md、../explanation/roadmap.md
 
 ---
@@ -48,9 +48,6 @@
 | 20 | P1 | 按 Diátaxis 重写文档 | 教程 / 指南 / 参考 / 解释四象限，README 改为落地页 | ☑ |
 | 21 | P1 | 任务表格子自适应文字 | 任务名与自由值完整显示，同列同宽，超长换行，缩放保留 | ☑ |
 | 22 | P0 | 今日页与挂件区块折叠 + 待办进度 | 三个组头可折叠；待办 `x / n`、黄竖条，并计入今日与托盘完成率 | ☑ |
-| 23 | P2 | 内存测量脚本与基线文档 | `npm run perf:memory` 按角色输出私有工作集，三个场景可复现 | ☑ |
-| 24 | P1 | 挂件按需创建 + 启动恢复上次可见性 | 隐藏挂件后重启不再创建；进程数 8 → 7 | ☑ |
-| 25 | P1 | 主窗隐藏即销毁、唤起重建 | 两窗隐藏后 6~7 进程；唤回恢复几何与上次页面 | ☑ |
 
 ---
 
@@ -172,24 +169,6 @@
 - 改动：文档重组为 tutorials / how-to / reference / explanation + project；按四象限重写入口、教程、操作指南、参考与解释；根 README 改为落地页，只保留 30 秒介绍和文档路由；新增 `reference/ui-spec.md`、`reference/commands.md`、`reference/file-locations.md`。
 - 验收：`docs:check` 校验类型头、状态头、必需文件和相对链接；README 中英文链接全部可达。
 
-### #23 内存测量脚本与基线文档
-
-- 现象：issue #1 反馈 8 进程 / 158 MB，但缺少按进程拆解的口径，无法判断哪些是 WebView2 固定成本。
-- 改动：新增 `scripts/measure-memory.ps1` 与 `npm run perf:memory`，遍历 `dailytask.exe` 进程树，按 `--type` / `--utility-sub-type` 归类，输出私有工作集与合计；新增 `docs/reference/memory-and-processes.md` 记录基线、可优化项与测量场景。
-- 验收：脚本能列出 browser / gpu / network / storage / renderer / crashpad 六类角色；三场景（冷启动、空闲、托盘隐藏）数字可复现。
-
-### #24 挂件按需创建 + 启动恢复上次可见性
-
-- 现象：`tauri.conf.json` 同时创建主窗与挂件，挂件即使用户不用也常驻一个 renderer。
-- 改动：`widget` 窗口改 `create: false`，Rust 侧用 `WebviewWindowBuilder::from_config` 按需创建；隐藏时 `destroy()`，显示时重建；可见性写入应用数据目录 `widget-visible`，启动时按该值决定是否创建，缺失按可见处理。
-- 验收：隐藏挂件后重启，进程数为 7 且托盘菜单显示「显示挂件」；再次显示后挂件胶囊态、停靠侧、跨窗口同步正常；`widget_visibility` 单测覆盖解析、写入与异常回退。
-
-### #25 主窗隐藏即销毁、唤起重建
-
-- 现象：主窗关闭或隐藏到托盘后 webview 常驻，renderer 一直占着内存；挂件已经能按需销毁，主窗还没有。
-- 改动：`main` 关闭与托盘隐藏改为 `destroy()`；`show_main` 用 `WebviewWindowBuilder::from_config` 重建，并从进程内存恢复位置、大小、最大化。挂件「展开主窗口」的监听从主窗前端搬到 Rust；挂件也接 `useTrayProgress`；更新检查按 localStorage 时间戳节流；`uiStore.view` 落 localStorage，重建后回到上次页面。
-- 验收：两窗都隐藏后 6~7 进程；托盘唤回后窗口回到隐藏前的位置/大小/页面；挂件展开按钮、单实例、跨窗口同步、托盘文案正常。
-
 ---
 
 ## 5. 建议顺序
@@ -268,17 +247,3 @@
 - 汇总区新增「待办 x / n」；挂件统计行允许换行，避免英文标签溢出。
 - debug 构建启动时自动打开 DevTools，方便排查前端初始化与 IPC 问题。
 - 测试：`settle.test`、`today.test`、`useTrayProgress.test`、`Today.test`、`Widget.test` 覆盖合并口径、折叠、胶囊往返重置与黄竖条。
-
----
-
-## 11. v0.1.13 完成记录（2026-11-09）
-
-全量校验：`npm run test` **336 passed**、`npm run lint`、`npm run typecheck`、`npm run docs:check`、`cargo test`（7 passed）、`cargo clippy` 全绿。
-
-- **#23**：新增 `scripts/measure-memory.ps1` 与 `npm run perf:memory`，按 `app / browser / gpu-process / network / storage / renderer / crashpad` 输出私有工作集。冷启动 20 秒实测 v0.1.12：8 进程 / 144.6 MB，其中 GPU 51.7 MB、两个 renderer 28.7 + 16.0 MB；确认 8 进程 = 1 个 Rust 进程 + 7 个 WebView2 进程。
-- **#24**：`widget` 改 `create: false`，Rust 侧用 `WebviewWindowBuilder::from_config` 按需创建；隐藏时 `destroy()`，显示时重建；可见性写入 `widget-visible`，启动时按标记决定，缺失按可见处理。`destroy()` 异步，托盘文案改在 `WindowEvent::Destroyed` 同步。实测：隐藏后重启 7 进程 / 122.4 MB；托盘左键重建后 8 进程、标记回到 `1`；右键「隐藏挂件」后销毁、菜单变为「显示挂件」。重建按启动规则回到胶囊态，停靠侧沿用 `localStorage`。
-- 视图按需加载：今日页保持同步，其余五个走 `React.lazy` + `Suspense`，首包 435 KB → 351 KB；挂件显示时内存 144.6 → 142.5 MB。
-- **#25**：主窗关闭与托盘隐藏改为 `destroy()`，`show_main` 用 `from_config` 重建并恢复位置、`inner_size`、最大化。几何必须用 `inner_size` 与 `set_size` 配对，用 `outer_size` 会每轮多算一圈边框（实测每轮 +26×71）。两窗都没了以后 Tauri 会请求退出，Rust 拦截 `code: None` 的 `ExitRequested` 保住托盘；托盘「退出」不受影响。挂件「展开主窗口」监听搬到 Rust，挂件接 `useTrayProgress`，更新检查按 1 小时节流，`uiStore.view` 落 localStorage。
-- **#25 实测**：启动 8 进程 / 134.4 MB；只隐藏挂件 7 / 123.1 MB；两窗都销毁 **1 进程 / 5.2 MB**（WebView2 整棵进程树退出）；托盘唤回 8 / 136.7 MB，0.7 秒后两个 renderer 就绪；连续 3 轮隐藏/唤回窗口矩形不变；`统计` 页与窗口位置均恢复；单实例二次启动可重建主窗。
-- 未采用：`--process-per-site`、`--disable-gpu`、`--enable-low-end-device-mode`，原因见 [内存与进程](../reference/memory-and-processes.md)。
-- 待手动走查：真实安装包升级后的首次启动；最大化状态下隐藏再唤回的还原尺寸。

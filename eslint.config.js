@@ -24,7 +24,15 @@ const deleteTokenPattern = {
 
 export default tseslint.config(
   {
-    ignores: ["dist", "node_modules", "src-tauri", "design", "coverage"],
+    ignores: [
+      "dist",
+      "node_modules",
+      "src-tauri",
+      "design",
+      "coverage",
+      ".npm-cache",
+      ".toolchain",
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -62,14 +70,7 @@ export default tseslint.config(
             {
               target: "./src/windows",
               from: "./src",
-              except: [
-                "./windows",
-                "./app",
-                "./stores",
-                "./domain",
-                "./ui",
-                "./shared",
-              ],
+              except: ["./windows", "./stores", "./domain", "./ui", "./shared"],
             },
           ],
         },
