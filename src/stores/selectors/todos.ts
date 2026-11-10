@@ -17,6 +17,8 @@ export interface TodoItem {
   todo: Todo;
   /** 逾期天数；非逾期为 0。 */
   overdueDays: number;
+  /** 距离截止日的天数；仅未完成且 dueDate > today 时有值。 */
+  daysLeft: number | null;
 }
 
 export interface TodoGroup {
@@ -73,24 +75,33 @@ export function buildTodoGroups(todos: Todo[], today: string): TodoGroupsData {
 
   for (const todo of todos) {
     if (todo.done) {
-      buckets.done.push({ todo, overdueDays: 0 });
+      buckets.done.push({ todo, overdueDays: 0, daysLeft: null });
       continue;
     }
     if (!todo.dueDate) {
-      buckets.later.push({ todo, overdueDays: 0 });
+      buckets.later.push({ todo, overdueDays: 0, daysLeft: null });
       continue;
     }
     if (todo.dueDate < today) {
       buckets.overdue.push({
         todo,
         overdueDays: diffDays(today, todo.dueDate),
+        daysLeft: null,
       });
     } else if (todo.dueDate === today) {
-      buckets.today.push({ todo, overdueDays: 0 });
+      buckets.today.push({ todo, overdueDays: 0, daysLeft: null });
     } else if (todo.dueDate <= weekEnd) {
-      buckets.thisWeek.push({ todo, overdueDays: 0 });
+      buckets.thisWeek.push({
+        todo,
+        overdueDays: 0,
+        daysLeft: diffDays(todo.dueDate, today),
+      });
     } else {
-      buckets.later.push({ todo, overdueDays: 0 });
+      buckets.later.push({
+        todo,
+        overdueDays: 0,
+        daysLeft: diffDays(todo.dueDate, today),
+      });
     }
   }
 

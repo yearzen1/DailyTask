@@ -26,7 +26,7 @@
 | `id` | string | UUID |
 | `taskId` | string | |
 | `start` | `YYYY-MM-DD` | 含当天 |
-| `end` | `YYYY-MM-DD \| null` | null = 至今 |
+| `end` | `YYYY-MM-DD \| null` | 截止日期，含当天；null = 一直有效 |
 | `everyDays` | number | 1 = 每天；N = 每 N 天；缺省 1 |
 
 ## 3. 适用性
@@ -44,12 +44,15 @@ isApplicable(intervals, date)
 - 每段独立
 - 任一命中即适用
 
-## 4. 停用 / 重新启用
+## 4. 截止 / 停用 / 重新启用
 
+- 截止日期就是区间 `end`：含当天，次日任务不再出现
+- 新建任务时可留空（一直有效），也可直接设截止日期
 - 停用：把开放区间 `end` 设为所选日期（含当天）
 - 重新启用：追加新段，`start` = 所选日期，`end = null`
 - 新段继承上一段 `everyDays`
 - 历史段与打卡不变
+- 今日页和挂件显示当前区间 `end` 的倒计时：`0` = 今天截止，`N` = 还差 N 天
 
 ## 5. 任务状态
 

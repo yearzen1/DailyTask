@@ -821,6 +821,17 @@ function WidgetTaskRow({
         </span>
         <span className={nameClass}>{row.task.name}</span>
 
+        {row.deadlineDays !== null ? (
+          <span
+            data-deadline-days={row.deadlineDays}
+            className="shrink-0 whitespace-nowrap text-[9.5px] font-semibold text-[var(--color-warning)]"
+          >
+            {row.deadlineDays === 0
+              ? t("deadline.today")
+              : t("deadline.inDays", { days: row.deadlineDays })}
+          </span>
+        ) : null}
+
         {editing ? (
           <input
             autoFocus

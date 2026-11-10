@@ -138,8 +138,11 @@ function CreateTaskDialog({
   const [name, setName] = useState("");
   const [category, setCategory] = useState<TaskCategory>("voluntary");
   const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState("");
   const [everyDays, setEveryDays] = useState("1");
-  const canSubmit = name.trim().length > 0 && startDate.length > 0;
+  const error = validateInterval(startDate, endDate || null, null);
+  const canSubmit =
+    name.trim().length > 0 && startDate.length > 0 && error === null;
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -150,6 +153,7 @@ function CreateTaskDialog({
       name: name.trim(),
       category,
       startDate,
+      endDate: endDate || null,
       everyDays: normalizeEveryDays(Number(everyDays)),
     });
     onClose();
@@ -208,6 +212,29 @@ function CreateTaskDialog({
             className="rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1 text-sm text-[var(--color-text)]"
           />
         </label>
+
+        <label className="flex flex-col gap-1 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+          {t("manage.field.end")}
+          <DateField
+            data-new-end
+            value={endDate || null}
+            min={startDate || undefined}
+            allowClear
+            onChange={(next) => setEndDate(next ?? "")}
+            aria-label={t("manage.field.end")}
+            className="rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1 text-sm text-[var(--color-text)]"
+          />
+          <span className="leading-tight">{t("manage.deadlineHint")}</span>
+        </label>
+
+        {error ? (
+          <p
+            data-new-error
+            className="m-0 text-[var(--text-2xs)] text-[var(--color-missed)]"
+          >
+            {t(INTERVAL_ERROR_KEY[error])}
+          </p>
+        ) : null}
 
         <EveryDaysField
           value={everyDays}

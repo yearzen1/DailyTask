@@ -365,14 +365,24 @@ function TaskGroup({
               <span
                 className={
                   row.state === "skipped"
-                    ? "min-w-0 truncate text-[var(--color-text-muted)] line-through"
+                    ? "min-w-0 flex-1 truncate text-[var(--color-text-muted)] line-through"
                     : row.state === "done"
-                      ? "min-w-0 truncate text-[var(--color-text-muted)]"
-                      : "min-w-0 truncate"
+                      ? "min-w-0 flex-1 truncate text-[var(--color-text-muted)]"
+                      : "min-w-0 flex-1 truncate"
                 }
               >
                 {row.task.name}
               </span>
+              {row.deadlineDays !== null ? (
+                <span
+                  data-deadline-days={row.deadlineDays}
+                  className="shrink-0 rounded-[var(--radius-pill)] bg-[color-mix(in_srgb,var(--color-warning)_14%,transparent)] px-[7px] py-px text-[var(--text-2xs)] font-semibold text-[var(--color-warning)]"
+                >
+                  {row.deadlineDays === 0
+                    ? t("deadline.today")
+                    : t("deadline.inDays", { days: row.deadlineDays })}
+                </span>
+              ) : null}
               {editingId === row.task.id ? (
                 <ValueInput
                   initial={row.value ?? ""}

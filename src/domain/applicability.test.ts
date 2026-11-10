@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { applicableTasks, isApplicable } from "./applicability";
+import {
+  applicableTasks,
+  currentInterval,
+  isApplicable,
+} from "./applicability";
 import type { Interval, Task } from "./types";
 
 function interval(
@@ -95,6 +99,33 @@ describe("isApplicable", () => {
 
   it("returns false for a task without intervals", () => {
     expect(isApplicable([], "2026-11-02")).toBe(false);
+  });
+});
+
+describe("currentInterval", () => {
+  it("returns the latest segment that applies on the date", () => {
+    const intervals = [
+      interval("2026-11-01", "2026-11-10"),
+      interval("2026-11-05", "2026-11-15"),
+    ];
+
+    expect(currentInterval(intervals, "2026-11-07")?.start).toBe("2026-11-05");
+  });
+
+  it("returns null when no segment applies", () => {
+    const intervals = [
+      interval("2026-10-01", "2026-10-31"),
+      interval("2026-11-05", null),
+    ];
+
+    expect(currentInterval(intervals, "2026-11-01")).toBeNull();
+  });
+
+  it("respects every N days when picking the current segment", () => {
+    const intervals = [interval("2026-11-02", "2026-11-12", 3)];
+
+    expect(currentInterval(intervals, "2026-11-03")).toBeNull();
+    expect(currentInterval(intervals, "2026-11-05")?.start).toBe("2026-11-02");
   });
 });
 

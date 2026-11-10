@@ -77,6 +77,22 @@ describe("buildToday", () => {
     expect(data.dateLabel).toContain("11/02");
   });
 
+  it("computes days left from the current interval's deadline", () => {
+    const data = buildToday(
+      [
+        task("future", "未来截止", "voluntary", 0, "2026-11-01", "2026-11-05"),
+        task("today", "今天截止", "voluntary", 1, "2026-11-01", TODAY),
+        task("open", "一直有效", "voluntary", 2),
+      ],
+      new Map(),
+      DEFAULT_SETTINGS,
+      [],
+      NOW,
+    );
+
+    expect(data.voluntary.map((row) => row.deadlineDays)).toEqual([3, 0, null]);
+  });
+
   it("excludes skipped tasks from the category denominator", () => {
     const data = buildToday(tasks, checkins, DEFAULT_SETTINGS, [], NOW);
 

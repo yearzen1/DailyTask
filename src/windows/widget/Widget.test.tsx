@@ -195,6 +195,32 @@ describe("Widget", () => {
     expect(screen.getByText("今天")).toBeInTheDocument();
   });
 
+  it("shows how many days are left before each task deadline", () => {
+    useTasksStore.setState({
+      tasks: [
+        {
+          ...task("t1", "跑步", "voluntary", 0),
+          intervals: [
+            { id: "i1", taskId: "t1", start: "2026-11-01", end: "2026-11-05" },
+          ],
+        },
+        {
+          ...task("t2", "最后一天", "forced", 1),
+          intervals: [
+            { id: "i2", taskId: "t2", start: "2026-11-01", end: TODAY },
+          ],
+        },
+        task("t3", "一直有效", "voluntary", 2),
+      ],
+    });
+
+    const { container } = render(<Widget />);
+
+    expect(screen.getByText("还差 3 天")).toBeInTheDocument();
+    expect(screen.getByText("今天截止")).toBeInTheDocument();
+    expect(container.querySelectorAll("[data-deadline-days]")).toHaveLength(2);
+  });
+
   it("renders every task and todo without the old 4/2 caps", () => {
     useTasksStore.setState({
       tasks: [

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { SqlDatabase } from "../db/client";
 import {
+  createTask,
   deleteTask,
   intervalFromRow,
   listTasks,
@@ -60,6 +61,49 @@ describe("taskFromRows", () => {
     expect(task.createdAt).toBe("2026-11-01T00:00:00.000Z");
     expect(task.intervals).toHaveLength(2);
     expect(task.intervals[0].end).toBe("2026-10-31");
+  });
+});
+
+describe("createTask", () => {
+  it("stores the deadline on the first interval", async () => {
+    const calls: unknown[][] = [];
+    const db: SqlDatabase = {
+      select: async <T>() => [{ next: 0 }] as T,
+      execute: async (_query, values = []) => {
+        calls.push(values);
+        return { rowsAffected: 1 };
+      },
+    };
+
+    const task = await createTask(db, {
+      name: "跑步",
+      category: "voluntary",
+      startDate: "2026-11-01",
+      endDate: "2026-11-30",
+    });
+
+    expect(task.intervals[0].end).toBe("2026-11-30");
+    expect(calls[1][3]).toBe("2026-11-30");
+  });
+
+  it("leaves the interval open when no deadline is given", async () => {
+    const calls: unknown[][] = [];
+    const db: SqlDatabase = {
+      select: async <T>() => [{ next: 0 }] as T,
+      execute: async (_query, values = []) => {
+        calls.push(values);
+        return { rowsAffected: 1 };
+      },
+    };
+
+    const task = await createTask(db, {
+      name: "跑步",
+      category: "voluntary",
+      startDate: "2026-11-01",
+    });
+
+    expect(task.intervals[0].end).toBeNull();
+    expect(calls[1][3]).toBeNull();
   });
 });
 

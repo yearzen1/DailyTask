@@ -21,6 +21,8 @@ export interface TasksState {
     name: string;
     category: TaskCategory;
     startDate: string;
+    /** 截止日期；null / 缺省表示一直有效。 */
+    endDate?: string | null;
     everyDays?: number;
   }) => Promise<Task>;
   update: (

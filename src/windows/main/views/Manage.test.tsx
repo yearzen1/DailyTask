@@ -85,6 +85,7 @@ const create = vi.fn(
     name: string;
     category: Task["category"];
     startDate: string;
+    endDate?: string | null;
     everyDays?: number;
   }) => {
     const created: Task = {
@@ -96,7 +97,7 @@ const create = vi.fn(
           id: "created-i",
           taskId: "created",
           start: input.startDate,
-          end: null,
+          end: input.endDate ?? null,
           everyDays: input.everyDays ?? 1,
         },
       ],
@@ -228,12 +229,49 @@ describe("Manage", () => {
       name: "阅读",
       category: "forced",
       startDate: "2026-11-04",
+      endDate: null,
       everyDays: 1,
     });
     expect(
       container.querySelector('[data-manage-row="created"]'),
     ).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("creates a task with an optional deadline", () => {
+    const { container } = render(<Manage />);
+
+    fireEvent.click(container.querySelector("[data-manage-new]") as Element);
+    fireEvent.change(container.querySelector("[data-new-name]") as Element, {
+      target: { value: "阅读" },
+    });
+    fireEvent.change(container.querySelector("[data-new-end]") as Element, {
+      target: { value: "2026-11-30" },
+    });
+    fireEvent.click(container.querySelector("[data-new-submit]") as Element);
+
+    expect(create).toHaveBeenCalledWith({
+      name: "阅读",
+      category: "voluntary",
+      startDate: "2026-11-04",
+      endDate: "2026-11-30",
+      everyDays: 1,
+    });
+  });
+
+  it("rejects a deadline earlier than the start date", () => {
+    const { container } = render(<Manage />);
+
+    fireEvent.click(container.querySelector("[data-manage-new]") as Element);
+    fireEvent.change(container.querySelector("[data-new-name]") as Element, {
+      target: { value: "阅读" },
+    });
+    fireEvent.change(container.querySelector("[data-new-end]") as Element, {
+      target: { value: "2026-11-01" },
+    });
+
+    expect(screen.getByText("截止日期不能早于启用日期")).toBeInTheDocument();
+    expect(container.querySelector("[data-new-submit]")).toBeDisabled();
   });
 
   it("creates and edits a task with an every-N-days interval", () => {
@@ -253,6 +291,7 @@ describe("Manage", () => {
       name: "健身",
       category: "voluntary",
       startDate: "2026-11-04",
+      endDate: null,
       everyDays: 3,
     });
     expect(
@@ -451,7 +490,7 @@ describe("Manage", () => {
       target: { value: "2026-11-01" },
     });
 
-    expect(screen.getByText("停用日期不能早于启用日期")).toBeInTheDocument();
+    expect(screen.getByText("截止日期不能早于启用日期")).toBeInTheDocument();
     expect(container.querySelector("[data-edit-submit]")).toBeDisabled();
 
     fireEvent.change(container.querySelector("[data-edit-start]") as Element, {

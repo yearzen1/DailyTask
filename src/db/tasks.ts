@@ -78,6 +78,8 @@ export interface CreateTaskInput {
   name: string;
   category: TaskCategory;
   startDate: string;
+  /** 截止日期；null / 缺省表示一直有效。 */
+  endDate?: string | null;
   everyDays?: number;
   order?: number;
 }
@@ -104,7 +106,7 @@ export async function createTask(
     id: crypto.randomUUID(),
     taskId: id,
     start: input.startDate,
-    end: null,
+    end: input.endDate || null,
     everyDays: normalizeEveryDays(input.everyDays),
   };
   await db.execute(

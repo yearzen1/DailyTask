@@ -45,7 +45,7 @@ describe("widget window config", () => {
     const rust = readFileSync(
       resolve(process.cwd(), "src-tauri/src/lib.rs"),
       "utf8",
-    );
+    ).replace(/\r\n/g, "\n");
 
     expect(widget).toBeUndefined();
     expect(rust).toContain('WIDGET_WINDOW,\n            WebviewUrl::App("index.html?window=widget".into())');

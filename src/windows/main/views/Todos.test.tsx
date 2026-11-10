@@ -101,6 +101,23 @@ describe("Todos", () => {
     expect(row).toHaveTextContent("逾期 3 天");
   });
 
+  it("shows days left for future due dates only", () => {
+    const { container } = render(<Todos />);
+
+    expect(
+      container.querySelector('[data-todo="预约体检"]'),
+    ).toHaveTextContent("还差 2 天");
+    expect(
+      container.querySelector('[data-todo="交房租"]'),
+    ).not.toHaveTextContent("还差");
+    expect(
+      container.querySelector('[data-todo="买猫粮"]'),
+    ).not.toHaveTextContent("还差");
+    expect(
+      container.querySelector('[data-todo="换灯泡"]'),
+    ).not.toHaveTextContent("还差");
+  });
+
   it("keeps completed todos collapsed until asked", () => {
     const { container } = render(<Todos />);
 

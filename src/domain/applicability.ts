@@ -23,3 +23,23 @@ export function isApplicable(intervals: Interval[], date: string): boolean {
 export function applicableTasks(tasks: Task[], date: string): Task[] {
   return tasks.filter((task) => isApplicable(task.intervals, date));
 }
+
+/**
+ * 当天命中的最新一段区间；多段重叠时以 start 最晚的为准。
+ * 用于读取当前区间的截止日期，避免拿旧区间的 end 误显示倒计时。
+ */
+export function currentInterval(
+  intervals: Interval[],
+  date: string,
+): Interval | null {
+  let current: Interval | null = null;
+  for (const interval of intervals) {
+    if (!isApplicable([interval], date)) {
+      continue;
+    }
+    if (current === null || interval.start > current.start) {
+      current = interval;
+    }
+  }
+  return current;
+}

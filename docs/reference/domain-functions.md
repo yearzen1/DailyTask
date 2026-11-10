@@ -28,7 +28,10 @@ range(start: string, end: string): string[]
 ```ts
 isApplicable(intervals: Interval[], date: string): boolean
 applicableTasks(tasks: Task[], date: string): Task[]
+currentInterval(intervals: Interval[], date: string): Interval | null
 ```
+
+`currentInterval` 返回当天命中的最新一段区间，用于读取截止日期；多段重叠时以 `start` 最晚的为准。
 
 规则：
 

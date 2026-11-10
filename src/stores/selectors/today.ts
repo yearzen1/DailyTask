@@ -3,7 +3,10 @@ import { useMemo } from "react";
 
 import { dateLocale } from "../../shared/i18n";
 
-import { applicableTasks } from "../../domain/applicability";
+import {
+  applicableTasks,
+  currentInterval,
+} from "../../domain/applicability";
 import { diffDays, logicalToday } from "../../domain/date";
 import { checkinKey } from "../../domain/keys";
 import {
@@ -24,6 +27,8 @@ export interface TodayTask {
   state: CellState;
   /** 当天的自由值（次数 / 时长 / 文本），只展示不判定。 */
   value: string | null;
+  /** 当前区间截止日距今天的天数；null = 无截止日期。0 = 今天截止。 */
+  deadlineDays: number | null;
 }
 
 export interface CategoryStat {
@@ -106,10 +111,13 @@ export function buildToday(
     .sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt))
     .map((task) => {
       const checkin = checkins.get(checkinKey(task.id, today));
+      const interval = currentInterval(task.intervals, today);
       return {
         task,
         state: projectCell(task, today, checkin, settings, today),
         value: checkin?.value ?? null,
+        deadlineDays:
+          interval?.end == null ? null : diffDays(interval.end, today),
       };
     });
 

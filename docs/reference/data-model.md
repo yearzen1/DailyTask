@@ -33,7 +33,7 @@ CREATE TABLE task_intervals (
   id          TEXT PRIMARY KEY,
   task_id     TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
   start_date  TEXT NOT NULL,
-  end_date    TEXT,                        -- NULL = 至今有效
+  end_date    TEXT,                        -- 截止日期；NULL = 一直有效
   every_days  INTEGER NOT NULL DEFAULT 1,  -- 1 = 每天；N = 每 N 天
   CHECK (end_date IS NULL OR end_date >= start_date)
 );

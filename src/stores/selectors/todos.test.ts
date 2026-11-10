@@ -55,6 +55,31 @@ describe("buildTodoGroups", () => {
     expect(overdue?.items[0].overdueDays).toBe(4);
   });
 
+  it("counts days left only for future due dates", () => {
+    const data = buildTodoGroups(
+      [
+        todo("friday", "2026-11-06"),
+        todo("later", "2026-11-20"),
+        todo("today", "2026-11-04"),
+        todo("overdue", "2026-11-01"),
+        todo("done", "2026-11-20", { done: true }),
+        todo("no-date", null),
+      ],
+      TODAY,
+    );
+    const find = (key: string, id: string) =>
+      data.groups
+        .find((group) => group.key === key)
+        ?.items.find((item) => item.todo.id === id);
+
+    expect(find("thisWeek", "friday")?.daysLeft).toBe(2);
+    expect(find("later", "later")?.daysLeft).toBe(16);
+    expect(find("today", "today")?.daysLeft).toBeNull();
+    expect(find("overdue", "overdue")?.daysLeft).toBeNull();
+    expect(find("done", "done")?.daysLeft).toBeNull();
+    expect(find("later", "no-date")?.daysLeft).toBeNull();
+  });
+
   it("keeps completed todos out of the overdue math", () => {
     const data = buildTodoGroups(
       [

@@ -451,6 +451,13 @@ function TodoRow({
           <span className="rounded-[var(--radius-pill)] bg-[color-mix(in_srgb,var(--color-warning)_14%,transparent)] px-[7px] py-px text-[var(--text-2xs)] font-semibold text-[var(--color-warning)]">
             {t("todos.dueToday")}
           </span>
+        ) : item.daysLeft !== null ? (
+          <span
+            data-days-left={item.daysLeft}
+            className="rounded-[var(--radius-pill)] bg-[color-mix(in_srgb,var(--color-warning)_10%,transparent)] px-[7px] py-px text-[var(--text-2xs)] font-semibold text-[var(--color-warning)]"
+          >
+            {t("deadline.inDays", { days: item.daysLeft })}
+          </span>
         ) : null}
       </span>
 

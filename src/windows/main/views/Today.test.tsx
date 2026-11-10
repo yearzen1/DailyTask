@@ -100,6 +100,43 @@ describe("Today due todos", () => {  beforeEach(() => {
     expect(setDone).toHaveBeenCalledWith("已完成的待办", false);
   });
 
+  it("shows how many days are left before each task deadline", () => {
+    useTasksStore.setState({
+      tasks: [
+        {
+          ...task(),
+          intervals: [
+            { id: "i1", taskId: "t1", start: "2026-11-01", end: "2026-11-05" },
+          ],
+        },
+        {
+          ...task(),
+          id: "t2",
+          name: "最后一天",
+          order: 1,
+          intervals: [
+            { id: "i2", taskId: "t2", start: "2026-11-01", end: TODAY },
+          ],
+        },
+        {
+          ...task(),
+          id: "t3",
+          name: "一直有效",
+          order: 2,
+          intervals: [
+            { id: "i3", taskId: "t3", start: "2026-11-01", end: null },
+          ],
+        },
+      ],
+    });
+
+    const { container } = render(<Today />);
+
+    expect(screen.getByText("还差 3 天")).toBeInTheDocument();
+    expect(screen.getByText("今天截止")).toBeInTheDocument();
+    expect(container.querySelectorAll("[data-deadline-days]")).toHaveLength(2);
+  });
+
   it("collapses task groups and the due todo block from the headers", () => {
     const voluntary = task();
     const forced: Task = {
