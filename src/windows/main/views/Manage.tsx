@@ -15,6 +15,7 @@ import {
   type ManageStatus,
 } from "../../../stores/selectors/manage";
 import { useTasksStore } from "../../../stores/tasksStore";
+import { Chip, type ChipVariant } from "../../../ui/Chip";
 import { ConfirmDeleteButton } from "../../../ui/ConfirmDeleteButton";
 import { DateField } from "../../../ui/DateField";
 import { useT } from "../../../ui/useT";
@@ -24,33 +25,13 @@ const CARD =
 
 const STATUS_META: Record<
   ManageStatus,
-  { labelKey: MessageKey; className: string }
+  { labelKey: MessageKey; variant: ChipVariant }
 > = {
-  active: {
-    labelKey: "manage.status.active",
-    className:
-      "bg-[color-mix(in_srgb,var(--color-voluntary)_12%,transparent)] text-[var(--color-voluntary)]",
-  },
-  scheduled: {
-    labelKey: "manage.status.scheduled",
-    className:
-      "bg-[color-mix(in_srgb,var(--color-warning)_14%,transparent)] text-[var(--color-warning)]",
-  },
-  endingToday: {
-    labelKey: "manage.status.endingToday",
-    className:
-      "bg-[color-mix(in_srgb,var(--color-warning)_18%,transparent)] text-[var(--color-warning)]",
-  },
-  endingLater: {
-    labelKey: "manage.status.endingLater",
-    className:
-      "bg-[color-mix(in_srgb,var(--color-warning)_14%,transparent)] text-[var(--color-warning)]",
-  },
-  disabled: {
-    labelKey: "manage.status.disabled",
-    className:
-      "bg-[var(--color-na)] text-[var(--color-text-muted)]",
-  },
+  active: { labelKey: "manage.status.active", variant: "success" },
+  scheduled: { labelKey: "manage.status.scheduled", variant: "warning" },
+  endingToday: { labelKey: "manage.status.endingToday", variant: "warning" },
+  endingLater: { labelKey: "manage.status.endingLater", variant: "warning" },
+  disabled: { labelKey: "manage.status.disabled", variant: "neutral" },
 };
 
 export default function Manage() {
@@ -732,21 +713,18 @@ function ManageTableRow({ row, today }: { row: ManageRow; today: string }) {
             {row.task.name}
           </span>
           {row.intervalCount > 1 ? (
-            <span
+            <Chip
+              variant="neutral"
               data-interval-count={row.intervalCount}
               title={t("manage.intervalsHint")}
-              className="shrink-0 rounded-[var(--radius-pill)] bg-[var(--color-na)] px-1.5 py-px text-[var(--text-2xs)] text-[var(--color-text-muted)]"
             >
               {t("manage.intervals", { count: row.intervalCount })}
-            </span>
+            </Chip>
           ) : null}
           {row.everyDays > 1 ? (
-            <span
-              data-every-days={row.everyDays}
-              className="shrink-0 rounded-[var(--radius-pill)] bg-[color-mix(in_srgb,var(--color-forced)_12%,transparent)] px-1.5 py-px text-[var(--text-2xs)] text-[var(--color-forced)]"
-            >
+            <Chip variant="info" data-every-days={row.everyDays}>
               {t("manage.everyDays", { count: row.everyDays })}
-            </span>
+            </Chip>
           ) : null}
         </div>
       </td>
@@ -765,11 +743,7 @@ function ManageTableRow({ row, today }: { row: ManageRow; today: string }) {
       </td>
       <td className="px-3">
         <div className="flex items-center gap-1">
-          <span
-            className={`rounded-[var(--radius-pill)] px-[7px] py-px text-[var(--text-2xs)] font-semibold ${meta.className}`}
-          >
-            {t(meta.labelKey)}
-          </span>
+          <Chip variant={meta.variant}>{t(meta.labelKey)}</Chip>
         </div>
       </td>
       <td className="px-3">

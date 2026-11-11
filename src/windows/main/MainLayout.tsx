@@ -252,9 +252,9 @@ export function MainLayout() {
                   onPointerCancel={endDrag}
                   onLostPointerCapture={endDrag}
                   onKeyDown={(event) => handleKeyDown(event, view)}
-                  className={`${
+                  className={`relative ${
                     active
-                      ? "bg-[var(--state-selected)] font-semibold text-[var(--color-voluntary)]"
+                      ? "bg-[var(--state-selected)] font-semibold text-[var(--color-voluntary)] before:absolute before:-left-1.5 before:top-1/2 before:h-4 before:w-[3px] before:-translate-y-1/2 before:rounded-[2px] before:bg-[var(--color-voluntary)]"
                       : "text-[var(--color-text-muted)] hover:bg-[var(--state-hover)]"
                   } flex h-9 w-full touch-none cursor-default items-center gap-2 rounded-[var(--radius-control)] px-2 text-left ${
                     draggingThis
@@ -278,10 +278,6 @@ export function MainLayout() {
             );
           })}
         </nav>
-
-        <div className="mt-auto px-2 py-2 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
-          {t("app.footer", { version: __APP_VERSION__ })}
-        </div>
       </aside>
 
       <section className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden p-6">
