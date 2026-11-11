@@ -11,6 +11,7 @@ import {
 } from "../../../stores/selectors/today";
 import { useTodosStore } from "../../../stores/todosStore";
 import { CheckCell } from "../../../ui/CheckCell";
+import { Chip } from "../../../ui/Chip";
 import { ProgressRing } from "../../../ui/ProgressRing";
 import { useT } from "../../../ui/useT";
 
@@ -241,20 +242,20 @@ function DueTodoRow({
       >
         {todo.title}
       </span>
-      <span className="ml-auto flex shrink-0 items-center gap-2 text-xs text-[var(--color-text-muted)]">
+      <Chip
+        variant={overdue ? "danger" : "warning"}
+        className="ml-auto"
+      >
         <span>{format(parseISO(todo.dueDate as string), "MM/dd")}</span>
-        <span
-          className={
-            overdue
-              ? "rounded-[var(--radius-pill)] bg-[color-mix(in_srgb,var(--color-missed)_12%,transparent)] px-[7px] py-px text-[var(--text-2xs)] font-semibold text-[var(--color-missed)]"
-              : "rounded-[var(--radius-pill)] bg-[color-mix(in_srgb,var(--color-warning)_14%,transparent)] px-[7px] py-px text-[var(--text-2xs)] font-semibold text-[var(--color-warning)]"
-          }
-        >
+        <span aria-hidden="true" className="opacity-50">
+          ·
+        </span>
+        <span>
           {overdue
             ? t("today.overdueDays", { days: overdueDays })
             : t("today.dueToday")}
         </span>
-      </span>
+      </Chip>
     </button>
   );
 }
@@ -373,15 +374,22 @@ function TaskGroup({
               >
                 {row.task.name}
               </span>
-              {row.deadlineDays !== null ? (
-                <span
+              {row.deadline !== null && row.deadlineDays !== null ? (
+                <Chip
+                  variant="warning"
+                  data-deadline={row.deadline}
                   data-deadline-days={row.deadlineDays}
-                  className="shrink-0 rounded-[var(--radius-pill)] bg-[color-mix(in_srgb,var(--color-warning)_14%,transparent)] px-[7px] py-px text-[var(--text-2xs)] font-semibold text-[var(--color-warning)]"
                 >
-                  {row.deadlineDays === 0
-                    ? t("deadline.today")
-                    : t("deadline.inDays", { days: row.deadlineDays })}
-                </span>
+                  <span>{format(parseISO(row.deadline), "MM/dd")}</span>
+                  <span aria-hidden="true" className="opacity-50">
+                    ·
+                  </span>
+                  <span>
+                    {row.deadlineDays === 0
+                      ? t("deadline.today")
+                      : t("deadline.inDays", { days: row.deadlineDays })}
+                  </span>
+                </Chip>
               ) : null}
               {editingId === row.task.id ? (
                 <ValueInput

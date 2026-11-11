@@ -27,6 +27,8 @@ export interface TodayTask {
   state: CellState;
   /** 当天的自由值（次数 / 时长 / 文本），只展示不判定。 */
   value: string | null;
+  /** 当前区间截止日（YYYY-MM-DD）；null = 无截止日期。 */
+  deadline: string | null;
   /** 当前区间截止日距今天的天数；null = 无截止日期。0 = 今天截止。 */
   deadlineDays: number | null;
 }
@@ -112,12 +114,13 @@ export function buildToday(
     .map((task) => {
       const checkin = checkins.get(checkinKey(task.id, today));
       const interval = currentInterval(task.intervals, today);
+      const deadline = interval?.end ?? null;
       return {
         task,
         state: projectCell(task, today, checkin, settings, today),
         value: checkin?.value ?? null,
-        deadlineDays:
-          interval?.end == null ? null : diffDays(interval.end, today),
+        deadline,
+        deadlineDays: deadline === null ? null : diffDays(deadline, today),
       };
     });
 

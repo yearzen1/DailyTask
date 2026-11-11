@@ -100,7 +100,7 @@ describe("Today due todos", () => {  beforeEach(() => {
     expect(setDone).toHaveBeenCalledWith("已完成的待办", false);
   });
 
-  it("shows how many days are left before each task deadline", () => {
+  it("shows the deadline date together with the days left", () => {
     useTasksStore.setState({
       tasks: [
         {
@@ -132,8 +132,18 @@ describe("Today due todos", () => {  beforeEach(() => {
 
     const { container } = render(<Today />);
 
-    expect(screen.getByText("还差 3 天")).toBeInTheDocument();
-    expect(screen.getByText("今天截止")).toBeInTheDocument();
+    const future = container.querySelector(
+      '[data-deadline="2026-11-05"]',
+    ) as HTMLElement;
+    expect(future).toHaveTextContent("11/05");
+    expect(future).toHaveTextContent("还差 3 天");
+
+    const today = container.querySelector(
+      `[data-deadline="${TODAY}"]`,
+    ) as HTMLElement;
+    expect(today).toHaveTextContent("11/02");
+    expect(today).toHaveTextContent("今天截止");
+
     expect(container.querySelectorAll("[data-deadline-days]")).toHaveLength(2);
   });
 

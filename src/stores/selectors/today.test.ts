@@ -77,7 +77,7 @@ describe("buildToday", () => {
     expect(data.dateLabel).toContain("11/02");
   });
 
-  it("computes days left from the current interval's deadline", () => {
+  it("reads the current interval's deadline and days left", () => {
     const data = buildToday(
       [
         task("future", "未来截止", "voluntary", 0, "2026-11-01", "2026-11-05"),
@@ -90,6 +90,11 @@ describe("buildToday", () => {
       NOW,
     );
 
+    expect(data.voluntary.map((row) => row.deadline)).toEqual([
+      "2026-11-05",
+      TODAY,
+      null,
+    ]);
     expect(data.voluntary.map((row) => row.deadlineDays)).toEqual([3, 0, null]);
   });
 
