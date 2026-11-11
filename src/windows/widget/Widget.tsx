@@ -21,10 +21,16 @@ import {
 } from "../../stores/selectors/today";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useTodosStore } from "../../stores/todosStore";
+import {
+  MenuHeading,
+  MenuItem,
+  MenuSurface,
+} from "../../ui/MenuSurface";
 import { applyTheme } from "../../ui/theme";
 import { useT } from "../../ui/useT";
 import {
   applyWidgetLayout,
+  openCapsuleMenu,
   readCollapsedPreference,
   readSidePreference,
   writeCollapsedPreference,
@@ -424,53 +430,49 @@ export function Widget() {
             onClick={() => setMenu(null)}
             className="fixed inset-0 z-40 cursor-default"
           />
-          <div
-            role="menu"
+          <MenuSurface
             data-widget-menu
-            aria-label={t("widget.menu")}
+            label={t("widget.menu")}
             style={{ left: menu.x, top: menu.y }}
-            className="fixed z-50 flex w-[148px] flex-col gap-0.5 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-1.5 shadow-[var(--shadow-popover)]"
+            className="fixed flex w-[148px] flex-col gap-0.5"
           >
-            <p className="m-0 mb-0.5 truncate px-1 text-[10px] text-[var(--color-text-muted)]">
+            <MenuHeading className="text-[10px]">
               {menu.row.task.name}
-            </p>
-            <StatusMenuItem label={t("checkin.done")} onClick={() => applyStatus("done")} />
-            <StatusMenuItem label={t("checkin.missed")} onClick={() => applyStatus("missed")} />
-            <StatusMenuItem
-              label={t(
-                menu.row.state === "skipped" ? "today.unskip" : "checkin.skipped",
-              )}
+            </MenuHeading>
+            <MenuItem
+              className="h-6 px-1.5 text-[11px]"
+              onClick={() => applyStatus("done")}
+            >
+              {t("checkin.done")}
+            </MenuItem>
+            <MenuItem
+              className="h-6 px-1.5 text-[11px]"
+              onClick={() => applyStatus("missed")}
+            >
+              {t("checkin.missed")}
+            </MenuItem>
+            <MenuItem
+              className="h-6 px-1.5 text-[11px]"
               onClick={() =>
                 applyStatus(menu.row.state === "skipped" ? null : "skipped")
               }
-            />
-            <StatusMenuItem
-              label={t("widget.menu.clear")}
+            >
+              {t(
+                menu.row.state === "skipped"
+                  ? "today.unskip"
+                  : "checkin.skipped",
+              )}
+            </MenuItem>
+            <MenuItem
+              className="h-6 px-1.5 text-[11px]"
               onClick={() => applyStatus(null)}
-            />
-          </div>
+            >
+              {t("widget.menu.clear")}
+            </MenuItem>
+          </MenuSurface>
         </>
       ) : null}
     </div>
-  );
-}
-
-function StatusMenuItem({
-  label,
-  onClick,
-}: {
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      onClick={onClick}
-      className="rounded-[var(--radius-control)] px-1.5 py-1 text-left text-[11px] text-[var(--color-text)] hover:bg-[var(--state-hover)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
-    >
-      {label}
-    </button>
   );
 }
 
@@ -563,6 +565,17 @@ function WidgetCapsule({
     onExpand();
   };
 
+  const handleContextMenu = (event: ReactMouseEvent) => {
+    event.preventDefault();
+    void openCapsuleMenu({
+      expandLabel: t("widget.capsuleExpand"),
+      hideLabel: t("widget.hideCapsule"),
+      onExpand,
+    }).catch((error: unknown) => {
+      console.error("[widget] 打开胶囊菜单失败", error);
+    });
+  };
+
   const rounded =
     side === "right"
       ? "rounded-l-[var(--radius-pill)]"
@@ -581,6 +594,7 @@ function WidgetCapsule({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         onClick={handleClick}
+        onContextMenu={handleContextMenu}
         className={`flex h-full w-full items-center justify-center gap-1.5 border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-[var(--color-text)] shadow-[var(--shadow-widget)] transition-colors hover:border-[var(--color-voluntary)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] ${rounded}`}
       >
         <span
@@ -820,17 +834,6 @@ function WidgetTaskRow({
           {ROW_SYMBOLS[row.state]}
         </span>
         <span className={nameClass}>{row.task.name}</span>
-
-        {row.deadlineDays !== null ? (
-          <span
-            data-deadline-days={row.deadlineDays}
-            className="shrink-0 whitespace-nowrap text-[9.5px] font-semibold text-[var(--color-warning)]"
-          >
-            {row.deadlineDays === 0
-              ? t("deadline.today")
-              : t("deadline.inDays", { days: row.deadlineDays })}
-          </span>
-        ) : null}
 
         {editing ? (
           <input

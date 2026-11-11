@@ -164,6 +164,14 @@ fn destroy_window(app: &AppHandle, label: &str) {
     }
 }
 
+/// 胶囊右键「隐藏挂件」：与托盘隐藏走同一条销毁路径，并同步托盘文案。
+#[tauri::command]
+fn hide_widget(app: AppHandle) -> Result<(), String> {
+    destroy_window(&app, WIDGET_WINDOW);
+    sync_tray_labels(&app);
+    Ok(())
+}
+
 /// 显示主窗口时保留挂件，避免桌面快捷入口消失。
 fn activate_main(app: &AppHandle) {
     if let Err(error) = show_main(app) {
@@ -350,7 +358,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             set_tray_progress,
-            set_tray_labels
+            set_tray_labels,
+            hide_widget
         ])
         // 主窗关闭后销毁较大的主 WebView，但保留（或重建）桌面挂件。
         .on_window_event(|window, event| {

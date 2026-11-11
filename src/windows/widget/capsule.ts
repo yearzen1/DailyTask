@@ -1,3 +1,5 @@
+import { invoke } from "@tauri-apps/api/core";
+import { Menu, MenuItem } from "@tauri-apps/api/menu";
 import {
   PhysicalPosition,
   PhysicalSize,
@@ -14,6 +16,53 @@ export const CAPSULE_STORAGE_KEY = "dailytask.widget.collapsed";
 export const CAPSULE_SIDE_KEY = "dailytask.widget.side";
 
 export type WidgetSide = "left" | "right";
+
+export interface CapsuleMenuOptions {
+  expandLabel: string;
+  hideLabel: string;
+  onExpand: () => void;
+}
+
+/**
+ * 原生菜单在 Rust 侧存活，前端必须一直持有引用到菜单关闭，
+ * 否则 popup 返回后菜单可能被回收、点击项不触发。
+ */
+let activeCapsuleMenu: Menu | null = null;
+let capsuleMenuSeq = 0;
+
+/**
+ * 胶囊窗口只有 96×36，HTML 菜单会被窗口边界裁切，
+ * 所以右键菜单走 Tauri 原生 popup；样式由系统决定。
+ */
+export async function openCapsuleMenu({
+  expandLabel,
+  hideLabel,
+  onExpand,
+}: CapsuleMenuOptions): Promise<void> {
+  const suffix = ++capsuleMenuSeq;
+  const expandItem = await MenuItem.new({
+    id: `capsule-expand-${suffix}`,
+    text: expandLabel,
+    action: () => {
+      activeCapsuleMenu = null;
+      onExpand();
+    },
+  });
+  const hideItem = await MenuItem.new({
+    id: `capsule-hide-${suffix}`,
+    text: hideLabel,
+    action: () => {
+      activeCapsuleMenu = null;
+      // 命令会销毁挂件窗口；调用方只关心触发，失败时记录日志即可。
+      void invoke("hide_widget").catch((error: unknown) => {
+        console.error("[widget] 隐藏挂件失败", error);
+      });
+    },
+  });
+
+  activeCapsuleMenu = await Menu.new({ items: [expandItem, hideItem] });
+  await activeCapsuleMenu.popup();
+}
 
 export interface WorkArea {
   x: number;

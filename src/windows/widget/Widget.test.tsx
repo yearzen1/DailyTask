@@ -31,6 +31,20 @@ const windowApi = vi.hoisted(() => ({
   }),
 }));
 
+const menuApi = vi.hoisted(() => {
+  const popup = vi.fn(async () => undefined);
+  return {
+    popup,
+    itemNew: vi.fn(async (options: unknown) => options),
+    menuNew: vi.fn(async (options: { items: unknown[] }) => ({
+      options,
+      popup,
+    })),
+  };
+});
+
+const invokeMock = vi.hoisted(() => vi.fn(async () => undefined));
+
 const monitorApi = vi.hoisted(() => ({
   currentMonitor: vi.fn(async () => ({
     size: { width: 1920, height: 1080 },
@@ -59,6 +73,13 @@ vi.mock("@tauri-apps/api/window", () => ({
     ) {}
   },
 }));
+
+vi.mock("@tauri-apps/api/menu", () => ({
+  MenuItem: { new: menuApi.itemNew },
+  Menu: { new: menuApi.menuNew },
+}));
+
+vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
 
 vi.mock("../../shared/events", () => ({
   emitWidgetExpand: vi.fn(async () => undefined),
@@ -145,6 +166,10 @@ describe("Widget", () => {
     windowApi.setSize.mockClear();
     windowApi.setPosition.mockClear();
     monitorApi.currentMonitor.mockClear();
+    menuApi.popup.mockClear();
+    menuApi.itemNew.mockClear();
+    menuApi.menuNew.mockClear();
+    invokeMock.mockClear();
     localStorage.removeItem(CAPSULE_STORAGE_KEY);
     localStorage.removeItem(CAPSULE_SIDE_KEY);
     seedStores();
@@ -195,7 +220,7 @@ describe("Widget", () => {
     expect(screen.getByText("今天")).toBeInTheDocument();
   });
 
-  it("shows how many days are left before each task deadline", () => {
+  it("does not render task deadlines in the widget", () => {
     useTasksStore.setState({
       tasks: [
         {
@@ -216,9 +241,9 @@ describe("Widget", () => {
 
     const { container } = render(<Widget />);
 
-    expect(screen.getByText("还差 3 天")).toBeInTheDocument();
-    expect(screen.getByText("今天截止")).toBeInTheDocument();
-    expect(container.querySelectorAll("[data-deadline-days]")).toHaveLength(2);
+    expect(screen.queryByText(/还差/)).not.toBeInTheDocument();
+    expect(screen.queryByText("今天截止")).not.toBeInTheDocument();
+    expect(container.querySelector("[data-deadline-days]")).not.toBeInTheDocument();
   });
 
   it("renders every task and todo without the old 4/2 caps", () => {
@@ -454,6 +479,58 @@ describe("Widget", () => {
     expect(
       screen.queryByRole("button", { name: /展开挂件/ }),
     ).not.toBeInTheDocument();
+  });
+
+  it("opens a native capsule menu with expand and hide", async () => {
+    localStorage.setItem(CAPSULE_STORAGE_KEY, "1");
+    render(<Widget />);
+    await act(async () => undefined);
+
+    fireEvent.contextMenu(
+      screen.getByRole("button", { name: /展开挂件/ }),
+    );
+    await act(async () => undefined);
+
+    expect(menuApi.itemNew).toHaveBeenCalledTimes(2);
+    const items = menuApi.itemNew.mock.calls.map(
+      ([options]) => options as { text: string; action: () => void },
+    );
+    expect(items.map((item) => item.text)).toEqual(["展开", "隐藏挂件"]);
+    expect(menuApi.popup).toHaveBeenCalled();
+  });
+
+  it("expands or hides the widget from the capsule menu", async () => {
+    localStorage.setItem(CAPSULE_STORAGE_KEY, "1");
+    render(<Widget />);
+    await act(async () => undefined);
+
+    fireEvent.contextMenu(
+      screen.getByRole("button", { name: /展开挂件/ }),
+    );
+    await act(async () => undefined);
+
+    const items = menuApi.itemNew.mock.calls.map(
+      ([options]) => options as { action: () => void },
+    );
+    items[0].action();
+    await act(async () => undefined);
+    expect(localStorage.getItem(CAPSULE_STORAGE_KEY)).toBe("0");
+
+    fireEvent.click(screen.getByRole("button", { name: "收起挂件" }));
+    await act(async () => undefined);
+
+    fireEvent.contextMenu(
+      screen.getByRole("button", { name: /展开挂件/ }),
+    );
+    await act(async () => undefined);
+
+    const hideItem = menuApi.itemNew.mock.calls
+      .map(([options]) => options as { action: () => void })
+      .at(-1) as { action: () => void };
+    hideItem.action();
+    await act(async () => undefined);
+
+    expect(invokeMock).toHaveBeenCalledWith("hide_widget");
   });
 
   it("restores the capsule on the saved side", async () => {
