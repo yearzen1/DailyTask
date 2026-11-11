@@ -128,7 +128,11 @@ run("git", [
 // 版本号没变（重发同版本）时不产生空提交。
 const staged = spawnSync("git", ["diff", "--cached", "--quiet"], { cwd: root });
 if (staged.status !== 0) {
-  run("git", ["commit", "-m", `chore(release): v${version}`]);
+  run("git", [
+    "commit",
+    "-m",
+    `chore(release): v${version}; chore(release): 发布 v${version}`,
+  ]);
   run("git", ["push"]);
 } else {
   console.log("版本号未变，跳过版本提交");
