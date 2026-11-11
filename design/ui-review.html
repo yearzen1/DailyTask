@@ -1,0 +1,2063 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DailyTask · UI 整理评审稿</title>
+<link rel="stylesheet" href="./tokens.css">
+<style>
+  /* ============================================================
+     评审稿外壳（不属于产品 token）
+     ============================================================ */
+  :root {
+    --canvas: #ECEDEF;
+    --canvas-text: #3A3A3A;
+    --canvas-muted: #7A7A7A;
+    --canvas-line: #D8DADF;
+  }
+  :root[data-theme="dark"] {
+    --canvas: #141414;
+    --canvas-text: #D8D8D8;
+    --canvas-muted: #8A8A8A;
+    --canvas-line: #2C2C2C;
+  }
+
+  * { box-sizing: border-box; }
+  html { height: 100%; }
+  body {
+    margin: 0;
+    min-height: 100%;
+    background: var(--canvas);
+    color: var(--canvas-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input, textarea, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+
+  /* ---------- 顶部工具栏 ---------- */
+  .page-head {
+    position: sticky; top: 0; z-index: 30;
+    display: flex; align-items: center; gap: var(--space-4);
+    padding: var(--space-3) var(--space-6);
+    background: color-mix(in srgb, var(--canvas) 90%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--canvas-line);
+  }
+  .brand { font-size: var(--text-sm); font-weight: 600; letter-spacing: .2px; }
+  .brand span { font-weight: 400; color: var(--canvas-muted); margin-left: var(--space-2); }
+
+  .tabs { display: flex; flex-wrap: wrap; gap: 2px; padding: 3px; border-radius: var(--radius-pill); background: var(--canvas-line); }
+  .tab {
+    border: 0; background: transparent;
+    padding: 5px 12px; border-radius: var(--radius-pill);
+    font-size: var(--text-xs); color: var(--canvas-muted);
+  }
+  .tab.is-active { background: var(--canvas); color: var(--canvas-text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+
+  .theme { display: flex; gap: 2px; margin-left: auto; padding: 3px; border-radius: var(--radius-pill); background: var(--canvas-line); }
+  .theme button {
+    border: 0; background: transparent;
+    padding: 5px 12px; border-radius: var(--radius-pill);
+    font-size: var(--text-xs); color: var(--canvas-muted);
+  }
+  .theme button.is-active { background: var(--canvas); color: var(--canvas-text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+
+  /* ---------- 舞台 ---------- */
+  .stage { display: none; padding: var(--space-6); }
+  .stage.is-active { display: block; }
+  .stage-inner { max-width: 1160px; margin: 0 auto; }
+  .frame-caption {
+    display: flex; align-items: baseline; gap: var(--space-2);
+    margin: 0 0 var(--space-3);
+    font-size: var(--text-xs); color: var(--canvas-muted);
+  }
+  .frame-caption b { font-size: var(--text-sm); font-weight: 600; color: var(--canvas-text); }
+
+  .demo-bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
+    margin: 0 0 var(--space-3);
+    font-size: var(--text-xs); color: var(--canvas-muted);
+  }
+  .demo-bar button {
+    border: 1px solid var(--canvas-line); background: var(--canvas);
+    padding: 4px 10px; border-radius: var(--radius-pill);
+    font-size: var(--text-xs); color: var(--canvas-text);
+  }
+  .demo-bar button.is-on { background: var(--color-voluntary); border-color: var(--color-voluntary); color: #fff; }
+
+  /* ---------- 主窗口 ---------- */
+  .window {
+    width: 1080px; height: 720px;
+    display: flex; flex-direction: column;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 24px 60px rgba(0,0,0,.16);
+  }
+  .titlebar {
+    height: var(--titlebar-height); flex: none;
+    display: flex; align-items: center; gap: var(--space-2);
+    padding: 0 var(--space-3) 0 var(--space-4);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    font-size: var(--text-xs); color: var(--color-text-muted);
+  }
+  .titlebar .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-voluntary); }
+  .win-ctrl { display: flex; gap: var(--space-4); margin-left: auto; font-size: var(--text-2xs); letter-spacing: 1px; }
+  .app { flex: 1; display: flex; min-height: 0; }
+
+  /* ---------- 导航 ---------- */
+  .nav {
+    width: var(--nav-width); flex: none;
+    display: flex; flex-direction: column; gap: 2px;
+    padding: var(--space-3) var(--space-2);
+    background: var(--color-surface);
+    border-right: 1px solid var(--color-border);
+  }
+  .nav-item {
+    position: relative;
+    display: flex; align-items: center; gap: var(--space-2);
+    height: 36px; padding: 0 var(--space-2); border-radius: var(--radius-control);
+    font-size: var(--text-base); color: var(--color-text-muted);
+  }
+  .nav-item.is-active { background: var(--state-selected); color: var(--color-voluntary); font-weight: 600; }
+  .nav-item.is-active::before {
+    content: ""; position: absolute; left: -6px; top: 50%;
+    width: 3px; height: 16px; margin-top: -8px; border-radius: 2px;
+    background: var(--color-voluntary);
+  }
+  .nav-item .icon { width: 16px; height: 16px; flex: none; }
+  .nav-item .nav-count {
+    margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px;
+    display: grid; place-items: center;
+    border-radius: var(--radius-pill);
+    background: color-mix(in srgb, var(--color-warning) 14%, transparent);
+    color: var(--color-warning); font-size: 10px; font-weight: 700;
+  }
+
+  /* ---------- 内容区 ---------- */
+  .content {
+    position: relative;
+    flex: 1; min-width: 0; min-height: 0;
+    display: flex; flex-direction: column; gap: var(--space-4);
+    padding: var(--space-6);
+    overflow: hidden;
+  }
+  .view-head { display: flex; align-items: baseline; gap: var(--space-3); flex: none; }
+  .view-head h1 { margin: 0; font-size: var(--text-lg); font-weight: 600; letter-spacing: .2px; }
+  .view-head .sub { font-size: var(--text-sm); color: var(--color-text-muted); }
+  .view-head .tools { margin-left: auto; display: flex; align-items: center; gap: var(--space-2); }
+  .fill { flex: 1; min-height: 0; }
+  .scroll { overflow: auto; }
+
+  .card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+
+  /* ---------- 通用按钮 ---------- */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    height: 28px; padding: 0 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control);
+    background: var(--color-surface);
+    font-size: var(--text-xs); color: var(--color-text);
+  }
+  .btn:hover { background: var(--state-hover); }
+  .btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+  .btn.primary { background: var(--color-voluntary); border-color: var(--color-voluntary); color: #fff; font-weight: 600; }
+  .btn.primary:hover { filter: brightness(1.04); }
+  .btn.danger { color: var(--color-missed); }
+  .btn.ghost { border-color: transparent; background: transparent; color: var(--color-text-muted); }
+  .btn.ghost:hover { background: var(--state-hover); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  .icon-btn {
+    width: 26px; height: 26px; display: grid; place-items: center;
+    border: 0; border-radius: var(--radius-control);
+    background: transparent; color: var(--color-text-muted);
+  }
+  .icon-btn:hover { background: var(--state-hover); color: var(--color-text); }
+  .icon-btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+  .icon-btn.danger:hover { color: var(--color-missed); }
+
+  /* ---------- chip ---------- */
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    height: 18px; padding: 0 7px;
+    border-radius: var(--radius-pill);
+    font-size: var(--text-2xs); font-weight: 600; line-height: 1;
+    white-space: nowrap;
+  }
+  .chip.neutral { color: var(--color-text-muted); background: var(--state-hover); }
+  .chip.date { color: var(--color-text-muted); background: color-mix(in srgb, var(--color-text) 5%, transparent); }
+  .chip.warning { color: var(--color-warning); background: color-mix(in srgb, var(--color-warning) 14%, transparent); }
+  .chip.danger { color: var(--color-missed); background: color-mix(in srgb, var(--color-missed) 12%, transparent); }
+  .chip.success { color: var(--color-voluntary); background: color-mix(in srgb, var(--color-voluntary) 12%, transparent); }
+  .chip.info { color: var(--color-forced); background: color-mix(in srgb, var(--color-forced) 12%, transparent); }
+  .chip .sep { opacity: .5; font-weight: 400; }
+
+  /* ---------- 今日 ---------- */
+  .progress { display: flex; align-items: center; gap: var(--space-6); padding: var(--space-4) var(--space-6); flex: none; }
+  .ring-wrap { position: relative; width: 96px; height: 96px; flex: none; }
+  .ring { display: block; }
+  .ring circle { fill: none; stroke-width: 8; }
+  .ring-track { stroke: var(--color-na); }
+  .ring-fg { stroke: var(--color-voluntary); stroke-linecap: round; }
+  .ring-label {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center; gap: 3px;
+    font-size: var(--text-lg); font-weight: 600; font-variant-numeric: tabular-nums;
+  }
+  .ring-label small { position: relative; top: 3px; font-size: var(--text-xs); font-weight: 400; color: var(--color-text-muted); }
+  .progress-main { display: flex; flex-direction: column; gap: 2px; }
+  .progress-main .line { font-size: var(--text-base); }
+  .progress-main .line b { font-variant-numeric: tabular-nums; }
+  .progress-main .sub { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .progress-split { margin-left: auto; display: flex; gap: var(--space-6); padding-left: var(--space-6); border-left: 1px solid var(--color-border); }
+  .split-item { display: flex; flex-direction: column; gap: 2px; min-width: 64px; }
+  .split-item .k { display: flex; align-items: center; gap: 6px; font-size: var(--text-xs); color: var(--color-text-muted); white-space: nowrap; }
+  .split-item .k i { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+  .split-item .v { font-size: var(--text-base); font-variant-numeric: tabular-nums; }
+
+  .groups { padding: var(--space-2); }
+  .group + .group { margin-top: var(--space-2); }
+  .group-head, .todos-head {
+    display: flex; align-items: center; gap: var(--space-2);
+    width: 100%; height: 34px; padding: 0 var(--space-2);
+    border: 0; background: transparent;
+    border-radius: var(--radius-control);
+    font-size: var(--text-xs); font-weight: 600; color: var(--color-text-muted);
+    text-align: left;
+  }
+  .group-head:hover, .todos-head:hover { background: var(--state-hover); }
+  .group-head i, .todos-head i { width: 3px; height: 12px; border-radius: 2px; flex: none; }
+  .group-head .arrow, .todos-head .arrow { font-size: 10px; line-height: 1; }
+  .group-head .count, .todos-head .count { margin-left: auto; font-weight: 400; font-variant-numeric: tabular-nums; }
+
+  .task-row {
+    display: flex; align-items: center; gap: var(--space-3);
+    min-height: 34px; padding: 0 var(--space-2);
+    border-radius: var(--radius-control);
+    cursor: pointer;
+  }
+  .task-row:hover { background: var(--state-hover); }
+  .task-row:active { background: var(--state-active); }
+  .task-row:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+  .check {
+    width: var(--check-size); height: var(--check-size); flex: none;
+    display: grid; place-items: center;
+    border: 1.5px solid var(--color-border-strong);
+    border-radius: 6px;
+    background: transparent;
+    font-size: 12px; font-weight: 700; line-height: 1;
+    color: transparent;
+  }
+  .task-row[data-status="done"] .check { background: var(--color-voluntary); border-color: var(--color-voluntary); color: #fff; }
+  .task-row[data-status="missed"] .check { border-color: var(--color-missed); color: var(--color-missed); }
+  .task-row[data-status="skipped"] .check { border-style: dashed; border-color: var(--color-border-strong); background: var(--color-na); color: var(--color-text-muted); }
+
+  .task-name { min-width: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .task-row[data-status="done"] .task-name { color: var(--color-text-muted); }
+  .task-row[data-status="skipped"] .task-name { color: var(--color-text-muted); text-decoration: line-through; }
+
+  .row-meta { margin-left: auto; display: flex; align-items: center; gap: var(--space-2); flex: none; }
+  .row-actions { display: flex; align-items: center; gap: 1px; flex: none; opacity: 0; transition: opacity .12s; }
+  .task-row:hover .row-actions,
+  .task-row:focus-within .row-actions,
+  .todo:hover .row-actions,
+  .todo:focus-within .row-actions,
+  body.force-actions .row-actions { opacity: 1; }
+  .row-actions .icon-btn { width: 24px; height: 24px; font-size: 12px; }
+  .skip-btn {
+    border: 0; background: transparent;
+    padding: 3px 6px; border-radius: var(--radius-control);
+    font-size: var(--text-xs); color: var(--color-text-muted);
+    opacity: 0;
+  }
+  .task-row:hover .skip-btn,
+  .task-row:focus-within .skip-btn,
+  body.force-actions .skip-btn { opacity: 1; }
+  .skip-btn:hover { background: var(--state-active); }
+
+  .value-chip {
+    border: 0; background: var(--state-hover);
+    padding: 2px 8px; border-radius: var(--radius-pill);
+    font-size: var(--text-xs); color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .value-chip.is-empty { background: transparent; opacity: 0; }
+  .task-row:hover .value-chip.is-empty,
+  .task-row:focus-within .value-chip.is-empty,
+  body.force-actions .value-chip.is-empty { opacity: 1; }
+  .value-chip:hover { background: var(--state-active); }
+
+  /* 今日到期待办 */
+  .todo {
+    position: relative;
+    display: flex; align-items: center; gap: var(--space-3);
+    min-height: 34px; padding: 0 var(--space-2);
+    border-radius: var(--radius-control);
+    cursor: pointer;
+  }
+  .todo:hover { background: var(--state-hover); }
+  .todo[data-overdue] { padding-left: calc(var(--space-2) + 12px); }
+  .todo[data-overdue]::before {
+    content: ""; position: absolute; left: 0; top: 6px; bottom: 6px;
+    width: 3px; border-radius: 2px; background: var(--color-missed);
+  }
+  .todo .mark {
+    width: 18px; height: 18px; flex: none;
+    display: grid; place-items: center;
+    border: 1.5px solid var(--color-border-strong); border-radius: 50%;
+    font-size: 10px; line-height: 1; color: transparent;
+  }
+  .todo[data-done] .mark { background: var(--color-voluntary); border-color: var(--color-voluntary); color: #fff; }
+  .todo .title { min-width: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .todo[data-done] .title { color: var(--color-text-muted); text-decoration: line-through; }
+  .todo .row-meta { font-size: var(--text-xs); color: var(--color-text-muted); }
+
+  /* 空状态 */
+  .empty {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 160px; flex: 1;
+    font-size: var(--text-sm); color: var(--color-text-muted);
+  }
+
+  /* ---------- 待办 ---------- */
+  .todo-form { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); flex: none; }
+  .todo-form .input-wrap { flex: 1; min-width: 0; display: flex; align-items: center; }
+  .todo-form textarea {
+    width: 100%; min-height: 24px; max-height: 96px; resize: none;
+    border: 0; background: transparent; outline: none;
+    font-size: var(--text-sm); line-height: 20px;
+    color: var(--color-text);
+  }
+  .todo-form textarea::placeholder { color: var(--color-text-muted); }
+  .date-input {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 26px; padding: 0 8px;
+    border: 1px solid var(--color-border); border-radius: var(--radius-control);
+    background: var(--color-bg);
+    font-size: var(--text-2xs); color: var(--color-text); white-space: nowrap;
+  }
+  .date-input .cal { color: var(--color-text-muted); font-size: 11px; }
+  .draft-hint { font-size: var(--text-2xs); color: var(--color-text-muted); }
+
+  .todo-group { padding: var(--space-2); }
+  .todo .row-actions { margin-left: 0; }
+  .todo .row-meta { margin-left: auto; }
+
+  /* ---------- 菜单 ---------- */
+  .menu {
+    position: absolute; z-index: 40;
+    width: 216px; padding: 6px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-popover);
+  }
+  .menu[hidden] { display: none; }
+  .menu.in-flow { position: static; }
+  .menu-head {
+    padding: 2px 6px 6px;
+    font-size: var(--text-2xs); color: var(--color-text-muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .menu-item {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; height: 28px; padding: 0 8px;
+    border: 0; border-radius: var(--radius-control);
+    background: transparent; text-align: left;
+    font-size: var(--text-xs); color: var(--color-text);
+  }
+  .menu-item:hover { background: var(--state-hover); }
+  .menu-item:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+  .menu-item.danger { color: var(--color-missed); }
+  .menu-item .kbd { margin-left: auto; font-size: var(--text-2xs); color: var(--color-text-muted); }
+  .menu-sep { height: 1px; margin: 5px 4px; background: var(--color-border); }
+  .menu-field { display: flex; align-items: center; gap: 8px; padding: 2px 6px 6px; font-size: var(--text-2xs); color: var(--color-text-muted); }
+  .menu-field .date-input { flex: 1; min-width: 0; }
+  .menu-actions { display: flex; justify-content: flex-end; gap: 6px; padding: 2px 4px 4px; }
+  .menu-actions .btn { height: 24px; padding: 0 8px; font-size: var(--text-2xs); }
+
+  /* ---------- 任务表 ---------- */
+  .seg {
+    display: flex; gap: 2px; padding: 2px;
+    border: 1px solid var(--color-border); border-radius: var(--radius-pill);
+    background: var(--color-bg);
+  }
+  .seg button {
+    border: 0; background: transparent;
+    padding: 3px 10px; border-radius: var(--radius-pill);
+    font-size: var(--text-2xs); color: var(--color-text-muted);
+  }
+  .seg button.is-active { background: var(--color-surface); color: var(--color-text); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+
+  .grid-card { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .grid-scroll { flex: 1; overflow: auto; }
+  .grid { --cell: var(--cell-size); --row: 34px; width: max-content; }
+  .grid-row { display: grid; grid-template-columns: var(--task-col-width) repeat(var(--cols, 30), var(--cell)); }
+  .g-head { position: sticky; z-index: 3; background: var(--color-surface); }
+  .g-head.month { top: 0; height: 22px; }
+  .g-head.dates { top: 22px; height: 34px; border-bottom: 1px solid var(--color-border); }
+  .g-corner {
+    position: sticky; left: 0; z-index: 4;
+    display: flex; align-items: center;
+    padding: 0 var(--space-2);
+    background: var(--color-surface);
+    border-right: 1px solid var(--color-border);
+    font-size: var(--text-2xs); color: var(--color-text-muted);
+  }
+  .g-month-track { height: 22px; border-bottom: 1px solid var(--color-border); }
+  .month-pill {
+    position: absolute; top: 0; left: var(--task-col-width); z-index: 6;
+    height: 22px; display: flex; align-items: center;
+    padding: 0 10px 0 8px;
+    background: var(--color-surface);
+    border-right: 1px solid var(--color-border);
+    font-size: 10px; color: var(--color-text-muted);
+    pointer-events: none;
+  }
+  .g-date {
+    height: 34px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    border-left: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+    font-size: var(--text-2xs); font-variant-numeric: tabular-nums;
+  }
+  .g-date small { font-size: 9px; color: var(--color-text-muted); }
+  .g-date b { font-weight: 500; }
+  .g-date.is-today { background: color-mix(in srgb, var(--color-voluntary) 9%, transparent); color: var(--color-voluntary); font-weight: 700; }
+  .g-date.is-today small { color: color-mix(in srgb, var(--color-voluntary) 70%, var(--color-text-muted)); }
+  .g-group-label {
+    position: sticky; left: 0; z-index: 2;
+    height: 26px; display: flex; align-items: center; gap: 6px;
+    padding-left: var(--space-2);
+    background: var(--color-surface);
+    font-size: var(--text-2xs); font-weight: 600; color: var(--color-text-muted);
+  }
+  .g-group-label i { width: 3px; height: 11px; border-radius: 2px; }
+  .g-group-fill { height: 26px; background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
+  .g-task {
+    position: sticky; left: 0; z-index: 2;
+    height: var(--row); display: flex; align-items: center; gap: 6px;
+    padding: 0 var(--space-2);
+    background: var(--color-surface);
+    border-right: 1px solid var(--color-border);
+    border-bottom: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+    font-size: var(--text-xs);
+  }
+  .g-task i { width: 5px; height: 5px; border-radius: 50%; flex: none; }
+  .g-task span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .g-cell {
+    height: var(--row); display: grid; place-items: center;
+    font-size: 12px; color: var(--color-text-muted); cursor: pointer;
+    border-left: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);
+  }
+  .g-cell.is-done { color: var(--color-voluntary); }
+  .g-cell.is-missed { color: var(--color-missed); }
+  .g-cell.is-skipped { color: var(--color-text-muted); }
+  .g-cell.is-na { background: var(--color-na); color: color-mix(in srgb, var(--color-text) 28%, transparent); cursor: not-allowed; }
+  .g-cell.is-today { background: color-mix(in srgb, var(--color-voluntary) 8%, transparent); box-shadow: inset -1px 0 0 color-mix(in srgb, var(--color-voluntary) 45%, transparent); }
+  .grid-foot {
+    flex: none; height: 30px;
+    display: flex; align-items: center; gap: 6px;
+    padding: 0 var(--space-3);
+    border-top: 1px solid var(--color-border);
+    background: var(--color-surface);
+    font-size: 10px; color: var(--color-text-muted);
+  }
+  .grid-foot .right { margin-left: auto; }
+  .grid-foot .sep { color: var(--color-border-strong); }
+
+  /* ---------- 表格（管理 / 统计） ---------- */
+  .table-card { min-height: 0; flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+  .table thead th {
+    position: sticky; top: 0; z-index: 2;
+    height: 36px; padding: 0 var(--space-4);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    text-align: left; font-size: var(--text-xs); font-weight: 500; color: var(--color-text-muted);
+    white-space: nowrap;
+  }
+  .table tbody td {
+    height: 42px; padding: 0 var(--space-4);
+    border-bottom: 1px solid color-mix(in srgb, var(--color-border) 65%, transparent);
+    vertical-align: middle;
+  }
+  .table tbody tr:hover { background: var(--state-hover); }
+  .table .name { font-weight: 500; }
+  .table .muted { color: var(--color-text-muted); font-size: var(--text-xs); }
+  .table .actions { display: flex; align-items: center; gap: 2px; justify-content: flex-end; opacity: 0; }
+  .table tbody tr:hover .actions, .table tbody tr:focus-within .actions, body.force-actions .table .actions { opacity: 1; }
+  .table .row-tools { display: flex; align-items: center; gap: 4px; }
+
+  .type {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: var(--text-xs); color: var(--color-text-muted); white-space: nowrap;
+  }
+  .type i { width: 6px; height: 6px; border-radius: 50%; }
+  .seg-badge {
+    display: inline-flex; align-items: center;
+    height: 16px; padding: 0 6px; margin-left: 6px;
+    border-radius: var(--radius-pill);
+    background: var(--state-hover);
+    font-size: 10px; color: var(--color-text-muted); font-weight: 500;
+  }
+
+  .bar-wrap { display: flex; align-items: center; gap: var(--space-3); }
+  .bar { flex: 1; height: 6px; border-radius: var(--radius-pill); background: var(--color-na); overflow: hidden; }
+  .bar > i { display: block; height: 100%; border-radius: inherit; background: var(--color-voluntary); }
+  .bar-wrap .pct { width: 40px; text-align: right; font-variant-numeric: tabular-nums; font-size: var(--text-xs); color: var(--color-text-muted); }
+  .table-note { margin: 0; padding: 8px var(--space-4); border-top: 1px solid var(--color-border); font-size: var(--text-2xs); color: var(--color-text-muted); }
+
+  /* ---------- 设置 ---------- */
+  .settings-scroll { overflow: auto; padding-right: 4px; }
+  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+  .settings-card { padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+  .settings-card h2 { margin: 0; font-size: var(--text-sm); font-weight: 600; }
+  .setting-row { display: flex; align-items: center; gap: var(--space-3); min-height: 30px; }
+  .setting-row .label { display: flex; flex-direction: column; gap: 1px; }
+  .setting-row .label b { font-size: var(--text-sm); font-weight: 400; }
+  .setting-row .label span { font-size: var(--text-2xs); color: var(--color-text-muted); }
+  .setting-row .control { margin-left: auto; flex: none; display: flex; align-items: center; gap: 6px; }
+  .switch { position: relative; display: inline-flex; width: 34px; height: 20px; flex: none; }
+  .switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+  .switch i {
+    width: 34px; height: 20px; border-radius: var(--radius-pill);
+    background: var(--color-border-strong); transition: background .15s;
+  }
+  .switch i::after {
+    content: ""; position: absolute; top: 3px; left: 3px;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .15s;
+  }
+  .switch input:checked + i { background: var(--color-voluntary); }
+  .switch input:checked + i::after { transform: translateX(14px); }
+  .switch input:focus-visible + i { box-shadow: var(--focus-ring); }
+  .select {
+    height: 26px; padding: 0 26px 0 8px;
+    border: 1px solid var(--color-border); border-radius: var(--radius-control);
+    background: var(--color-bg); font-size: var(--text-xs);
+  }
+  .version { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); color: var(--color-text-muted); }
+  .version b { color: var(--color-text); font-weight: 600; }
+  .settings-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+
+  /* ---------- 挂件 ---------- */
+  .widget-stage { display: flex; align-items: flex-start; justify-content: center; gap: 72px; padding: var(--space-6) 0 var(--space-2); }
+  .widget-slot { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); }
+  .slot-label { font-size: var(--text-2xs); color: var(--canvas-muted); }
+  .slot-label b { color: var(--canvas-text); font-weight: 600; }
+  .checker {
+    background: repeating-conic-gradient(#E4E6E9 0 25%, #F1F2F4 0 50%) 0 0 / 16px 16px;
+    border-radius: 20px;
+  }
+  :root[data-theme="dark"] .checker { background: repeating-conic-gradient(#242424 0 25%, #2E2E2E 0 50%) 0 0 / 16px 16px; }
+
+  .widget-frame { padding: 8px; }
+  .widget-card {
+    position: relative;
+    width: 244px; height: 344px;
+    padding: var(--space-3);
+    display: flex; flex-direction: column;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-widget);
+    box-shadow: var(--shadow-widget);
+    color: var(--color-text);
+    overflow: hidden;
+  }
+  .w-head { height: 22px; flex: none; display: flex; align-items: center; gap: 6px; }
+  .w-date { font-size: 12.5px; font-weight: 600; letter-spacing: .2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .w-actions { margin-left: auto; display: flex; gap: 1px; opacity: 0; transition: opacity .12s; }
+  .widget-card:hover .w-actions, .widget-card.is-hover .w-actions { opacity: 1; }
+  .w-act {
+    width: 18px; height: 18px; display: grid; place-items: center;
+    border: 0; background: transparent; border-radius: 4px;
+    color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  }
+  .w-act:hover { background: var(--state-hover); color: var(--color-text); }
+  .w-act svg { width: 12px; height: 12px; }
+
+  .w-ring-wrap { flex: none; display: flex; align-items: center; gap: 12px; min-height: 50px; margin: 4px 0; }
+  .w-ring-wrap svg { width: 40px; height: 40px; flex: none; }
+  .w-ring-wrap circle { fill: none; stroke-width: 4; }
+  .w-ring-track { stroke: color-mix(in srgb, var(--color-text) 12%, transparent); }
+  .w-ring-fg { stroke: var(--color-voluntary); stroke-linecap: round; }
+  .w-ring-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .w-ring-text b { font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
+  .w-ring-text span { font-size: 10px; color: var(--color-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .w-splits { display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: 10px; color: var(--color-text-muted); }
+  .w-splits span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .w-splits i { width: 5px; height: 5px; border-radius: 50%; }
+
+  .w-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding-right: 2px; }
+  .w-scroll::-webkit-scrollbar { width: 4px; }
+  .w-scroll::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--color-text) 18%, transparent); border-radius: 2px; }
+  .w-group-head {
+    display: flex; align-items: center; gap: 6px;
+    width: 100%; height: 20px; padding: 0 4px;
+    border: 0; border-radius: 4px; background: transparent;
+    font-size: 10.5px; font-weight: 600; color: var(--color-text-muted); text-align: left;
+  }
+  .w-group-head:hover { background: var(--state-hover); }
+  .w-group-head i { width: 3px; height: 12px; border-radius: 2px; flex: none; }
+  .w-group-head .arrow { font-size: 9px; line-height: 1; }
+  .w-group-head .count { margin-left: auto; font-weight: 400; font-variant-numeric: tabular-nums; }
+
+  .w-task {
+    position: relative;
+    display: flex; align-items: center; gap: 6px;
+    height: 26px; padding: 0 4px 0 6px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .w-task:hover { background: var(--state-hover); }
+  .w-check {
+    width: 17px; height: 17px; flex: none;
+    display: grid; place-items: center;
+    border: 1.4px solid var(--color-border-strong); border-radius: 4px;
+    font-size: 10px; font-weight: 700; line-height: 1; color: transparent;
+  }
+  .w-task.is-done .w-check { background: var(--color-voluntary); border-color: var(--color-voluntary); color: #fff; }
+  .w-task.is-missed .w-check { border-color: var(--color-missed); color: var(--color-missed); }
+  .w-task.is-skipped .w-check { border-style: dashed; background: var(--color-na); color: var(--color-text-muted); }
+  .w-name { min-width: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .w-task.is-done .w-name { color: var(--color-text-muted); }
+  .w-task.is-skipped .w-name { color: var(--color-text-muted); text-decoration: line-through; }
+  .w-value {
+    flex: none; max-width: 42%;
+    padding: 0 4px; border-radius: var(--radius-pill);
+    font-size: 10px; color: var(--color-text-muted); font-variant-numeric: tabular-nums;
+    background: var(--state-hover);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .w-more {
+    position: absolute; right: 1px; top: 50%; transform: translateY(-50%);
+    width: 16px; height: 16px; display: grid; place-items: center;
+    border: 0; border-radius: 3px; background: transparent;
+    font-size: 11px; color: var(--color-text-muted);
+    opacity: 0;
+  }
+  .w-task:hover .w-more, body.force-actions .w-more { opacity: 1; }
+  .w-more:hover { background: var(--state-active); }
+
+  .w-todo {
+    display: flex; align-items: center; gap: 6px;
+    min-height: 26px; padding: 0 4px 0 6px;
+    border-radius: 5px;
+    font-size: 11.5px;
+    cursor: pointer;
+  }
+  .w-todo:hover { background: var(--state-hover); }
+  .w-dot {
+    width: 12px; height: 12px; flex: none;
+    display: grid; place-items: center;
+    border: 1.4px solid var(--color-border-strong); border-radius: 50%;
+    font-size: 8px; line-height: 1; color: transparent;
+  }
+  .w-todo.is-done .w-dot { background: var(--color-voluntary); border-color: var(--color-voluntary); color: #fff; }
+  .w-todo .w-title { min-width: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .w-todo.is-done .w-title { color: var(--color-text-muted); text-decoration: line-through; }
+  .w-todo .w-meta { flex: none; font-size: 9.5px; color: var(--color-text-muted); white-space: nowrap; }
+
+  .capsule-frame { width: 96px; height: 36px; padding: 4px; }
+  .capsule {
+    width: 88px; height: 28px;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    border: 1px solid var(--color-border);
+    border-radius: 999px 0 0 999px;
+    background: var(--color-surface);
+    box-shadow: var(--shadow-widget);
+    color: var(--color-text);
+    font-size: 11px;
+    cursor: context-menu;
+  }
+  .capsule:hover { border-color: var(--color-voluntary); }
+  .capsule .arrow { font-size: 10px; color: var(--color-text-muted); }
+  .capsule b { font-size: 10px; font-weight: 400; color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+  .capsule-hint { font-size: var(--text-2xs); color: var(--canvas-muted); }
+
+  .native-menu {
+    width: 136px; padding: 4px 0;
+    border: 1px solid #C8C8C8; border-radius: 6px;
+    background: #FAFAFA;
+    box-shadow: 0 5px 16px rgba(0,0,0,.18);
+    font-size: 12px;
+  }
+  :root[data-theme="dark"] .native-menu { background: #2B2B2B; border-color: #4A4A4A; }
+  .native-menu .n-item { height: 26px; display: flex; align-items: center; padding: 0 12px; white-space: nowrap; }
+  .native-menu .n-item:hover { background: #E5F1FB; }
+  :root[data-theme="dark"] .native-menu .n-item:hover { background: #3A3A3A; }
+  .native-menu .n-sep { height: 1px; margin: 4px 8px; background: #DCDCDC; }
+  :root[data-theme="dark"] .native-menu .n-sep { background: #4A4A4A; }
+
+  .widget-menu-demo { position: relative; }
+  .widget-menu-demo .menu { left: 0; top: 0; width: 148px; }
+  .widget-menu-demo .menu-item { height: 24px; font-size: 11px; }
+
+  /* ---------- 组件规范 ---------- */
+  .spec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+  .spec-card { padding: var(--space-4); }
+  .spec-card h2 { margin: 0 0 var(--space-1); font-size: var(--text-sm); font-weight: 600; }
+  .spec-card p { margin: 0 0 var(--space-3); font-size: var(--text-xs); color: var(--color-text-muted); }
+  .spec-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+
+  .anatomy { position: relative; padding: var(--space-6) var(--space-4) var(--space-3); }
+  .anatomy .task-row { border: 1px dashed var(--color-border-strong); }
+  .anatomy .dot-label {
+    position: absolute; font-size: 10px; color: var(--color-text-muted);
+  }
+  .anatomy .dot-label::before {
+    content: ""; position: absolute; width: 1px; height: 12px;
+    background: var(--color-border-strong);
+  }
+
+  .density-row { display: flex; align-items: center; gap: var(--space-2); height: 34px; padding: 0 var(--space-2); border-radius: var(--radius-control); font-size: var(--text-sm); }
+  .density-row:hover { background: var(--state-hover); }
+  .density-widget { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 6px; border-radius: 5px; font-size: 12px; }
+  .density-widget:hover { background: var(--state-hover); }
+  .measure { margin-left: auto; font-size: var(--text-2xs); color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+
+  /* ---------- 说明卡 ---------- */
+  .notes { max-width: 1080px; margin: var(--space-6) auto 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+  .note { padding: var(--space-4); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-card); }
+  .note h3 { margin: 0 0 var(--space-2); font-size: var(--text-sm); }
+  .note ol, .note ul { margin: 0; padding-left: var(--space-5); font-size: var(--text-xs); line-height: 1.9; color: var(--color-text-muted); }
+  .note b { color: var(--color-text); font-weight: 600; }
+  .note code { font-family: var(--font-mono); font-size: var(--text-2xs); }
+</style>
+</head>
+<body>
+
+<!-- ================= 图标 sprite ================= -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-today" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+    <rect x="2" y="3" width="12" height="11" rx="2"/><path d="M2 6.5h12M5.5 1.8V4M10.5 1.8V4"/>
+  </symbol>
+  <symbol id="i-grid" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+    <rect x="2" y="2" width="12" height="12" rx="2"/><path d="M6.3 2v12M2 6.3h12"/>
+  </symbol>
+  <symbol id="i-todo" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+    <path d="M3 4.5l1.5 1.5L7 3.5"/><path d="M3 11l1.5 1.5L7 10"/><path d="M9 5h4M9 11.5h4"/>
+  </symbol>
+  <symbol id="i-manage" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+    <path d="M2 4.5h12M2 8h12M2 11.5h12"/><circle cx="5.5" cy="4.5" r="1.6" fill="var(--color-surface)"/><circle cx="10.5" cy="11.5" r="1.6" fill="var(--color-surface)"/>
+  </symbol>
+  <symbol id="i-stats" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+    <path d="M3 13V8M8 13V3M13 13v-3"/>
+  </symbol>
+  <symbol id="i-settings" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+    <circle cx="8" cy="8" r="2.4"/><path d="M8 1.6v1.8M8 12.6v1.8M14.4 8h-1.8M3.4 8H1.6M12.5 3.5l-1.3 1.3M4.8 11.2l-1.3 1.3M12.5 12.5l-1.3-1.3M4.8 4.8L3.5 3.5"/>
+  </symbol>
+  <symbol id="i-expand" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6.5 2.5h-4v4M9.5 13.5h4v-4M2.5 2.5l4.5 4.5M13.5 13.5L9 9"/>
+  </symbol>
+  <symbol id="i-pin" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8 1.8v4.4M4.8 6.2h6.4L10 10H6L4.8 6.2zM8 10.2v4"/>
+  </symbol>
+  <symbol id="i-collapse" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 3.5L10.5 8 6 12.5"/>
+  </symbol>
+  <symbol id="i-cal" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+    <rect x="2.5" y="3" width="11" height="10.5" rx="2"/><path d="M2.5 6.2h11M5.5 1.8V4M10.5 1.8V4"/>
+  </symbol>
+</svg>
+
+<header class="page-head">
+  <div class="brand">DailyTask <span>UI 整理评审稿 · 11/15</span></div>
+  <nav class="tabs" role="tablist" aria-label="评审视图">
+    <button class="tab is-active" role="tab" aria-selected="true" data-view="today">今日</button>
+    <button class="tab" role="tab" aria-selected="false" data-view="grid">任务表</button>
+    <button class="tab" role="tab" aria-selected="false" data-view="todos">待办</button>
+    <button class="tab" role="tab" aria-selected="false" data-view="manage">任务管理</button>
+    <button class="tab" role="tab" aria-selected="false" data-view="stats">统计</button>
+    <button class="tab" role="tab" aria-selected="false" data-view="settings">设置</button>
+    <button class="tab" role="tab" aria-selected="false" data-view="widget">挂件</button>
+    <button class="tab" role="tab" aria-selected="false" data-view="spec">组件规范</button>
+  </nav>
+  <div class="theme" role="group" aria-label="主题">
+    <button data-theme-btn="light" class="is-active">浅色</button>
+    <button data-theme-btn="dark">深色</button>
+  </div>
+</header>
+
+<!-- ============================================================
+     今日
+     ============================================================ -->
+<section class="stage is-active" data-stage="today">
+  <div class="stage-inner">
+    <p class="frame-caption"><b>今日</b> 主窗口 1080 × 720 · 截止日期改为「日期 · 倒计时」一个 chip · 待办同样合并</p>
+    <div class="demo-bar">
+      <span>演示：</span>
+      <button type="button" data-toggle-actions>显示行内操作</button>
+      <button type="button" data-toggle="today-deadline">只看有截止日期的任务</button>
+    </div>
+
+    <div class="window">
+      <div class="titlebar">
+        <span class="dot"></span><span>DailyTask</span>
+        <span class="win-ctrl" aria-hidden="true">—&nbsp;&nbsp;▢&nbsp;&nbsp;✕</span>
+      </div>
+
+      <div class="app">
+        <aside class="nav">
+          <div class="nav-item is-active"><svg class="icon"><use href="#i-today"/></svg>今日</div>
+          <div class="nav-item"><svg class="icon"><use href="#i-grid"/></svg>任务表</div>
+          <div class="nav-item"><svg class="icon"><use href="#i-todo"/></svg>待办<span class="nav-count">5</span></div>
+          <div class="nav-item"><svg class="icon"><use href="#i-manage"/></svg>任务管理</div>
+          <div class="nav-item"><svg class="icon"><use href="#i-stats"/></svg>统计</div>
+          <div class="nav-item"><svg class="icon"><use href="#i-settings"/></svg>设置</div>
+        </aside>
+
+        <div class="content">
+          <div class="view-head">
+            <h1>今日</h1>
+            <span class="sub">11/15 周日</span>
+            <span class="chip warning" style="margin-left:4px">还剩 5 项</span>
+          </div>
+
+          <!-- 进度 -->
+          <div class="card progress">
+            <div class="ring-wrap">
+              <svg class="ring" viewBox="0 0 100 100" width="96" height="96" aria-hidden="true">
+                <circle class="ring-track" cx="50" cy="50" r="42"/>
+                <circle class="ring-fg" cx="50" cy="50" r="42" transform="rotate(-90 50 50)"
+                        stroke-dasharray="263.89" stroke-dashoffset="164.93"/>
+              </svg>
+              <div class="ring-label"><span data-ring-done>3</span><small>/ <span data-ring-total>8</span></small></div>
+            </div>
+            <div class="progress-main">
+              <div class="line">已完成 <b data-progress-done>3</b> / <b data-progress-total>8</b> 项</div>
+              <div class="sub">完成率 <span data-progress-pct>38%</span> · <span data-progress-note>还剩 5 项</span></div>
+            </div>
+            <div class="progress-split">
+              <div class="split-item">
+                <div class="k"><i style="background:var(--color-voluntary)"></i>自愿</div>
+                <div class="v" data-split="voluntary">2 / 4</div>
+              </div>
+              <div class="split-item">
+                <div class="k"><i style="background:var(--color-forced)"></i>被迫</div>
+                <div class="v" data-split="forced">1 / 2</div>
+              </div>
+              <div class="split-item">
+                <div class="k"><i style="background:var(--color-warning)"></i>待办</div>
+                <div class="v" data-split="todos">0 / 2</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 任务分组 -->
+          <div class="card groups fill scroll">
+            <div class="group" data-group="voluntary">
+              <button class="group-head" type="button">
+                <i style="background:var(--color-voluntary)"></i>
+                自愿任务<span class="arrow">▾</span><span class="count">2 / 4</span>
+              </button>
+              <div class="task-row" data-status="done" tabindex="0">
+                <span class="check">✓</span><span class="task-name">早起</span>
+                <button class="skip-btn" type="button">今天不做</button>
+              </div>
+              <div class="task-row" data-status="done" tabindex="0">
+                <span class="check">✓</span><span class="task-name">背单词</span>
+                <span class="row-meta"><button class="value-chip" type="button">30 分</button></span>
+                <button class="skip-btn" type="button">今天不做</button>
+              </div>
+              <div class="task-row" data-status="pending" data-has-deadline tabindex="0">
+                <span class="check">✓</span><span class="task-name">跑步</span>
+                <span class="row-meta">
+                  <span class="chip warning" data-deadline="2026-11-20">11/20 <span class="sep">·</span> 还差 5 天</span>
+                  <button class="value-chip is-empty" type="button">添加值</button>
+                </span>
+                <button class="skip-btn" type="button">今天不做</button>
+              </div>
+              <div class="task-row" data-status="pending" tabindex="0">
+                <span class="check">✓</span><span class="task-name">阅读 20 分钟</span>
+                <span class="row-meta"><button class="value-chip is-empty" type="button">添加值</button></span>
+                <button class="skip-btn" type="button">今天不做</button>
+              </div>
+            </div>
+
+            <div class="group" data-group="forced">
+              <button class="group-head" type="button">
+                <i style="background:var(--color-forced)"></i>
+                被迫任务<span class="arrow">▾</span><span class="count">1 / 2</span>
+              </button>
+              <div class="task-row" data-status="done" tabindex="0">
+                <span class="check">✓</span><span class="task-name">开会</span>
+                <button class="skip-btn" type="button">今天不做</button>
+              </div>
+              <div class="task-row" data-status="pending" data-has-deadline tabindex="0">
+                <span class="check">✓</span><span class="task-name">交周报</span>
+                <span class="row-meta">
+                  <span class="chip warning" data-deadline="2026-11-15">11/15 <span class="sep">·</span> 今天截止</span>
+                  <button class="value-chip is-empty" type="button">添加值</button>
+                </span>
+                <button class="skip-btn" type="button">今天不做</button>
+              </div>
+            </div>
+
+            <!-- 今日到期待办 -->
+            <div class="group" data-group="todos">
+              <button class="todos-head" type="button">
+                <i style="background:var(--color-warning)"></i>
+                今日到期待办<span class="arrow">▾</span><span class="count">0 / 2</span>
+              </button>
+              <div class="todo" data-overdue tabindex="0">
+                <span class="mark">✓</span><span class="title">交房租</span>
+                <span class="row-meta">
+                  <span class="chip danger">11/10 <span class="sep">·</span> 逾期 5 天</span>
+                </span>
+              </div>
+              <div class="todo" tabindex="0">
+                <span class="mark">✓</span><span class="title">买猫粮</span>
+                <span class="row-meta">
+                  <span class="chip warning">11/15 <span class="sep">·</span> 今天</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="note">
+        <h3>本次改动</h3>
+        <ol>
+          <li>有截止日期的任务：<b>11/20 · 还差 5 天</b>，当天截止显示 <b>11/15 · 今天截止</b></li>
+          <li>日期和倒计时合并成一个 chip，右侧不再堆两个标签</li>
+          <li>待办行同样合并：<b>11/10 · 逾期 5 天</b> / <b>11/15 · 今天</b></li>
+          <li>值 chip 常显有值；空值只在 hover / focus 时出现</li>
+          <li>「今天不做」弱化为行尾次要操作，hover 才显示</li>
+        </ol>
+      </div>
+      <div class="note">
+        <h3>实现对应</h3>
+        <ul>
+          <li><code>TodayTask</code> 增加 <code>deadline</code>，取当前区间 <code>end</code></li>
+          <li>截止日期 chip 复用 <code>.chip.warning</code>，逾期复用 <code>.chip.danger</code></li>
+          <li>挂件展开态<b>不显示</b>任何截止日期信息</li>
+          <li>行内操作显隐规则统一到 <code>row-actions</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     任务表
+     ============================================================ -->
+<section class="stage" data-stage="grid">
+  <div class="stage-inner">
+    <p class="frame-caption"><b>任务表</b> 双行 sticky 表头 + sticky 任务列 · 今天列高亮 · 月份 pill 跟随滚动</p>
+    <div class="window">
+      <div class="titlebar">
+        <span class="dot"></span><span>DailyTask</span>
+        <span class="win-ctrl" aria-hidden="true">—&nbsp;&nbsp;▢&nbsp;&nbsp;✕</span>
+      </div>
+      <div class="app">
+        <aside class="nav">
+          <div class="nav-item"><svg class="icon"><use href="#i-today"/></svg>今日</div>
+          <div class="nav-item is-active"><svg class="icon"><use href="#i-grid"/></svg>任务表</div>
+          <div class="nav-item"><svg class="icon"><use href="#i-todo"/></svg>待办<span class="nav-count">5</span></div>
+          <div class="nav-item"><svg class="icon"><use href="#i-manage"/></svg>任务管理</div>
+          <div class="nav-item"><svg class="icon"><use href="#i-stats"/></svg>统计</div>
+          <div class="nav-item"><svg class="icon"><use href="#i-settings"/></svg>设置</div>
+        </aside>
+        <div class="content">
+          <div class="view-head">
+            <h1>任务表</h1>
+            <span class="sub">08/22 – 11/27 · 98 天</span>
+            <div class="tools">
+              <div class="seg" role="group" aria-label="缩放档位">
+                <button class="is-active" data-grid-mode="detail">详细</button>
+                <button data-grid-mode="overview">概览</button>
+              </div>
+              <button class="btn" type="button">今天</button>
+            </div>
+          </div>
+          <div class="card grid-card" data-mode="detail">
+            <div class="month-pill">2026 年 11 月</div>
+            <div class="grid-scroll"><div class="grid" id="task-grid" style="--cols: 98"></div></div>
+            <div class="grid-foot">
+              <span>7 个任务</span><span class="sep">·</span><span>98 天</span><span class="sep">·</span><span>今日 11/15</span>
+              <span class="right">Ctrl + 滚轮缩放</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note">
+        <h3>本次整理</h3>
+        <ol>
+          <li>表头、任务列、分组条的底色和边框统一，减少三套灰</li>
+          <li>今天列：日期头 + 整列 8% 绿底，右侧边界线</li>
+          <li>状态格保留符号，概览模式退化为色块</li>
+          <li>月份 pill 固定任务列右侧，随横向滚动换月</li>
+        </ol>
+      </div>
+      <div class="note">
+        <h3>不改的部分</h3>
+        <ul>
+          <li>业务交互：点格循环、备注气泡、缩放档位全部保持</li>
+          <li>不改数据结构、不改 <code>TaskGrid.tsx</code> 的数据流</li>
+          <li>只统一类名、间距和粘性层级</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     待办
+     ============================================================ -->
+<section class="stage" data-stage="todos">
+  <div class="stage-inner">
+    <p class="frame-caption"><b>待办</b> 输入草稿跨 tab 保留 · 日期与倒计时合并 · 右键菜单统一</p>
+    <div class="demo-bar">
+      <span>演示：</span>
+      <button type="button" data-toggle-actions>显示行内操作</button>
+      <button type="button" data-demo-menu="todo" class="is-on">打开右键菜单</button>
+      <button type="button" data-toggle="todo-draft">清空 / 恢复草稿</button>
+    </div>
+
+    <div class="window">
+      <div class="titlebar">
+        <span class="dot"></span><span>DailyTask</span>
+        <span class="win-ctrl" aria-hidden="true">—&nbsp;&nbsp;▢&nbsp;&nbsp;✕</span>
+      </div>
+      <div class="app">
+        <aside class="nav">
+          <div class="nav-item"><svg class="icon"><use href="#i-today"/></svg>今日</div>
+          <div class="nav-item"><svg class="icon"><use href="#i-grid"/></svg>任务表</div>
+          <div class="nav-item is-active"><svg class="icon"><use href="#i-todo"/></svg>待办<span class="nav-count">5</span></div>
+          <div class="nav-item"><svg class="icon"><use href="#i-manage"/></svg>任务管理</div>
+          <div class="nav-item"><svg class="icon"><use href="#i-stats"/></svg>统计</div>
+          <div class="nav-item"><svg class="icon"><use href="#i-settings"/></svg>设置</div>
+        </aside>
+
+        <div class="content">
+          <div class="view-head">
+            <h1>待办</h1>
+            <span class="sub">5 项未完成</span>
+          </div>
+
+          <!-- 输入 -->
+          <form class="card todo-form" onsubmit="return false">
+            <div class="input-wrap">
+              <textarea data-todo-input rows="1" placeholder="添加待办，回车保存" aria-label="添加待办">买猫粮</textarea>
+            </div>
+            <span class="date-input" data-todo-date>
+              <svg width="11" height="11" class="cal"><use href="#i-cal"/></svg>11/20
+            </span>
+            <button class="btn primary" type="submit">添加</button>
+          </form>
+          <div class="draft-hint" data-draft-hint>草稿会保留：切到其他页面再回来，标题和日期都还在</div>
+
+          <!-- 列表 -->
+          <div class="fill scroll" style="display:flex;flex-direction:column;gap:12px">
+            <div class="card todo-group">
+              <div class="todos-head">
+                <i style="background:var(--color-missed)"></i>逾期<span class="arrow">▾</span><span class="count">1</span>
+              </div>
+              <div class="todo" data-overdue data-todo="rent" tabindex="0">
+                <span class="mark">✓</span><span class="title">交房租</span>
+                <span class="row-meta"><span class="chip danger">11/10 <span class="sep">·</span> 逾期 5 天</span></span>
+                <span class="row-actions">
+                  <button class="icon-btn" type="button" title="改名">✎</button>
+                  <button class="icon-btn" type="button" title="改日期"><svg width="12" height="12"><use href="#i-cal"/></svg></button>
+                  <button class="icon-btn danger" type="button" title="删除">✕</button>
+                </span>
+              </div>
+            </div>
+
+            <div class="card todo-group">
+              <div class="todos-head">
+                <i style="background:var(--color-warning)"></i>今天<span class="arrow">▾</span><span class="count">1</span>
+              </div>
+              <div class="todo" data-todo="cat" tabindex="0">
+                <span class="mark">✓</span><span class="title">买猫粮</span>
+                <span class="row-meta"><span class="chip warning">11/15 <span class="sep">·</span> 今天</span></span>
+                <span class="row-actions">
+                  <button class="icon-btn" type="button" title="改名">✎</button>
+                  <button class="icon-btn" type="button" title="改日期"><svg width="12" height="12"><use href="#i-cal"/></svg></button>
+                  <button class="icon-btn danger" type="button" title="删除">✕</button>
+                </span>
+              </div>
+            </div>
+
+            <div class="card todo-group">
+              <div class="todos-head">
+                <i style="background:var(--color-border-strong)"></i>本周<span class="arrow">▾</span><span class="count">2</span>
+              </div>
+              <div class="todo" data-todo="checkup" tabindex="0">
+                <span class="mark">✓</span><span class="title">预约体检</span>
+                <span class="row-meta"><span class="chip warning">11/20 <span class="sep">·</span> 还差 5 天</span></span>
+                <span class="row-actions">
+                  <button class="icon-btn" type="button" title="改名">✎</button>
+                  <button class="icon-btn" type="button" title="改日期"><svg width="12" height="12"><use href="#i-cal"/></svg></button>
+                  <button class="icon-btn danger" type="button" title="删除">✕</button>
+                </span>
+              </div>
+              <div class="todo" data-todo="parcel" tabindex="0">
+                <span class="mark">✓</span><span class="title">取快递</span>
+                <span class="row-meta"><span class="chip warning">11/21 <span class="sep">·</span> 还差 6 天</span></span>
+                <span class="row-actions">
+                  <button class="icon-btn" type="button" title="改名">✎</button>
+                  <button class="icon-btn" type="button" title="改日期"><svg width="12" height="12"><use href="#i-cal"/></svg></button>
+                  <button class="icon-btn danger" type="button" title="删除">✕</button>
+                </span>
+              </div>
+            </div>
+
+            <div class="card todo-group">
+              <div class="todos-head">
+                <i style="background:var(--color-border-strong)"></i>以后<span class="arrow">▾</span><span class="count">1</span>
+              </div>
+              <div class="todo" data-todo="bulb" tabindex="0">
+                <span class="mark">✓</span><span class="title">换灯泡</span>
+                <span class="row-meta"><span class="chip neutral">无截止</span></span>
+                <span class="row-actions">
+                  <button class="icon-btn" type="button" title="改名">✎</button>
+                  <button class="icon-btn" type="button" title="改日期"><svg width="12" height="12"><use href="#i-cal"/></svg></button>
+                  <button class="icon-btn danger" type="button" title="删除">✕</button>
+                </span>
+              </div>
+            </div>
+
+            <div class="card todo-group">
+              <button class="todos-head" type="button" data-done-toggle>
+                <i style="background:var(--color-voluntary)"></i>已完成<span class="arrow">▸</span><span class="count">3</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 右键菜单 -->
+          <div class="menu" data-demo-panel="todo" style="right:120px;bottom:96px">
+            <p class="menu-head">预约体检</p>
+            <div class="menu-field">
+              <span>截止日期</span>
+              <span class="date-input"><svg width="11" height="11" class="cal"><use href="#i-cal"/></svg>11/20</span>
+            </div>
+            <div class="menu-actions">
+              <button class="btn ghost" type="button">清除日期</button>
+              <button class="btn primary" type="button">保存</button>
+            </div>
+            <div class="menu-sep"></div>
+            <button class="menu-item danger" type="button">删除待办</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="note">
+        <h3>本次改动</h3>
+        <ol>
+          <li>输入标题和截止日期放进 <b>uiStore 草稿</b>，切换页面不丢；创建成功才清空</li>
+          <li>行内日期 + 倒计时合并成一个 chip，右侧更干净</li>
+          <li><b>✎ / 日历 / ✕</b> 统一 hover 显示，删除用红色</li>
+          <li>右键菜单和挂件任务菜单共用同一套菜单样式</li>
+        </ol>
+      </div>
+      <div class="note">
+        <h3>注意</h3>
+        <ul>
+          <li>“无截止”保留中性 chip，不再和倒计时混用黄色</li>
+          <li>逾期行左侧 3px 红条保留</li>
+          <li>草稿只在本次运行内保留，重启应用清空</li>
+          <li>删除仍然二次确认，不因为整理 UI 改安全逻辑</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     任务管理
+     ============================================================ -->
+<section class="stage" data-stage="manage">
+  <div class="stage-inner">
+    <p class="frame-caption"><b>任务管理</b> 表格密度与状态 chip 统一 · 操作列 hover 显示</p>
+    <div class="demo-bar">
+      <span>演示：</span>
+      <button type="button" data-toggle-actions>显示操作列</button>
+    </div>
+    <div class="window">
+      <div class="titlebar">
+        <span class="dot"></span><span>DailyTask</span>
+        <span class="win-ctrl" aria-hidden="true">—&nbsp;&nbsp;▢&nbsp;&nbsp;✕</span>
+      </div>
+      <div class="app">
+        <aside class="nav">
+          <div class="nav-item"><svg class="icon"><use href="#i-today"/></svg>今日</div>
+          <div class="nav-item"><svg class="icon"><use href="#i-grid"/></svg>任务表</div>
+          <div class="nav-item"><svg class="icon"><use href="#i-todo"/></svg>待办<span class="nav-count">5</span></div>
+          <div class="nav-item is-active"><svg class="icon"><use href="#i-manage"/></svg>任务管理</div>
+          <div class="nav-item"><svg class="icon"><use href="#i-stats"/></svg>统计</div>
+          <div class="nav-item"><svg class="icon"><use href="#i-settings"/></svg>设置</div>
+        </aside>
+        <div class="content">
+          <div class="view-head">
+            <h1>任务管理</h1>
+            <span class="sub">4 个任务 · 1 个已停用</span>
+            <div class="tools"><button class="btn primary" type="button">新建任务</button></div>
+          </div>
+          <div class="card table-card">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th style="width:26%">任务</th>
+                  <th style="width:12%">类型</th>
+                  <th style="width:24%">启用日期</th>
+                  <th style="width:14%">截止日期</th>
+                  <th style="width:14%">状态</th>
+                  <th style="width:10%;text-align:right">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="name">早起</td>
+                  <td><span class="type"><i style="background:var(--color-voluntary)"></i>自愿</span></td>
+                  <td class="muted">08/01 – 至今</td>
+                  <td class="muted">无</td>
+                  <td><span class="chip success">进行中</span></td>
+                  <td>
+                    <div class="actions" style="opacity:1">
+                      <button class="icon-btn" type="button" title="编辑">✎</button>
+                      <button class="icon-btn danger" type="button" title="删除">✕</button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="name">背单词<span class="seg-badge">2 段</span></td>
+                  <td><span class="type"><i style="background:var(--color-voluntary)"></i>自愿</span></td>
+                  <td class="muted">10/01 – 11/20</td>
+                  <td class="muted">11/20</td>
+                  <td><span class="chip success">进行中</span></td>
+                  <td>
+                    <div class="actions">
+                      <button class="icon-btn" type="button" title="编辑">✎</button>
+                      <button class="icon-btn danger" type="button" title="删除">✕</button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="name">交周报</td>
+                  <td><span class="type"><i style="background:var(--color-forced)"></i>被迫</span></td>
+                  <td class="muted">09/01 – 11/15</td>
+                  <td class="muted">11/15</td>
+                  <td><span class="chip warning">今日为止</span></td>
+                  <td>
+                    <div class="actions">
+                      <button class="icon-btn" type="button" title="编辑">✎</button>
+                      <button class="icon-btn danger" type="button" title="删除">✕</button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="name">跳绳</td>
+                  <td><span class="type"><i style="background:var(--color-voluntary)"></i>自愿</span></td>
+                  <td class="muted">06/01 – 10/31</td>
+                  <td class="muted">10/31</td>
+                  <td><span class="chip neutral">已停用</span></td>
+                  <td>
+                    <div class="actions">
+                      <button class="icon-btn" type="button" title="重新启用">↻</button>
+                      <button class="icon-btn danger" type="button" title="删除">✕</button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="table-note">多段区间只显示最新一段，用「N 段」角标提示；新建任务可设置可选截止日期。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note">
+        <h3>本次整理</h3>
+        <ol>
+          <li>类型统一为「色点 + 沉稳文字」，不用彩色底 chip</li>
+          <li>状态 chip：进行中绿、今日为止黄、已停用中性</li>
+          <li>操作列 hover 显示，减少每行右侧噪音</li>
+          <li>日期列统一 <b>MM/dd – MM/dd</b>，无截止写「无」</li>
+        </ol>
+      </div>
+      <div class="note">
+        <h3>不改的部分</h3>
+        <ul>
+          <li>多段区间的编辑弹窗逻辑</li>
+          <li>停用 / 重新启用 / 删除的二次确认</li>
+          <li>表格数据来源和排序</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     统计
+     ============================================================ -->
+<section class="stage" data-stage="stats">
+  <div class="stage-inner">
+    <p class="frame-caption"><b>统计</b> 统一表格行高、进度条与口径说明</p>
+    <div class="window">
+      <div class="titlebar">
+        <span class="dot"></span><span>DailyTask</span>
+        <span class="win-ctrl" aria-hidden="true">—&nbsp;&nbsp;▢&nbsp;&nbsp;✕</span>
+      </div>
+      <div class="app">
+        <aside class="nav">
+          <div class="nav-item"><svg class="icon"><use href="#i-today"/></svg>今日</div>
+          <div class="nav-item"><svg class="icon"><use href="#i-grid"/></svg>任务表</div>
+          <div class="nav-item"><svg class="icon"><use href="#i-todo"/></svg>待办<span class="nav-count">5</span></div>
+          <div class="nav-item"><svg class="icon"><use href="#i-manage"/></svg>任务管理</div>
+          <div class="nav-item is-active"><svg class="icon"><use href="#i-stats"/></svg>统计</div>
+          <div class="nav-item"><svg class="icon"><use href="#i-settings"/></svg>设置</div>
+        </aside>
+        <div class="content">
+          <div class="view-head">
+            <h1>统计</h1>
+            <span class="sub">近 30 天完成情况</span>
+          </div>
+          <div class="card table-card">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th style="width:32%">任务</th>
+                  <th style="width:18%">当前连续</th>
+                  <th>近 30 天</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="name">早起</td>
+                  <td class="muted">12 天</td>
+                  <td>
+                    <div class="bar-wrap"><div class="bar"><i style="width:92%"></i></div><span class="pct">92%</span></div>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="name">背单词</td>
+                  <td class="muted">8 天</td>
+                  <td>
+                    <div class="bar-wrap"><div class="bar"><i style="width:74%"></i></div><span class="pct">74%</span></div>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="name">开会</td>
+                  <td class="muted">4 天</td>
+                  <td>
+                    <div class="bar-wrap"><div class="bar"><i style="width:61%"></i></div><span class="pct">61%</span></div>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="name">阅读 20 分钟</td>
+                  <td class="muted">2 天</td>
+                  <td>
+                    <div class="bar-wrap"><div class="bar"><i style="width:38%"></i></div><span class="pct">38%</span></div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="table-note">口径：只统计适用且未跳过的日子；今日待办计入当天完成率。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note">
+        <h3>本次整理</h3>
+        <ol>
+          <li>连续天数和百分比都用 tabular-nums，列对齐</li>
+          <li>进度条高度 6，轨道用 <code>--color-na</code>，填充用自愿绿</li>
+          <li>口径说明固定在表底，不随行滚动</li>
+        </ol>
+      </div>
+      <div class="note">
+        <h3>不改的部分</h3>
+        <ul>
+          <li>统计口径和最近 30 天窗口</li>
+          <li>任务排序与数据来源</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     设置
+     ============================================================ -->
+<section class="stage" data-stage="settings">
+  <div class="stage-inner">
+    <p class="frame-caption"><b>设置</b> 两列卡片 · 开关统一 34×20 · 危险操作不使用主色</p>
+    <div class="window">
+      <div class="titlebar">
+        <span class="dot"></span><span>DailyTask</span>
+        <span class="win-ctrl" aria-hidden="true">—&nbsp;&nbsp;▢&nbsp;&nbsp;✕</span>
+      </div>
+      <div class="app">
+        <aside class="nav">
+          <div class="nav-item"><svg class="icon"><use href="#i-today"/></svg>今日</div>
+          <div class="nav-item"><svg class="icon"><use href="#i-grid"/></svg>任务表</div>
+          <div class="nav-item"><svg class="icon"><use href="#i-todo"/></svg>待办<span class="nav-count">5</span></div>
+          <div class="nav-item"><svg class="icon"><use href="#i-manage"/></svg>任务管理</div>
+          <div class="nav-item"><svg class="icon"><use href="#i-stats"/></svg>统计</div>
+          <div class="nav-item is-active"><svg class="icon"><use href="#i-settings"/></svg>设置</div>
+        </aside>
+        <div class="content">
+          <div class="view-head">
+            <h1>设置</h1>
+            <span class="sub">修改后立即生效</span>
+          </div>
+          <div class="settings-scroll fill">
+            <div class="settings-grid">
+              <section class="card settings-card">
+                <h2>外观</h2>
+                <div class="setting-row">
+                  <div class="label"><b>主题</b><span>跟随系统或手动指定</span></div>
+                  <div class="control">
+                    <div class="seg">
+                      <button class="is-active" type="button">跟随系统</button>
+                      <button type="button">浅色</button>
+                      <button type="button">深色</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="setting-row">
+                  <div class="label"><b>语言</b><span>界面文案与日期格式</span></div>
+                  <div class="control"><select class="select"><option>跟随系统</option><option>简体中文</option><option>English</option></select></div>
+                </div>
+              </section>
+
+              <section class="card settings-card">
+                <h2>行为</h2>
+                <div class="setting-row">
+                  <div class="label"><b>自动结算漏打</b><span>过了当天仍未打卡记为未完成</span></div>
+                  <div class="control"><label class="switch"><input type="checkbox" checked><i></i></label></div>
+                </div>
+                <div class="setting-row">
+                  <div class="label"><b>一天起始时间</b><span>用于判断“今天”的边界</span></div>
+                  <div class="control"><select class="select"><option>04:00</option><option>00:00</option><option>06:00</option></select></div>
+                </div>
+              </section>
+
+              <section class="card settings-card">
+                <h2>窗口</h2>
+                <div class="setting-row">
+                  <div class="label"><b>挂件置顶</b><span>始终显示在其他窗口上方</span></div>
+                  <div class="control"><label class="switch"><input type="checkbox" checked><i></i></label></div>
+                </div>
+                <div class="setting-row">
+                  <div class="label"><b>开机自启</b><span>登录系统后自动运行</span></div>
+                  <div class="control"><label class="switch"><input type="checkbox"><i></i></label></div>
+                </div>
+              </section>
+
+              <section class="card settings-card">
+                <h2>数据</h2>
+                <div class="setting-row">
+                  <div class="label"><b>本地备份</b><span>每日自动备份，保留最近 7 份</span></div>
+                  <div class="control"><span class="chip success">运行中</span></div>
+                </div>
+                <div class="settings-actions">
+                  <button class="btn" type="button">导出数据</button>
+                  <button class="btn" type="button">导入数据</button>
+                  <button class="btn danger" type="button">清空数据</button>
+                </div>
+              </section>
+
+              <section class="card settings-card" style="grid-column:1 / -1">
+                <h2>更新</h2>
+                <div class="setting-row">
+                  <div class="version">当前版本 <b>v0.1.15</b> · 最近检查：今天 09:12</div>
+                  <div class="control"><button class="btn" type="button">检查更新</button></div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note">
+        <h3>本次整理</h3>
+        <ol>
+          <li>两列卡片对齐，行高统一 30，标签和说明两级字号</li>
+          <li>开关统一 34×20，主色只在开启态出现</li>
+          <li>数据操作按钮同组排列，危险操作红色文字</li>
+          <li>更新卡片单独占满一行，版本号加粗</li>
+        </ol>
+      </div>
+      <div class="note">
+        <h3>不改的部分</h3>
+        <ul>
+          <li>设置项含义、存储位置和即时生效逻辑</li>
+          <li>导入 / 导出确认流程</li>
+          <li>更新检查与安装重启流程</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     挂件
+     ============================================================ -->
+<section class="stage" data-stage="widget">
+  <div class="stage-inner">
+    <p class="frame-caption"><b>挂件</b> 展开 260×360（含 8px 透明边距）· 胶囊 96×36 · 展开态不显示任务截止日期</p>
+    <div class="demo-bar">
+      <span>演示：</span>
+      <button type="button" data-toggle-actions>显示悬停操作</button>
+      <button type="button" data-demo-menu="widget-task" class="is-on">打开任务菜单</button>
+      <button type="button" data-demo-menu="capsule" class="is-on">打开胶囊右键菜单</button>
+    </div>
+
+    <div class="widget-stage">
+      <!-- 展开态 -->
+      <div class="widget-slot">
+        <div class="checker widget-frame">
+          <div class="widget-card is-hover">
+            <div class="w-head">
+              <span class="w-date">今日 · 11/15 周日</span>
+              <div class="w-actions">
+                <button class="w-act" type="button" title="展开主窗口"><svg><use href="#i-expand"/></svg></button>
+                <button class="w-act" type="button" title="取消置顶"><svg><use href="#i-pin"/></svg></button>
+                <button class="w-act" type="button" title="收起挂件"><svg><use href="#i-collapse"/></svg></button>
+              </div>
+            </div>
+
+            <div class="w-ring-wrap">
+              <svg viewBox="0 0 40 40" aria-hidden="true">
+                <circle class="w-ring-track" cx="20" cy="20" r="17"/>
+                <circle class="w-ring-fg" cx="20" cy="20" r="17" transform="rotate(-90 20 20)"
+                        stroke-dasharray="106.81" stroke-dashoffset="66.76"/>
+              </svg>
+              <div class="w-ring-text">
+                <b>3 / 8</b>
+                <span>38% · 还剩 5 项</span>
+                <div class="w-splits">
+                  <span><i style="background:var(--color-voluntary)"></i>自愿 2/4</span>
+                  <span><i style="background:var(--color-forced)"></i>被迫 1/2</span>
+                  <span><i style="background:var(--color-warning)"></i>待办 0/2</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="w-scroll">
+              <button class="w-group-head" type="button">
+                <i style="background:var(--color-voluntary)"></i>自愿任务<span class="arrow">▾</span><span class="count">2 / 4</span>
+              </button>
+              <div class="w-task is-done"><span class="w-check">✓</span><span class="w-name">早起</span></div>
+              <div class="w-task is-done"><span class="w-check">✓</span><span class="w-name">背单词</span><span class="w-value">30 分</span></div>
+              <div class="w-task"><span class="w-check">✓</span><span class="w-name">跑步</span><span class="w-value">5 km</span><button class="w-more" type="button">⋯</button></div>
+              <div class="w-task"><span class="w-check">✓</span><span class="w-name">阅读 20 分钟</span><button class="w-more" type="button">⋯</button></div>
+
+              <button class="w-group-head" type="button">
+                <i style="background:var(--color-forced)"></i>被迫任务<span class="arrow">▾</span><span class="count">1 / 2</span>
+              </button>
+              <div class="w-task is-done"><span class="w-check">✓</span><span class="w-name">开会</span></div>
+              <div class="w-task"><span class="w-check">✓</span><span class="w-name">交周报</span><button class="w-more" type="button">⋯</button></div>
+
+              <button class="w-group-head" type="button">
+                <i style="background:var(--color-warning)"></i>今日到期待办<span class="arrow">▾</span><span class="count">0 / 2</span>
+              </button>
+              <div class="w-todo"><span class="w-dot">✓</span><span class="w-title">交房租</span><span class="w-meta">逾期 5 天</span></div>
+              <div class="w-todo"><span class="w-dot">✓</span><span class="w-title">买猫粮</span><span class="w-meta">今天</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="slot-label"><b>展开态</b> · 截止日期不显示 · 值 chip 保留</div>
+      </div>
+
+      <!-- 任务菜单 -->
+      <div class="widget-slot" style="padding-top:72px">
+        <div class="menu in-flow" data-demo-panel="widget-task" style="width:148px;padding:4px">
+          <p class="menu-head" style="padding:2px 4px 4px">跑步</p>
+          <button class="menu-item" type="button" style="height:24px;font-size:11px">已完成</button>
+          <button class="menu-item" type="button" style="height:24px;font-size:11px">未完成</button>
+          <button class="menu-item" type="button" style="height:24px;font-size:11px">今天不做</button>
+          <button class="menu-item" type="button" style="height:24px;font-size:11px">清除</button>
+        </div>
+        <div class="slot-label"><b>任务右键菜单</b> · 宽 148 / 项高 24</div>
+      </div>
+
+      <!-- 胶囊 + 右键菜单 -->
+      <div class="widget-slot" style="padding-top:96px">
+        <div class="checker capsule-frame">
+          <div class="capsule" tabindex="0">
+            <span class="arrow">‹</span><span>展开</span><b>3/8</b>
+          </div>
+        </div>
+        <div class="slot-label"><b>胶囊态</b> · 右边缘停靠</div>
+        <div style="position:relative; margin-top:8px">
+          <div class="native-menu" data-demo-panel="capsule">
+            <div class="n-item">展开挂件</div>
+            <div class="n-sep"></div>
+            <div class="n-item">隐藏挂件</div>
+          </div>
+          <div class="capsule-hint" style="margin-top:8px;text-align:center">右键弹出 · 系统原生菜单（示意）</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="note">
+        <h3>本次改动</h3>
+        <ol>
+          <li>展开态任务行<b>不再显示</b>「还差 N 天」或截止日期</li>
+          <li>胶囊右键菜单：<b>展开挂件 / 隐藏挂件</b></li>
+          <li>隐藏 = 销毁挂件窗口，托盘点「显示挂件」唤回</li>
+          <li>展开态标题栏三个操作仍只在 hover 出现</li>
+        </ol>
+      </div>
+      <div class="note">
+        <h3>实现约束</h3>
+        <ul>
+          <li>胶囊窗口只有 96×36，HTML 菜单会被裁切</li>
+          <li>所以右键菜单用 <code>@tauri-apps/api/menu</code> 原生 popup</li>
+          <li>菜单样式由系统决定，和应用内菜单不完全一致</li>
+          <li>左键展开、拖动吸附、拖后不触发展开保持现状</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     组件规范
+     ============================================================ -->
+<section class="stage" data-stage="spec">
+  <div class="stage-inner">
+    <p class="frame-caption"><b>组件规范</b> 本次整理沉淀出的可复用规则，后续 React 落地按这里执行</p>
+
+    <div class="spec-grid">
+      <section class="card spec-card">
+        <h2>Chip</h2>
+        <p>高度主窗 18 / 挂件 16，圆角 pill，11px 600。语义固定，不再每个页面手写颜色。</p>
+        <div class="spec-row">
+          <span class="chip date">11/20</span>
+          <span class="chip warning">11/20 · 还差 5 天</span>
+          <span class="chip danger">11/10 · 逾期 5 天</span>
+          <span class="chip success">进行中</span>
+          <span class="chip info">被迫</span>
+          <span class="chip neutral">无截止</span>
+        </div>
+        <p style="margin-top:12px">
+          <b style="color:var(--color-text)">规则：</b>
+          日期和倒计时合并；今天截止用 warning；逾期用 danger；无截止用 neutral。
+        </p>
+      </section>
+
+      <section class="card spec-card">
+        <h2>按钮</h2>
+        <p>主按钮只给“添加 / 保存 / 新建”；次按钮描边；危险操作红色文字，不用红色填充。</p>
+        <div class="spec-row">
+          <button class="btn primary" type="button">添加</button>
+          <button class="btn" type="button">取消</button>
+          <button class="btn ghost" type="button">今天不做</button>
+          <button class="btn danger" type="button">删除</button>
+          <button class="icon-btn" type="button" title="编辑">✎</button>
+          <button class="icon-btn danger" type="button" title="删除">✕</button>
+        </div>
+        <p style="margin-top:12px">主窗按钮高 28，挂件操作高 18–24；焦点态统一 <code>--focus-ring</code>。</p>
+      </section>
+
+      <section class="card spec-card">
+        <h2>菜单</h2>
+        <p>应用内菜单统一 216px、padding 6、菜单项 28；首行显示对象名称；危险项单独分隔。</p>
+        <div style="position:relative;height:180px">
+          <div class="menu" style="left:0;top:0">
+            <p class="menu-head">预约体检</p>
+            <button class="menu-item" type="button">改日期<span class="kbd">11/20</span></button>
+            <button class="menu-item" type="button">清除日期</button>
+            <div class="menu-sep"></div>
+            <button class="menu-item danger" type="button">删除待办</button>
+          </div>
+        </div>
+        <p>挂件任务菜单宽 148、项高 24；胶囊右键走系统原生菜单。</p>
+      </section>
+
+      <section class="card spec-card">
+        <h2>行内操作</h2>
+        <p>勾选和名称常显；值、改名、日期、删除 hover / focus 才出现。危险操作永远最后。</p>
+        <div class="anatomy">
+          <div class="task-row" data-status="pending">
+            <span class="check">✓</span>
+            <span class="task-name">跑步</span>
+            <span class="row-meta"><span class="chip warning">11/20 · 还差 5 天</span></span>
+            <span class="row-actions" style="opacity:1">
+              <button class="icon-btn" type="button" title="改名">✎</button>
+              <button class="icon-btn" type="button" title="日期"><svg width="12" height="12"><use href="#i-cal"/></svg></button>
+              <button class="icon-btn danger" type="button" title="删除">✕</button>
+            </span>
+          </div>
+        </div>
+        <p>行高主窗 34 / 挂件 26；主窗勾选 22×22，挂件 17×17。</p>
+      </section>
+
+      <section class="card spec-card">
+        <h2>行密度</h2>
+        <p>同一套语义，两档密度。挂件只缩尺寸，不缩信息层级。</p>
+        <div class="density-row">
+          <span class="check" style="width:22px;height:22px;background:var(--color-voluntary);border-color:var(--color-voluntary);color:#fff">✓</span>
+          <span>主窗任务行</span>
+          <span class="chip warning" style="margin-left:auto">11/20 · 还差 5 天</span>
+          <span class="measure">34px</span>
+        </div>
+        <div class="density-widget" style="margin-top:8px;background:var(--color-surface);border:1px solid var(--color-border)">
+          <span class="w-check">✓</span>
+          <span class="w-name">挂件任务行</span>
+          <span class="w-value">30 分</span>
+          <span class="measure">26px</span>
+        </div>
+      </section>
+
+      <section class="card spec-card">
+        <h2>状态与颜色</h2>
+        <p>只使用 tokens.css 的语义色，不新增裸色值。</p>
+        <div class="spec-row">
+          <span class="chip success">自愿 / 完成</span>
+          <span class="chip info">被迫</span>
+          <span class="chip danger">未完成 / 危险</span>
+          <span class="chip warning">截止 / 警告</span>
+          <span class="chip neutral">中性 / 已停用</span>
+        </div>
+        <p style="margin-top:12px">今天列、选中导航等大面积底色统一用 <code>color-mix(... 8–10%)</code>，不叠加第二种强调色。</p>
+      </section>
+    </div>
+
+    <div class="notes">
+      <div class="note">
+        <h3>落地顺序</h3>
+        <ol>
+          <li>先抽 <code>Chip</code> 和 <code>MenuSurface</code> 两个小组件</li>
+          <li>今日、待办、挂件先接，覆盖本次功能</li>
+          <li>再整理任务表、管理、统计、设置</li>
+          <li>保留所有 <code>data-*</code> 测试标记和业务逻辑</li>
+        </ol>
+      </div>
+      <div class="note">
+        <h3>不在本次范围</h3>
+        <ul>
+          <li>不改数据库结构和领域计算</li>
+          <li>不重写任务表虚拟化</li>
+          <li>不引入第三方 UI 组件库</li>
+          <li>不改变托盘、单实例、更新流程</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  // ---------- 主题 ----------
+  const root = document.documentElement;
+  const themeFromUrl = new URLSearchParams(location.search).get('theme');
+  if (themeFromUrl === 'dark') root.dataset.theme = 'dark';
+  function syncThemeButtons() {
+    document.querySelectorAll('[data-theme-btn]').forEach(btn => {
+      btn.classList.toggle('is-active', btn.dataset.themeBtn === root.dataset.theme);
+    });
+  }
+  syncThemeButtons();
+  document.querySelectorAll('[data-theme-btn]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      root.dataset.theme = btn.dataset.themeBtn;
+      syncThemeButtons();
+    });
+  });
+
+  // ---------- 视图切换 ----------
+  function showView(name) {
+    document.querySelectorAll('[data-view]').forEach(tab => {
+      const on = tab.dataset.view === name;
+      tab.classList.toggle('is-active', on);
+      tab.setAttribute('aria-selected', String(on));
+    });
+    document.querySelectorAll('[data-stage]').forEach(stage => {
+      const on = stage.dataset.stage === name;
+      stage.classList.toggle('is-active', on);
+      if (on && name === 'grid') requestAnimationFrame(scrollToToday);
+    });
+  }
+  document.querySelectorAll('[data-view]').forEach(tab => {
+    tab.addEventListener('click', () => showView(tab.dataset.view));
+  });
+
+  // ---------- 演示开关 ----------
+  document.querySelectorAll('[data-toggle-actions]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const on = document.body.classList.toggle('force-actions');
+      btn.classList.toggle('is-on', on);
+    });
+  });
+
+  document.querySelectorAll('[data-demo-menu]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const panel = document.querySelector(`[data-demo-panel="${btn.dataset.demoMenu}"]`);
+      if (!panel) return;
+      const show = panel.hidden;
+      panel.hidden = !show;
+      btn.classList.toggle('is-on', show);
+    });
+  });
+  document.querySelectorAll('[data-demo-panel]').forEach(panel => { panel.hidden = false; });
+
+  document.querySelectorAll('[data-toggle="today-deadline"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const on = btn.classList.toggle('is-on');
+      document.querySelectorAll('[data-stage="today"] .task-row').forEach(row => {
+        row.style.display = on && !row.hasAttribute('data-has-deadline') ? 'none' : '';
+      });
+    });
+  });
+
+  document.querySelector('[data-toggle="todo-draft"]')?.addEventListener('click', (event) => {
+    const input = document.querySelector('[data-todo-input]');
+    const hint = document.querySelector('[data-draft-hint]');
+    const wasFilled = input.value.length > 0;
+    input.value = wasFilled ? '' : '买猫粮';
+    event.currentTarget.classList.toggle('is-on', wasFilled);
+    hint.textContent = wasFilled
+      ? '草稿已清空；输入后切换页面再回来会保留'
+      : '草稿会保留：切到其他页面再回来，标题和日期都还在';
+  });
+
+  // ---------- 今日：行状态循环 + 进度 ----------
+  const todayRows = [...document.querySelectorAll('[data-stage="today"] .task-row')];
+  const cycle = { pending: 'done', done: 'missed', missed: 'skipped', skipped: 'pending' };
+  const RING_C = 2 * Math.PI * 42;
+
+  function refreshToday() {
+    const counted = todayRows.filter(row => row.dataset.status !== 'skipped');
+    const done = counted.filter(row => row.dataset.status === 'done').length;
+    const total = counted.length + 2; // 两条到期待办
+    const todoDone = document.querySelectorAll('[data-stage="today"] .todo[data-done]').length;
+    const allDone = done + todoDone;
+    const ratio = total ? allDone / total : 0;
+    const fg = document.querySelector('[data-stage="today"] .ring-fg');
+    if (fg) fg.style.strokeDashoffset = RING_C * (1 - ratio);
+    document.querySelector('[data-ring-done]').textContent = allDone;
+    document.querySelector('[data-ring-total]').textContent = total;
+    document.querySelector('[data-progress-done]').textContent = allDone;
+    document.querySelector('[data-progress-total]').textContent = total;
+    document.querySelector('[data-progress-pct]').textContent = Math.round(ratio * 100) + '%';
+    const left = Math.max(total - allDone, 0);
+    document.querySelector('[data-progress-note]').textContent = left ? `还剩 ${left} 项` : '全部完成';
+
+    const todoSplit = document.querySelector('[data-split="todos"]');
+    if (todoSplit) todoSplit.textContent = `${todoDone} / 2`;
+    const todoGroup = document.querySelector('[data-stage="today"] [data-group="todos"]');
+    if (todoGroup) todoGroup.querySelector('.count').textContent = `${todoDone} / 2`;
+
+    document.querySelectorAll('[data-stage="today"] [data-group]').forEach(group => {
+      const rows = [...group.querySelectorAll('.task-row')];
+      if (!rows.length) return;
+      const doneCount = rows.filter(row => row.dataset.status === 'done').length;
+      const totalCount = rows.filter(row => row.dataset.status !== 'skipped').length;
+      group.querySelector('.count').textContent = `${doneCount} / ${totalCount}`;
+      const key = group.dataset.group;
+      const split = document.querySelector(`[data-split="${key}"]`);
+      if (split) split.textContent = `${doneCount} / ${totalCount}`;
+    });
+  }
+
+  todayRows.forEach(row => {
+    row.addEventListener('click', event => {
+      if (event.target.closest('.skip-btn, .value-chip, .row-actions')) return;
+      row.dataset.status = cycle[row.dataset.status] ?? 'done';
+      refreshToday();
+    });
+    row.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        row.dataset.status = cycle[row.dataset.status] ?? 'done';
+        refreshToday();
+      }
+    });
+    row.querySelector('.skip-btn')?.addEventListener('click', event => {
+      event.stopPropagation();
+      row.dataset.status = row.dataset.status === 'skipped' ? 'pending' : 'skipped';
+      refreshToday();
+    });
+  });
+
+  document.querySelectorAll('[data-stage="today"] .todo').forEach(todo => {
+    todo.addEventListener('click', () => {
+      todo.toggleAttribute('data-done');
+      refreshToday();
+    });
+  });
+
+  document.querySelectorAll('.group-head, .todos-head').forEach(head => {
+    head.addEventListener('click', () => {
+      const group = head.parentElement;
+      const rows = [...group.children].filter(el => el !== head);
+      const collapsed = group.toggleAttribute('data-collapsed');
+      const arrow = head.querySelector('.arrow');
+      if (arrow) arrow.textContent = collapsed ? '▸' : '▾';
+      rows.forEach(row => { row.style.display = collapsed ? 'none' : ''; });
+    });
+  });
+
+  refreshToday();
+
+  // ---------- 任务表 ----------
+  const GRID_START = Date.UTC(2026, 7, 22);
+  const GRID_DAYS = 98;
+  const TODAY_INDEX = 85; // 11/15
+  const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
+  const GRID_GROUPS = [
+    {
+      title: '自愿任务', color: 'var(--color-voluntary)',
+      rows: [
+        { name: '早起', seed: 1 },
+        { name: '跑步', seed: 2 },
+        { name: '背单词', seed: 3 },
+        { name: '阅读 20 分钟', seed: 4 },
+      ],
+    },
+    {
+      title: '被迫任务', color: 'var(--color-forced)',
+      rows: [
+        { name: '开会', seed: 5 },
+        { name: '交周报', seed: 6 },
+        { name: '打卡', seed: 7 },
+      ],
+    },
+  ];
+
+  function stateAt(seed, i) {
+    if (i > TODAY_INDEX + 7) return 'n';
+    if (seed === 3 && i < 61) return 'n';
+    const r = (i * 7 + seed * 11) % 13;
+    return r === 0 ? 'm' : r === 5 ? 's' : 'd';
+  }
+  function symbolOf(ch) {
+    return ch === 'd' ? '✓' : ch === 'm' ? '✗' : ch === 'n' ? '▫' : ch === 's' ? '–' : '';
+  }
+  function classOf(ch) {
+    return ch === 'd' ? 'is-done' : ch === 'm' ? 'is-missed' : ch === 'n' ? 'is-na' : ch === 's' ? 'is-skipped' : '';
+  }
+
+  function buildGrid() {
+    const grid = document.getElementById('task-grid');
+    if (!grid || grid.dataset.built) return;
+    grid.dataset.built = '1';
+
+    const monthRow = document.createElement('div');
+    monthRow.className = 'grid-row g-head month';
+    const mCorner = document.createElement('div');
+    mCorner.className = 'g-corner';
+    const mTrack = document.createElement('div');
+    mTrack.className = 'g-month-track';
+    mTrack.style.gridColumn = '2 / -1';
+    monthRow.append(mCorner, mTrack);
+    grid.appendChild(monthRow);
+
+    const dateRow = document.createElement('div');
+    dateRow.className = 'grid-row g-head dates';
+    const dCorner = document.createElement('div');
+    dCorner.className = 'g-corner';
+    dCorner.textContent = '任务 / 日期';
+    dateRow.appendChild(dCorner);
+    for (let i = 0; i < GRID_DAYS; i++) {
+      const d = new Date(GRID_START + i * 86400000);
+      const cell = document.createElement('div');
+      cell.className = 'g-date' + (i === TODAY_INDEX ? ' is-today' : '');
+      cell.innerHTML = `<b>${d.getUTCDate()}</b><small>${WEEKDAYS[d.getUTCDay()]}</small>`;
+      dateRow.appendChild(cell);
+    }
+    grid.appendChild(dateRow);
+
+    GRID_GROUPS.forEach(group => {
+      const groupRow = document.createElement('div');
+      groupRow.className = 'grid-row';
+      const label = document.createElement('div');
+      label.className = 'g-group-label';
+      label.innerHTML = `<i style="background:${group.color}"></i>${group.title} · ${group.rows.length}`;
+      const fill = document.createElement('div');
+      fill.className = 'g-group-fill';
+      fill.style.gridColumn = '2 / -1';
+      groupRow.append(label, fill);
+      grid.appendChild(groupRow);
+
+      group.rows.forEach(row => {
+        const tr = document.createElement('div');
+        tr.className = 'grid-row';
+        const task = document.createElement('div');
+        task.className = 'g-task';
+        task.innerHTML = `<i style="background:${group.color}"></i><span>${row.name}</span>`;
+        tr.appendChild(task);
+        for (let i = 0; i < GRID_DAYS; i++) {
+          const ch = stateAt(row.seed, i);
+          const cell = document.createElement('div');
+          cell.className = `g-cell ${classOf(ch)}${i === TODAY_INDEX ? ' is-today' : ''}`;
+          cell.textContent = symbolOf(ch);
+          if (ch !== 'n') {
+            cell.addEventListener('click', () => {
+              const next = cell.dataset.state === 'd' ? 'm' : cell.dataset.state === 'm' ? '.' : 'd';
+              cell.dataset.state = next;
+              cell.className = `g-cell ${classOf(next)}${i === TODAY_INDEX ? ' is-today' : ''}`;
+              cell.textContent = symbolOf(next);
+            });
+          }
+          tr.appendChild(cell);
+        }
+        grid.appendChild(tr);
+      });
+    });
+  }
+
+  function scrollToToday() {
+    const scroller = document.querySelector('.grid-scroll');
+    if (!scroller || !scroller.offsetParent) return;
+    const cellW = parseFloat(getComputedStyle(document.getElementById('task-grid')).getPropertyValue('--cell')) || 32;
+    const visible = Math.floor((scroller.clientWidth - 160) / cellW);
+    scroller.scrollLeft = Math.max(0, (TODAY_INDEX - Math.max(visible - 4, 0)) * cellW);
+    updateMonthPill();
+  }
+  function updateMonthPill() {
+    const scroller = document.querySelector('.grid-scroll');
+    const pill = document.querySelector('.month-pill');
+    if (!scroller || !pill) return;
+    const cellW = parseFloat(getComputedStyle(document.getElementById('task-grid')).getPropertyValue('--cell')) || 32;
+    const idx = Math.min(GRID_DAYS - 1, Math.max(0, Math.floor(scroller.scrollLeft / cellW)));
+    const d = new Date(GRID_START + idx * 86400000);
+    pill.textContent = `${d.getUTCFullYear()} 年 ${d.getUTCMonth() + 1} 月`;
+  }
+  document.querySelector('.grid-scroll')?.addEventListener('scroll', updateMonthPill);
+
+  document.querySelectorAll('[data-grid-mode]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const card = document.querySelector('.grid-card');
+      card.dataset.mode = btn.dataset.gridMode;
+      document.querySelectorAll('[data-grid-mode]').forEach(b => b.classList.toggle('is-active', b === btn));
+      requestAnimationFrame(scrollToToday);
+    });
+  });
+
+  buildGrid();
+
+  // ---------- 直达链接 ----------
+  const directView = new URLSearchParams(location.search).get('view');
+  if (directView) showView(directView);
+</script>
+</body>
+</html>
