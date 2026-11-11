@@ -1,8 +1,8 @@
-# DailyTask 开发进度 · v0.1.15
+# DailyTask 开发进度 · v0.1.16
 
 > 类型：项目记录
 > 状态：迭代中
-> 当前版本：v0.1.15
+> 当前版本：v0.1.16
 > 本轮：2026-11-11 草稿保留、截止日期、胶囊隐藏与 UI 整理，共 4 项，完成 **4/4**
 > 相关：changelog.md、../explanation/roadmap.md
 
@@ -259,9 +259,9 @@
 
 ---
 
-## 11. v0.1.15 完成记录（2026-11-11）
+## 11. v0.1.16 完成记录（2026-11-11）
 
-全量校验：`npm run test` **348 passed**、`npm run lint`、`npm run typecheck`、`npm run docs:check`、`npm run build`、`cargo check` 全绿。
+全量校验：`npm run test` **348 passed**、`npm run lint`、`npm run typecheck`、`npm run docs:check`、`npm run build`、`cargo check` 全绿。已发布 v0.1.16：<https://github.com/yearzen1/DailyTask/releases/tag/v0.1.16>。
 
 - **#24**：待办快速新增的标题与截止日期移入 `uiStore.todoDraft`，切换视图后保留；`Todos.test` 覆盖卸载重挂与创建失败保留。
 - **#25**：`TodayTask` 增加 `deadline`；今日页显示「11/20 · 还差 5 天」/「11/15 · 今天截止」，挂件删除截止倒计时；选择器与今日、挂件测试同步更新。
