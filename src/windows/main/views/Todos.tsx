@@ -15,8 +15,15 @@ import {
   type TodoItem,
 } from "../../../stores/selectors/todos";
 import { useTodosStore } from "../../../stores/todosStore";
+import { useUiStore } from "../../../stores/uiStore";
+import { Chip } from "../../../ui/Chip";
 import { ConfirmDeleteButton } from "../../../ui/ConfirmDeleteButton";
 import { DateField } from "../../../ui/DateField";
+import {
+  MenuHeading,
+  MenuSeparator,
+  MenuSurface,
+} from "../../../ui/MenuSurface";
 import { useT } from "../../../ui/useT";
 
 const CARD =
@@ -169,16 +176,13 @@ export default function Todos() {
             onClick={() => setMenu(null)}
             className="fixed inset-0 z-40 cursor-default"
           />
-          <div
-            role="menu"
+          <MenuSurface
             data-todo-menu
-            aria-label={t("todos.menu")}
+            label={t("todos.menu")}
             style={{ left: menu.x, top: menu.y }}
-            className="fixed z-50 w-[216px] rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2 shadow-[var(--shadow-popover)]"
+            className="fixed w-[216px]"
           >
-            <p className="mb-1 truncate px-1 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
-              {menu.todo.title}
-            </p>
+            <MenuHeading>{menu.todo.title}</MenuHeading>
             <label className="flex items-center gap-1.5 px-1 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
               {t("todos.menu.date")}
               <DateField
@@ -209,6 +213,7 @@ export default function Todos() {
                 {t("todos.menu.save")}
               </button>
             </div>
+            <MenuSeparator />
             <ConfirmDeleteButton
               role="menuitem"
               data-menu-delete
@@ -222,7 +227,7 @@ export default function Todos() {
             >
               {t("todos.menu.delete")}
             </ConfirmDeleteButton>
-          </div>
+          </MenuSurface>
         </>
       ) : null}
     </>
@@ -233,8 +238,10 @@ export default function Todos() {
 function TodoForm() {
   const t = useT();
   const create = useTodosStore((state) => state.create);
-  const [title, setTitle] = useState("");
-  const [dueDate, setDueDate] = useState("");
+  const title = useUiStore((state) => state.todoDraft.title);
+  const dueDate = useUiStore((state) => state.todoDraft.dueDate);
+  const setTodoDraft = useUiStore((state) => state.setTodoDraft);
+  const resetTodoDraft = useUiStore((state) => state.resetTodoDraft);
   const canSubmit = title.trim().length > 0;
 
   const submit = (event: FormEvent) => {
@@ -242,9 +249,12 @@ function TodoForm() {
     if (!canSubmit) {
       return;
     }
-    void create({ title: title.trim(), dueDate: dueDate || null });
-    setTitle("");
-    setDueDate("");
+    // 创建成功才清空草稿；失败时保留，避免用户重输。
+    void create({ title: title.trim(), dueDate: dueDate || null })
+      .then(() => resetTodoDraft())
+      .catch((error: unknown) => {
+        console.error("[todos] 新增待办失败", error);
+      });
   };
 
   return (
@@ -259,7 +269,7 @@ function TodoForm() {
         value={title}
         aria-label={t("todos.addPlaceholder")}
         placeholder={t("todos.addPlaceholder")}
-        onChange={(event) => setTitle(event.target.value)}
+        onChange={(event) => setTodoDraft({ title: event.target.value })}
         onKeyDown={(event) => {
           if (
             event.key === "Enter" &&
@@ -275,7 +285,7 @@ function TodoForm() {
       <DateField
         data-todo-due
         value={dueDate || null}
-        onChange={(next) => setDueDate(next ?? "")}
+        onChange={(next) => setTodoDraft({ dueDate: next ?? "" })}
         aria-label={t("todos.dueLabel")}
         allowClear
         className="w-[132px] rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-bg)] px-1.5 py-0.5 text-[var(--text-2xs)] text-[var(--color-text)]"
@@ -345,6 +355,13 @@ function TodoRow({
   const { todo, overdueDays } = item;
   const overdue = overdueDays > 0;
   const dueToday = todo.dueDate === today;
+  const dueMeta = overdue
+    ? t("todos.overdueDays", { days: overdueDays })
+    : dueToday
+      ? t("todos.dueToday")
+      : item.daysLeft !== null
+        ? t("deadline.inDays", { days: item.daysLeft })
+        : null;
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(todo.title);
@@ -437,28 +454,26 @@ function TodoRow({
 
       <span className="ml-auto flex shrink-0 items-center gap-2 text-xs text-[var(--color-text-muted)]">
         {todo.dueDate ? (
-          <span data-due={todo.dueDate}>
-            {format(parseISO(todo.dueDate), "MM/dd")}
-          </span>
-        ) : (
-          <span>{t("todos.noDue")}</span>
-        )}
-        {overdue ? (
-          <span className="rounded-[var(--radius-pill)] bg-[color-mix(in_srgb,var(--color-missed)_12%,transparent)] px-[7px] py-px text-[var(--text-2xs)] font-semibold text-[var(--color-missed)]">
-            {t("todos.overdueDays", { days: overdueDays })}
-          </span>
-        ) : dueToday ? (
-          <span className="rounded-[var(--radius-pill)] bg-[color-mix(in_srgb,var(--color-warning)_14%,transparent)] px-[7px] py-px text-[var(--text-2xs)] font-semibold text-[var(--color-warning)]">
-            {t("todos.dueToday")}
-          </span>
-        ) : item.daysLeft !== null ? (
-          <span
-            data-days-left={item.daysLeft}
-            className="rounded-[var(--radius-pill)] bg-[color-mix(in_srgb,var(--color-warning)_10%,transparent)] px-[7px] py-px text-[var(--text-2xs)] font-semibold text-[var(--color-warning)]"
+          <Chip
+            variant={overdue ? "danger" : "warning"}
+            data-due={todo.dueDate}
+            data-days-left={item.daysLeft ?? undefined}
           >
-            {t("deadline.inDays", { days: item.daysLeft })}
-          </span>
-        ) : null}
+            <span>{format(parseISO(todo.dueDate), "MM/dd")}</span>
+            {dueMeta ? (
+              <>
+                <span aria-hidden="true" className="opacity-50">
+                  ·
+                </span>
+                <span>{dueMeta}</span>
+              </>
+            ) : null}
+          </Chip>
+        ) : (
+          <Chip variant="neutral" data-no-due>
+            {t("todos.noDue")}
+          </Chip>
+        )}
       </span>
 
       <button

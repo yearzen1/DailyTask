@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS, type Todo } from "../../../domain/types";
 import { useSettingsStore } from "../../../stores/settingsStore";
 import { useTodosStore } from "../../../stores/todosStore";
+import { useUiStore } from "../../../stores/uiStore";
 import Todos from "./Todos";
 
 const NOW = new Date(2026, 10, 4, 9, 0, 0); // 周三
@@ -39,6 +40,7 @@ describe("Todos", () => {
     remove.mockClear();
 
     useSettingsStore.setState({ settings: DEFAULT_SETTINGS });
+    useUiStore.setState({ todoDraft: { title: "", dueDate: "" } });
     useTodosStore.setState({
       todos: [
         todo("交房租", "2026-11-01"),
@@ -126,7 +128,7 @@ describe("Todos", () => {
     expect(container.querySelector('[data-todo="写周报"]')).toBeInTheDocument();
   });
 
-  it("adds a todo from the quick form", () => {
+  it("adds a todo from the quick form", async () => {
     const { container } = render(<Todos />);
     const input = screen.getByLabelText("添加待办，回车保存");
 
@@ -134,13 +136,50 @@ describe("Todos", () => {
     fireEvent.change(container.querySelector("[data-todo-due]") as Element, {
       target: { value: "2026-11-05" },
     });
-    fireEvent.click(container.querySelector("[data-todo-add]") as Element);
+    await act(async () => {
+      fireEvent.click(container.querySelector("[data-todo-add]") as Element);
+    });
 
     expect(create).toHaveBeenCalledWith({
       title: "买菜",
       dueDate: "2026-11-05",
     });
     expect(input).toHaveValue("");
+  });
+
+  it("keeps the quick-add draft when the view unmounts", () => {
+    const first = render(<Todos />);
+    fireEvent.change(screen.getByLabelText("添加待办，回车保存"), {
+      target: { value: "预约体检" },
+    });
+    fireEvent.change(
+      first.container.querySelector("[data-todo-due]") as Element,
+      { target: { value: "2026-11-20" } },
+    );
+
+    first.unmount();
+
+    const second = render(<Todos />);
+    expect(screen.getByLabelText("添加待办，回车保存")).toHaveValue("预约体检");
+    expect(
+      second.container.querySelector("[data-todo-due]") as Element,
+    ).toHaveValue("2026-11-20");
+  });
+
+  it("keeps the draft when creating a todo fails", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    create.mockRejectedValueOnce(new Error("db down"));
+    const { container } = render(<Todos />);
+    const input = screen.getByLabelText("添加待办，回车保存");
+
+    fireEvent.change(input, { target: { value: "买菜" } });
+    await act(async () => {
+      fireEvent.click(container.querySelector("[data-todo-add]") as Element);
+    });
+
+    expect(input).toHaveValue("买菜");
+    expect(useUiStore.getState().todoDraft.title).toBe("买菜");
+    error.mockRestore();
   });
 
   it("submits with Enter and blocks blank titles", () => {
