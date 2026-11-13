@@ -47,6 +47,18 @@ function doneToday(): Checkin {
   };
 }
 
+function skippedToday(): Checkin {
+  return {
+    id: "c2",
+    taskId: "t2",
+    date: TODAY,
+    status: "skipped",
+    value: null,
+    note: null,
+    updatedAt: "2026-11-02T00:00:00.000Z",
+  };
+}
+
 describe("TaskGrid", () => {
   const setStatus = vi.fn(async () => undefined);
   const setNote = vi.fn(async () => undefined);
@@ -137,6 +149,41 @@ describe("TaskGrid", () => {
     );
     expect(todayCell).toHaveAttribute("data-state", "done");
     expect(todayCell).toHaveAttribute("data-today");
+  });
+
+  it("keeps the today tint off cells that are skipped", () => {
+    useCheckinsStore.setState({
+      byKey: new Map([
+        [checkinKey("t1", TODAY), doneToday()],
+        [checkinKey("t2", TODAY), skippedToday()],
+      ]),
+    });
+    const { container } = render(<TaskGrid />);
+
+    const skipped = container.querySelector(
+      `[data-task="t2"][data-date="${TODAY}"]`,
+    );
+    expect(skipped).toHaveAttribute("data-state", "skipped");
+    expect(skipped).not.toHaveAttribute("data-today-tint");
+
+    const done = container.querySelector(
+      `[data-task="t1"][data-date="${TODAY}"]`,
+    );
+    expect(done).toHaveAttribute("data-today-tint");
+  });
+
+  it("keeps the today tint off cells outside the interval", () => {
+    const { container } = render(<TaskGrid />);
+
+    fireEvent.click(
+      container.querySelector('[data-group-header="disabled"]') as Element,
+    );
+
+    const none = container.querySelector(
+      `[data-task="t3"][data-date="${TODAY}"]`,
+    );
+    expect(none).toHaveAttribute("data-state", "none");
+    expect(none).not.toHaveAttribute("data-today-tint");
   });
 
   it("only focuses a cell on click and never writes a check-in", () => {
