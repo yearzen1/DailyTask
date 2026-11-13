@@ -259,6 +259,14 @@
 
 ---
 
+## 13. v0.1.18 完成记录（2026-11-13）
+
+全量校验：`npm run test` **357 passed**、`npm run lint`、`npm run typecheck`、`npm run docs:check`、`npm run build`、`tauri build` 全绿。已发布 v0.1.18：<https://github.com/yearzen1/DailyTask/releases/tag/v0.1.18>。
+
+- **#29**：新增 `stores/dayStore`（`now` + `sync`，逻辑日不变时不写 store）与 `app/dayRollover`（启动即采样、30s 轮询、`window focus` / `visibilitychange` 立即采样）；`main.tsx` 在 hydrate 后启动。今日、任务表、统计、待办、任务管理、托盘进度统一改用 `useDayNow()`，跨日后自动重算，不再等到点一下置顶。`dayRollover.test` 覆盖同日不变、跨 `dayStartHour`、focus 与 cleanup，`today.test`、`Widget.test` 覆盖选择器与挂件的跨日刷新。
+
+---
+
 ## 12. v0.1.17 完成记录（2026-11-13）
 
 全量校验：`npm run test` **350 passed**、`npm run lint`、`npm run typecheck`、`npm run docs:check`、`npm run build`、`tauri build` 全绿。已发布 v0.1.17：<https://github.com/yearzen1/DailyTask/releases/tag/v0.1.17>。
