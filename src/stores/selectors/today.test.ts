@@ -1,9 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { act, renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { checkinKey } from "../../domain/keys";
 import type { Checkin, CheckinStatus, Task, Todo } from "../../domain/types";
 import { DEFAULT_SETTINGS } from "../../domain/types";
-import { buildToday } from "./today";
+import { useCheckinsStore } from "../checkinsStore";
+import { useDayStore } from "../dayStore";
+import { useSettingsStore } from "../settingsStore";
+import { useTasksStore } from "../tasksStore";
+import { useTodosStore } from "../todosStore";
+import { buildToday, useTodayData } from "./today";
 
 const NOW = new Date(2026, 10, 2, 9, 0, 0);
 const TODAY = "2026-11-02";
@@ -148,5 +154,36 @@ describe("buildToday", () => {
       applicable: 6,
       ratio: 0.4,
     });
+  });
+});
+
+describe("useTodayData", () => {
+  beforeEach(() => {
+    useSettingsStore.setState({ settings: DEFAULT_SETTINGS, loaded: true });
+    useTasksStore.setState({
+      tasks: [task("v1", "跑步", "voluntary", 1)],
+      loaded: true,
+    });
+    useCheckinsStore.setState({ byKey: new Map(), loaded: true });
+    useTodosStore.setState({ todos: [], loaded: true });
+    useDayStore.setState({ now: new Date(2026, 10, 2, 9, 0, 0) });
+  });
+
+  it("follows the day store when the logical day rolls over", () => {
+    const { result } = renderHook(() => useTodayData());
+
+    expect(result.current.today).toBe(TODAY);
+    expect(result.current.dateLabel).toContain("11/02");
+    expect(result.current.voluntary[0].state).toBe("pending");
+
+    act(() => {
+      useDayStore
+        .getState()
+        .sync(new Date(2026, 10, 3, 9, 0, 0), DEFAULT_SETTINGS.dayStartHour);
+    });
+
+    expect(result.current.today).toBe("2026-11-03");
+    expect(result.current.dateLabel).toContain("11/03");
+    expect(result.current.voluntary[0].state).toBe("pending");
   });
 });

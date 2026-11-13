@@ -11,6 +11,7 @@ import {
   type Todo,
 } from "../../domain/types";
 import { useCheckinsStore } from "../../stores/checkinsStore";
+import { useDayStore } from "../../stores/dayStore";
 import { emitWidgetExpand } from "../../shared/events";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useTasksStore } from "../../stores/tasksStore";
@@ -172,6 +173,7 @@ describe("Widget", () => {
     invokeMock.mockClear();
     localStorage.removeItem(CAPSULE_STORAGE_KEY);
     localStorage.removeItem(CAPSULE_SIDE_KEY);
+    useDayStore.setState({ now: null });
     seedStores();
   });
 
@@ -218,6 +220,21 @@ describe("Widget", () => {
     expect(screen.getByText("逾期 2 天")).toBeInTheDocument();
     expect(screen.getByText("买猫粮")).toBeInTheDocument();
     expect(screen.getByText("今天")).toBeInTheDocument();
+  });
+
+  it("rolls over to the next day without any click", () => {
+    render(<Widget />);
+    expect(screen.getByText(/今日 · 11\/02/)).toBeInTheDocument();
+    expect(screen.getByText("买猫粮")).toBeInTheDocument();
+
+    act(() => {
+      useDayStore
+        .getState()
+        .sync(new Date(2026, 10, 3, 9, 0, 0), DEFAULT_SETTINGS.dayStartHour);
+    });
+
+    expect(screen.getByText(/今日 · 11\/03/)).toBeInTheDocument();
+    expect(screen.getByText("逾期 1 天")).toBeInTheDocument();
   });
 
   it("does not render task deadlines in the widget", () => {
