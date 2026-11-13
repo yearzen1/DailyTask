@@ -1,6 +1,6 @@
 [package]
 name = "dailytask"
-version = "0.1.17"
+version = "0.1.18"
 description = "Daily task check-in and todo desktop app"
 authors = ["DailyTask"]
 license = "MIT"
