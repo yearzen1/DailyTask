@@ -36,7 +36,7 @@
 - 日期做列、任务做行
 - 双行 sticky 表头 + sticky 任务列
 - 月份 pill 跟随滚动
-- 今天列高亮
+- 今天列高亮：8% 绿底只覆盖 `pending / done / missed`，`skipped` 与区间外不被染绿
 
 ## 4. 待办
 

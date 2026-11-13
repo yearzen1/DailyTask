@@ -116,3 +116,14 @@ export const Events = {
 托盘左键         → 同时显示主窗与挂件
 单实例第二次启动 → 同时显示主窗与挂件
 ```
+
+## 6. 跨日刷新
+
+两个窗口各自跑 `startDayRollover()`（`src/app/dayRollover.ts`），没有任何用户操作也会换日：
+
+- `src/stores/dayStore.ts` 存最近一次采样时刻，`sync(now, dayStartHour)` 只在逻辑日变化时写入，同一天内重复调用不触发重渲染
+- 轮询 30s + `window focus` / `document visibilitychange` 立即采样；休眠或改系统时间也能在下一次采样纠回来
+- 今日页、任务表、统计、待办、任务管理、挂件与托盘进度都订阅 `useDayNow()`，跨日后一起重算
+- 漏打 / 自动结算仍是 `projectCell` 的投影，`today` 前进即生效，不写库
+
+手动验证：设置页把「一天起始时间」改到当前时间之后 1 小时，保持 app 开着等到该整点。
