@@ -1487,12 +1487,12 @@ function GridCell({
     ? `${t("checkin.aria", { task: taskName, status: statusLabel })} · ${value}`
     : t("checkin.aria", { task: taskName, status: statusLabel });
 
-  const detailBackground = isToday ? TODAY_TINT : undefined;
+  /** 今天列绿底只覆盖真要打卡的三态；「今天不做」和区间外保持自己的底色。 */
+  const tinted = state === "pending" || state === "done" || state === "missed";
+  const todayTint = isToday && tinted ? TODAY_TINT : undefined;
   const background = overview
-    ? (overviewBackground(state) ??
-      (isToday ? TODAY_TINT : undefined))
-    : (detailBackground ??
-      (state === "none" ? "var(--color-na)" : undefined));
+    ? (overviewBackground(state) ?? todayTint)
+    : (todayTint ?? (state === "none" ? "var(--color-na)" : undefined));
 
   return (
     <div
@@ -1506,6 +1506,7 @@ function GridCell({
         data-date={date}
         data-state={state}
         data-today={isToday ? "" : undefined}
+        data-today-tint={todayTint ? "" : undefined}
         data-focused={focused ? "" : undefined}
         data-value={value ?? undefined}
         tabIndex={tabIndex}
