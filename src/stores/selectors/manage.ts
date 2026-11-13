@@ -2,6 +2,7 @@ import { useMemo } from "react";
 
 import { logicalToday } from "../../domain/date";
 import type { Task } from "../../domain/types";
+import { useDayNow } from "../dayStore";
 import { useSettingsStore } from "../settingsStore";
 import { useTasksStore } from "../tasksStore";
 
@@ -75,12 +76,13 @@ export function buildManageRows(tasks: Task[], today: string): ManageRow[] {
 export function useManageRows(): { today: string; rows: ManageRow[] } {
   const tasks = useTasksStore((state) => state.tasks);
   const settings = useSettingsStore((state) => state.settings);
+  const now = useDayNow();
 
   return useMemo(
     () => {
-      const today = logicalToday(new Date(), settings.dayStartHour);
+      const today = logicalToday(now, settings.dayStartHour);
       return { today, rows: buildManageRows(tasks, today) };
     },
-    [tasks, settings.dayStartHour],
+    [tasks, settings.dayStartHour, now],
   );
 }

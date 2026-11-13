@@ -11,6 +11,7 @@ import { checkinKey } from "../../domain/keys";
 import { projectCell, type CellState } from "../../domain/settle";
 import type { Checkin, Settings, Task } from "../../domain/types";
 import { useCheckinsStore } from "../checkinsStore";
+import { useDayNow } from "../dayStore";
 import { useSettingsStore } from "../settingsStore";
 import { useTasksStore } from "../tasksStore";
 
@@ -61,9 +62,10 @@ export function useGridData(): GridData {
   const tasks = useTasksStore((state) => state.tasks);
   const checkins = useCheckinsStore((state) => state.byKey);
   const settings = useSettingsStore((state) => state.settings);
+  const now = useDayNow();
 
   return useMemo(
-    () => buildGridData(tasks, checkins, settings, new Date()),
-    [tasks, checkins, settings],
+    () => buildGridData(tasks, checkins, settings, now),
+    [tasks, checkins, settings, now],
   );
 }

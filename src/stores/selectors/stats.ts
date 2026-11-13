@@ -4,6 +4,7 @@ import { logicalToday } from "../../domain/date";
 import { completionRate30, taskStreak } from "../../domain/stats";
 import type { Checkin, Settings, Task } from "../../domain/types";
 import { useCheckinsStore } from "../checkinsStore";
+import { useDayNow } from "../dayStore";
 import { useSettingsStore } from "../settingsStore";
 import { useTasksStore } from "../tasksStore";
 
@@ -43,9 +44,10 @@ export function useStats(): StatsData {
   const tasks = useTasksStore((state) => state.tasks);
   const checkins = useCheckinsStore((state) => state.byKey);
   const settings = useSettingsStore((state) => state.settings);
+  const now = useDayNow();
 
   return useMemo(
-    () => buildStats(tasks, checkins, settings, new Date()),
-    [tasks, checkins, settings],
+    () => buildStats(tasks, checkins, settings, now),
+    [tasks, checkins, settings, now],
   );
 }

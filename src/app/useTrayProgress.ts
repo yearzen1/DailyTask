@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { logicalToday } from "../domain/date";
 import { combineProgress, dayProgress } from "../domain/settle";
 import { useCheckinsStore } from "../stores/checkinsStore";
+import { useDayNow } from "../stores/dayStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useTasksStore } from "../stores/tasksStore";
 import { useTodosStore } from "../stores/todosStore";
@@ -18,8 +19,9 @@ export function useTrayProgress(): void {
   const todos = useTodosStore((state) => state.todos);
   const t = useT();
   const locale = useLocale();
+  const now = useDayNow();
 
-  const today = logicalToday(new Date(), settings.dayStartHour);
+  const today = logicalToday(now, settings.dayStartHour);
   const progress = combineProgress(
     dayProgress(tasks, checkins, today, settings, today),
     todoStatOf(dueTodosFor(todos, today, settings)),

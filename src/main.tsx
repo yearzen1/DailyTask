@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { initApp, type AppData } from "./app/init";
+import { startDayRollover } from "./app/dayRollover";
 import { startCrossWindowSync } from "./app/sync";
 import App from "./App";
 import { rotateDailyBackup } from "./db/backup";
@@ -53,6 +54,8 @@ void initApp()
     hydrate(data);
     setLocale(data.settings.language);
     applyTheme(data.settings.theme);
+    // 跨日后各窗口自己把「今天」推到新的一天，不依赖任何点击。
+    startDayRollover();
     void (target === "widget" ? Promise.resolve() : rotateDailyBackup()).catch(
       (error: unknown) => {
         console.error("[backup] 每日备份失败", error);

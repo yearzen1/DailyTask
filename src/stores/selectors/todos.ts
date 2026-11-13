@@ -3,6 +3,7 @@ import { useMemo } from "react";
 
 import { diffDays, formatDate, logicalToday } from "../../domain/date";
 import type { Todo } from "../../domain/types";
+import { useDayNow } from "../dayStore";
 import { useSettingsStore } from "../settingsStore";
 import { useTodosStore } from "../todosStore";
 
@@ -126,9 +127,10 @@ export function buildTodoGroups(todos: Todo[], today: string): TodoGroupsData {
 export function useTodoGroups(): TodoGroupsData {
   const todos = useTodosStore((state) => state.todos);
   const settings = useSettingsStore((state) => state.settings);
+  const now = useDayNow();
 
   return useMemo(
-    () => buildTodoGroups(todos, logicalToday(new Date(), settings.dayStartHour)),
-    [todos, settings.dayStartHour],
+    () => buildTodoGroups(todos, logicalToday(now, settings.dayStartHour)),
+    [todos, settings.dayStartHour, now],
   );
 }

@@ -18,6 +18,7 @@ import {
 } from "../../domain/settle";
 import type { Checkin, Settings, Task, Todo } from "../../domain/types";
 import { useCheckinsStore } from "../checkinsStore";
+import { useDayNow } from "../dayStore";
 import { useSettingsStore } from "../settingsStore";
 import { useTasksStore } from "../tasksStore";
 import { useTodosStore } from "../todosStore";
@@ -156,9 +157,10 @@ export function useTodayData(): TodayData {
   const checkins = useCheckinsStore((state) => state.byKey);
   const settings = useSettingsStore((state) => state.settings);
   const todos = useTodosStore((state) => state.todos);
+  const now = useDayNow();
 
   return useMemo(
-    () => buildToday(tasks, checkins, settings, todos, new Date()),
-    [tasks, checkins, settings, todos],
+    () => buildToday(tasks, checkins, settings, todos, now),
+    [tasks, checkins, settings, todos, now],
   );
 }
