@@ -60,6 +60,7 @@ end   = max(today + 30, 最晚区间启用日)
 ## 6. 格子
 
 - 五态：`done / missed / skipped / pending / none`
+- 今天列绿底只覆盖 `pending / done / missed`；`skipped` 与区间外 `none` 保持自己的底色，不被染绿
 - 区间外 / 非周期日 → `none`，显示 `▫`，不可点
 - 自由值：详细模式有值时用值替换符号；列宽按该列最长值自适应，不截断
 - 自由值超过 320px 列宽时换行显示，行高自动增高
