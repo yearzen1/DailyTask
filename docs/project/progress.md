@@ -259,6 +259,14 @@
 
 ---
 
+## 12. v0.1.17 完成记录（2026-11-13）
+
+全量校验：`npm run test` **350 passed**、`npm run lint`、`npm run typecheck`、`npm run docs:check`、`npm run build`、`tauri build` 全绿。已发布 v0.1.17：<https://github.com/yearzen1/DailyTask/releases/tag/v0.1.17>。
+
+- **#28**：任务表今天列的 8% 绿底只覆盖 `pending / done / missed`；`skipped` 与区间外 `none` 保持原底色，不再被染绿。`GridCell` 新增 `data-today-tint` 供 `TaskGrid.test` 断言，`docs/reference/grid.md` §6 补口径。
+
+---
+
 ## 11. v0.1.16 完成记录（2026-11-11）
 
 全量校验：`npm run test` **348 passed**、`npm run lint`、`npm run typecheck`、`npm run docs:check`、`npm run build`、`cargo check` 全绿。已发布 v0.1.16：<https://github.com/yearzen1/DailyTask/releases/tag/v0.1.16>。
