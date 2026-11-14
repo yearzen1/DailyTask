@@ -93,6 +93,7 @@ CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 规则：
 
 - migration **只追加**，禁止改已发布脚本
+- 迁移文件必须是 **LF** 行尾，`.gitattributes` 已固定 `src-tauri/migrations/** text eol=lf`：sqlx 用 SHA-384 按字节校验，CRLF 会触发 `migration N was previously applied but has been modified`
 - 迁移在 `src-tauri/src/lib.rs` 的 `Migration` 数组注册
 - 改 `CHECK` 约束只能重建表（SQLite 不支持直接放宽）
 

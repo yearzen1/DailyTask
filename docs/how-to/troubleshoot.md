@@ -31,7 +31,26 @@
 |---|---|
 | `database is locked` | 退出另一个实例，结束残留 exe |
 | 迁移失败 | 备份 DB，检查 migration 版本顺序 |
+| `migration N was previously applied but has been modified` | 迁移文件的字节变了（多为 CRLF），见 3.1 |
+| `no such table: task_name_periods` | 迁移没跑完，见 3.1 |
 | 旧数据异常 | 确认 004 是否执行；旧 recorded 应变成 done |
+
+### 3.1 迁移校验和与行尾
+
+sqlx 把每个迁移脚本的 SHA-384 记进 `_sqlx_migrations`，**按字节**比对。同一个文件被 git 在 LF 与 CRLF 之间转换过，校验和就变，启动时报：
+
+```text
+migration 1 was previously applied but has been modified
+```
+
+此时迁移列表已被插件取走并失败，**另一个窗口**再打开同一个库时不再跑迁移，于是接着报 `no such table: task_name_periods`——两个窗口各报一个错，根因是同一个。
+
+处理：
+
+1. 确认 `src-tauri/migrations/*.sql` 是 LF：`git ls-files --eol src-tauri/migrations`
+2. 仓库根 `.gitattributes` 已把该目录固定为 `text eol=lf`；若被改回 CRLF，重新 checkout 该目录即可
+3. 不要用改历史脚本或删库来绕过；`core.autocrlf=true` 的机器上重装/重克隆会再次触发
+4. 校验和变化后仍想保留数据，只能把文件恢复成当初写入库的字节（通常是 LF）
 
 ## 4. 托盘
 

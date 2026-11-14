@@ -32,6 +32,7 @@ DailyTask/
 │  ├─ migrations/002_checkin_value.sql
 │  ├─ migrations/003_task_interval_every_days.sql
 │  ├─ migrations/004_drop_recorded_status.sql
+│  ├─ migrations/005_task_name_periods.sql
 │  └─ tauri.conf.json                # 双窗口尺寸/透明/置顶
 ├─ src/
 │  ├─ main.tsx  App.tsx
