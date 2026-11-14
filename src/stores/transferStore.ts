@@ -20,7 +20,7 @@ export interface ImportResult {
 export interface TransferState {
   exporting: boolean;
   importing: boolean;
-  /** 导出 JSON v1；取消对话框返回 null。 */
+  /** 导出 JSON v2（含名称段）；取消对话框返回 null。 */
   exportToFile: () => Promise<string | null>;
   /** 选择文件导入并 upsert；取消返回 null。 */
   importFromFile: () => Promise<ImportResult | null>;

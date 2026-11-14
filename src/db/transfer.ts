@@ -1,18 +1,20 @@
 import type {
   Checkin,
   Interval,
+  NamePeriod,
   Settings,
   Task,
   Todo,
 } from "../domain/types";
 import { normalizeEveryDays } from "../domain/intervals";
+import { namePeriodsOf } from "../domain/names";
 import type { SqlDatabase } from "./client";
 import { listCheckins } from "./checkins";
 import { getSettings, sanitizeSettings, setSettings } from "./settings";
 import { listTasks } from "./tasks";
 import { listTodos } from "./todos";
 
-/** JSON v1：任务与区间分开放，导入时可以按 id upsert。 */
+/** JSON v2：任务、名称段与区间分开放，导入时可以按 id upsert。v1 仍可导入。 */
 export interface ExportTask {
   id: string;
   name: string;
@@ -23,9 +25,10 @@ export interface ExportTask {
 }
 
 export interface ExportBundle {
-  version: 1;
+  version: 1 | 2;
   exportedAt: string;
   tasks: ExportTask[];
+  namePeriods: NamePeriod[];
   intervals: Interval[];
   checkins: Checkin[];
   todos: Todo[];
@@ -40,7 +43,7 @@ export function buildExportBundle(
   now: Date,
 ): ExportBundle {
   return {
-    version: 1,
+    version: 2,
     exportedAt: now.toISOString(),
     tasks: tasks.map((task) => ({
       id: task.id,
@@ -50,6 +53,12 @@ export function buildExportBundle(
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
     })),
+    namePeriods: tasks
+      .flatMap((task) => namePeriodsOf(task))
+      .sort(
+        (a, b) =>
+          a.taskId.localeCompare(b.taskId) || a.start.localeCompare(b.start),
+      ),
     intervals: tasks
       .flatMap((task) => task.intervals)
       .sort((a, b) => a.taskId.localeCompare(b.taskId) || a.start.localeCompare(b.start)),
@@ -124,6 +133,39 @@ function isInterval(value: unknown): value is Interval {
   );
 }
 
+function isNamePeriod(value: unknown): value is NamePeriod {
+  return (
+    isRecord(value) &&
+    isString(value.id) &&
+    isString(value.taskId) &&
+    isString(value.name) &&
+    isString(value.start) &&
+    isNullableString(value.end)
+  );
+}
+
+/** v1 没有名称段：每个任务按最早区间启用日合成一段。 */
+function synthesizeNamePeriods(
+  tasks: ExportTask[],
+  intervals: Interval[],
+): NamePeriod[] {
+  const earliest = new Map<string, string>();
+  for (const interval of intervals) {
+    const current = earliest.get(interval.taskId);
+    if (current === undefined || interval.start < current) {
+      earliest.set(interval.taskId, interval.start);
+    }
+  }
+
+  return tasks.map((task) => ({
+    id: `${task.id}:name`,
+    taskId: task.id,
+    name: task.name,
+    start: earliest.get(task.id) ?? task.createdAt.slice(0, 10),
+    end: null,
+  }));
+}
+
 function isCheckin(value: unknown): value is ImportCheckin {
   return (
     isRecord(value) &&
@@ -173,18 +215,26 @@ export function parseImportBundle(text: string): ExportBundle {
   if (!isRecord(raw)) {
     throw new Error("invalid-structure");
   }
-  if (raw.version !== 1) {
+  if (raw.version !== 1 && raw.version !== 2) {
     throw new Error("unsupported-version");
   }
 
+  const version = raw.version;
+  const tasks = arrayOf(raw.tasks, isExportTask);
+  const intervals = arrayOf(raw.intervals, isInterval).map((interval) => ({
+    ...interval,
+    everyDays: normalizeEveryDays(interval.everyDays),
+  }));
+
   return {
-    version: 1,
+    version,
     exportedAt: isString(raw.exportedAt) ? raw.exportedAt : new Date().toISOString(),
-    tasks: arrayOf(raw.tasks, isExportTask),
-    intervals: arrayOf(raw.intervals, isInterval).map((interval) => ({
-      ...interval,
-      everyDays: normalizeEveryDays(interval.everyDays),
-    })),
+    tasks,
+    namePeriods:
+      version === 2
+        ? arrayOf(raw.namePeriods, isNamePeriod)
+        : synthesizeNamePeriods(tasks, intervals),
+    intervals,
     checkins: arrayOf(raw.checkins, isCheckin).map((checkin) => ({
       ...checkin,
       status: checkin.status === "recorded" ? "done" : checkin.status,
@@ -196,6 +246,7 @@ export function parseImportBundle(text: string): ExportBundle {
 
 export interface ImportCounts {
   tasks: number;
+  namePeriods: number;
   intervals: number;
   checkins: number;
   todos: number;
@@ -210,6 +261,10 @@ export async function importData(
   db: SqlDatabase,
   bundle: ExportBundle,
 ): Promise<ImportCounts> {
+  const namePeriods =
+    bundle.namePeriods ??
+    synthesizeNamePeriods(bundle.tasks, bundle.intervals);
+
   for (const task of bundle.tasks) {
     await db.execute(
       "INSERT INTO tasks (id, name, category, sort_order, created_at, updated_at) " +
@@ -224,6 +279,15 @@ export async function importData(
         task.createdAt,
         task.updatedAt,
       ],
+    );
+  }
+
+  for (const period of namePeriods) {
+    await db.execute(
+      "INSERT INTO task_name_periods (id, task_id, name, start_date, end_date) " +
+        "VALUES (?, ?, ?, ?, ?) ON CONFLICT(task_id, start_date) DO UPDATE SET " +
+        "name = excluded.name, end_date = excluded.end_date",
+      [period.id, period.taskId, period.name, period.start, period.end],
     );
   }
 
@@ -284,6 +348,7 @@ export async function importData(
 
   return {
     tasks: bundle.tasks.length,
+    namePeriods: namePeriods.length,
     intervals: bundle.intervals.length,
     checkins: bundle.checkins.length,
     todos: bundle.todos.length,

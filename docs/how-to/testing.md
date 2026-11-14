@@ -74,7 +74,28 @@ npm run dev:app
 
 手动检查中文 / English、200% DPI、挂件 260px。
 
-## 6. 常见缺口
+## 6. 性能测试
+
+三层，各管一件事：
+
+| 层 | 命令 | 管什么 |
+|---|---|---|
+| 结构门禁 | `npm test`（含 `*.perf.test.tsx`） | DOM 数量、渲染次数、缓存规模；数量超标必然卡 |
+| 纯函数基准 | `npm run bench` | `buildGridData` / 列宽 / 窗口计算的 ops/s，只看趋势 |
+| 真机首屏 | `npm run perf:grid` | WebView2 里点开任务表的真实耗时与长任务 |
+
+结构门禁不写时间阈值（jsdom 计时不稳），只断言数量上限；耗时只由 `perf:grid` 报告，超预算退出码 1。
+
+`npm run perf:grid` 需要 Windows + WebView2：它自己启动一个带 `--remote-debugging-port=9222` 的 dev 实例，测完关掉。dev 构建下 React StrictMode 会双渲染，所以 dev 预算比 release 宽（700ms vs 150ms），脚本会自动识别构建类型。
+
+要验 release 预算：
+
+```bash
+npm run tauri -- build --no-bundle
+npm run perf:grid -- --release
+```
+
+## 7. 常见缺口
 
 - 只测 mock，不测真实 SQLite
 - 只测中文，不测英文长文案

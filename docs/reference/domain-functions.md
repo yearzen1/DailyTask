@@ -42,6 +42,21 @@ currentInterval(intervals: Interval[], date: string): Interval | null
 
 显示为 `▫` 且不可点。
 
+## 2.5 名称段
+
+```ts
+namePeriodsOf(task: Task): NamePeriod[]      // 按 start 升序；缺省时合成一段
+currentNamePeriod(task: Task): NamePeriod
+currentName(task: Task): string
+isDateInNamePeriod(period: NamePeriod, date: string): boolean
+nameOn(task: Task, date: string): string
+```
+
+- 任务名按日期分段保存，旧段永不改写
+- `namePeriodsOf` 在任务没有 `namePeriods` 时，用 `task.name` 合成一段覆盖最早区间到至今
+- 日期落在段外时 `nameOn` 退回最近的段，保证异常数据下也有名字
+- 网格与统计按名称段拆行；今日页、挂件继续使用 `currentName`
+
 ## 3. 格子投影
 
 ```ts
@@ -88,25 +103,30 @@ combineProgress(progress, { done, total }): DayProgress
 ## 5. 连续天数
 
 ```ts
-taskStreak(task, checkins, today, settings): number
+interface DateRange { start: string; end: string }
+
+taskStreak(task, checkins, today, settings, range?: DateRange): number
 ```
 
-- 从今天往前遍历
+- 从今天或 `range.end`（取较早者）往前遍历
 - `done` +1
 - `missed` 立即中断
 - `skipped`、`pending`、不适用日期不计数也不中断
-- 最多回看 3660 天
+- 不越过 `range.start`，最多回看 3660 天
+- 名称分段的旧段以段结束日为终点
 
 ## 6. 近 30 天完成率
 
 ```ts
-completionRate30(task, checkins, today, settings): number
+completionRate30(task, checkins, today, settings, range?: DateRange): number
 ```
 
 - 分母只含 `done + missed`
 - `skipped`、`pending`、不适用日期不进分母
-- 窗口固定 30 天
+- 窗口固定 30 天，终点为今天或 `range.end`（取较早者）
+- 不越过 `range.start`
 - 分母为 0 时返回 0
+- 名称分段的旧段以段结束日为窗口终点
 
 ## 7. 单击循环
 
@@ -132,6 +152,7 @@ missed            → null（删除该行）
 - 每 N 天的锚点与跨段独立周期
 - `today` 边界、自动结算开关
 - skipped 对 streak / 完成率的影响
+- 名称段边界、旧段统计终点
 - 旧 `recorded` 数据迁移后按 done 计算
 
 测试文件：
@@ -139,3 +160,4 @@ missed            → null（删除该行）
 - `src/domain/*.test.ts`
 - `src/db/intervals.test.ts`（真实 SQLite）
 - `src/db/checkins.test.ts`（真实 SQLite）
+- `src/db/migrations.test.ts`（迁移回填）

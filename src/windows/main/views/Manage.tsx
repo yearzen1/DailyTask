@@ -7,6 +7,7 @@ import {
   validateInterval,
   type IntervalError,
 } from "../../../domain/intervals";
+import { namePeriodsOf } from "../../../domain/names";
 import type { MessageKey } from "../../../shared/i18n";
 import type { Task, TaskCategory } from "../../../domain/types";
 import {
@@ -334,22 +335,27 @@ const INTERVAL_ERROR_KEY: Record<IntervalError, MessageKey> = {
 /** 编辑任务：名称/类型 + 最新一段区间；更早区间只读，历史打卡不碰。 */
 function EditTaskDialog({
   task,
+  today,
   onClose,
 }: {
   task: Task;
+  today: string;
   onClose: () => void;
 }) {
   const t = useT();
   const update = useTasksStore((state) => state.update);
+  const rename = useTasksStore((state) => state.rename);
   const updateInterval = useTasksStore((state) => state.updateInterval);
   const sorted = [...task.intervals].sort((a, b) =>
     a.start.localeCompare(b.start),
   );
   const latest = sorted[sorted.length - 1] ?? null;
   const previousEnd = sorted.length > 1 ? sorted[sorted.length - 2].end : null;
+  const periods = namePeriodsOf(task);
 
   const [name, setName] = useState(task.name);
   const [category, setCategory] = useState(task.category);
+  const [typoOnly, setTypoOnly] = useState(true);
   const [start, setStart] = useState(latest?.start ?? "");
   const [end, setEnd] = useState(latest?.end ?? "");
   const [openEnded, setOpenEnded] = useState(latest?.end === null);
@@ -369,7 +375,18 @@ function EditTaskDialog({
     if (!canSubmit) {
       return;
     }
-    void update(task.id, { name: name.trim(), category });
+    const trimmed = name.trim();
+    if (trimmed !== task.name) {
+      void rename(
+        task.id,
+        trimmed,
+        today,
+        typoOnly ? "rewrite-current" : "from-today",
+      );
+    }
+    if (category !== task.category) {
+      void update(task.id, { category });
+    }
     if (latest) {
       void updateInterval(latest.id, {
         start,
@@ -401,7 +418,7 @@ function EditTaskDialog({
             onClose();
           }
         }}
-        className="relative z-10 flex w-[420px] max-w-[calc(100vw-32px)] flex-col gap-3 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-popover)]"
+        className="relative z-10 flex max-h-[calc(100vh-32px)] w-[420px] max-w-[calc(100vw-32px)] flex-col gap-3 overflow-auto rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-popover)]"
       >
         <h2 className="m-0 text-sm font-semibold">
           {t("manage.editTitle", { name: task.name })}
@@ -416,7 +433,37 @@ function EditTaskDialog({
             onChange={(event) => setName(event.target.value)}
             className="rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1 text-sm text-[var(--color-text)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
           />
+          <span className="leading-tight">
+            {t(typoOnly ? "manage.renameHintTypo" : "manage.renameHint")}
+          </span>
         </label>
+
+        <label className="flex items-center gap-1.5 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+          <input
+            type="checkbox"
+            data-edit-name-typo
+            checked={typoOnly}
+            onChange={(event) => setTypoOnly(event.target.checked)}
+          />
+          {t("manage.nameHistory.typo")}
+        </label>
+
+        <div className="text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+          <p className="m-0 mb-1">{t("manage.nameHistory")}</p>
+          <ul className="m-0 flex list-none flex-col gap-0.5 p-0 tabular-nums">
+            {periods.map((period) => (
+              <li key={period.id} data-name-history={period.id}>
+                <span className="mr-2 text-[var(--color-text)]">
+                  {period.name}
+                </span>
+                {format(parseISO(period.start), "MM/dd")} –{" "}
+                {period.end
+                  ? format(parseISO(period.end), "MM/dd")
+                  : t("manage.ongoing")}
+              </li>
+            ))}
+          </ul>
+        </div>
 
         <CategoryPicker value={category} onChange={setCategory} variant="edit" />
 
@@ -784,7 +831,11 @@ function ManageTableRow({ row, today }: { row: ManageRow; today: string }) {
             onClose={() => setDialog(null)}
           />
         ) : dialog === "edit" ? (
-          <EditTaskDialog task={row.task} onClose={() => setDialog(null)} />
+          <EditTaskDialog
+            task={row.task}
+            today={today}
+            onClose={() => setDialog(null)}
+          />
         ) : null}
       </td>
     </tr>

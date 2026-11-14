@@ -1,3 +1,6 @@
+import { format, parseISO } from "date-fns";
+import { useMemo, useState } from "react";
+
 import { useStats, type TaskStat } from "../../../stores/selectors/stats";
 import { useT } from "../../../ui/useT";
 
@@ -7,6 +10,33 @@ const CARD =
 export default function Stats() {
   const t = useT();
   const { rows } = useStats();
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const historyCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      if (!row.current) {
+        counts.set(row.task.id, (counts.get(row.task.id) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [rows]);
+
+  const toggleHistory = (taskId: string) => {
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
+  };
+
+  const visibleRows = rows.filter(
+    (row) => row.current || expanded.has(row.task.id),
+  );
 
   return (
     <>
@@ -45,8 +75,16 @@ export default function Stats() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <StatsRow key={row.task.id} row={row} />
+              {visibleRows.map((row) => (
+                <StatsRow
+                  key={row.key}
+                  row={row}
+                  historyCount={
+                    row.current ? (historyCounts.get(row.task.id) ?? 0) : 0
+                  }
+                  expanded={expanded.has(row.task.id)}
+                  onToggle={() => toggleHistory(row.task.id)}
+                />
               ))}
             </tbody>
           </table>
@@ -60,29 +98,67 @@ export default function Stats() {
   );
 }
 
-function StatsRow({ row }: { row: TaskStat }) {
+function StatsRow({
+  row,
+  historyCount,
+  expanded,
+  onToggle,
+}: {
+  row: TaskStat;
+  historyCount: number;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
   const t = useT();
   const percent = Math.round(row.rate * 100);
   const color =
     row.task.category === "voluntary"
       ? "var(--color-voluntary)"
       : "var(--color-forced)";
+  const range = t("stats.range", {
+    start: format(parseISO(row.namePeriod.start), "MM/dd"),
+    end: row.namePeriod.end
+      ? format(parseISO(row.namePeriod.end), "MM/dd")
+      : t("manage.ongoing"),
+  });
 
   return (
     <tr
-      data-stats-row={row.task.id}
+      data-stats-row={row.key}
+      data-current={row.current ? "" : undefined}
       data-streak={row.streak}
       data-rate={percent}
-      className="border-b border-[var(--color-border)] last:border-b-0 hover:bg-[var(--state-hover)]"
+      className={`border-b border-[var(--color-border)] last:border-b-0 hover:bg-[var(--state-hover)] ${
+        row.current ? "" : "text-[var(--color-text-muted)]"
+      }`}
     >
       <td className="h-[38px] px-4">
         <div className="flex items-center gap-2">
           <i
             aria-hidden="true"
             className="size-[5px] shrink-0 rounded-full"
-            style={{ background: color }}
+            style={{ background: color, opacity: row.current ? 1 : 0.35 }}
           />
-          <span className="truncate">{row.task.name}</span>
+          <span className="min-w-0 truncate">{row.name}</span>
+          {row.current ? null : (
+            <span className="shrink-0 text-[var(--text-2xs)] tabular-nums">
+              {range}
+            </span>
+          )}
+          {row.current && historyCount > 0 ? (
+            <button
+              type="button"
+              data-name-history-toggle={row.task.id}
+              aria-expanded={expanded}
+              onClick={onToggle}
+              className="shrink-0 whitespace-nowrap rounded-[var(--radius-pill)] border border-[var(--color-border)] px-1.5 py-px text-[var(--text-2xs)] hover:bg-[var(--state-hover)]"
+            >
+              {t(
+                expanded ? "stats.nameHistory.hide" : "stats.nameHistory",
+                { count: historyCount },
+              )}
+            </button>
+          ) : null}
           <span className="shrink-0 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
             {t(
               row.task.category === "voluntary"

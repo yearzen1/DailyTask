@@ -1,6 +1,7 @@
 import { isApplicable } from "./applicability";
 import { addDays, diffDays, range } from "./date";
-import type { Task } from "./types";
+import { namePeriodsOf } from "./names";
+import type { NamePeriod, Task } from "./types";
 
 /** 保底一年历史 + 未来 30 天，覆盖「整年概览」与临时补打卡。 */
 export const GRID_PAST_DAYS = 365;
@@ -49,7 +50,14 @@ export function buildDateAxis(tasks: Task[], today: string): DateAxis {
 }
 
 export interface GridRow {
+  /** 名称段标识；当前段复用 task.id，历史段为 task.id~period.id。 */
+  key: string;
   task: Task;
+  namePeriod: NamePeriod;
+  /** 该段显示的名字。 */
+  name: string;
+  /** 是否为当前（最新）名称段。 */
+  current: boolean;
   /** 已停用：历史可见，但格子不可点。 */
   disabled: boolean;
 }
@@ -81,13 +89,30 @@ export function groupTasks(tasks: Task[], today: string): GridGroups {
   const groups: GridGroups = { voluntary: [], forced: [], disabled: [] };
 
   for (const task of sorted) {
-    if (isRetired(task, today)) {
-      groups.disabled.push({ task, disabled: true });
-    } else if (task.category === "voluntary") {
-      groups.voluntary.push({ task, disabled: false });
-    } else {
-      groups.forced.push({ task, disabled: false });
-    }
+    const retired = isRetired(task, today);
+    const group = retired
+      ? groups.disabled
+      : task.category === "voluntary"
+        ? groups.voluntary
+        : groups.forced;
+
+    // 当前名称段在最上面，历史段按时间倒序紧随其后。
+    const periods = namePeriodsOf(task);
+    const ordered = [
+      periods[periods.length - 1],
+      ...periods.slice(0, -1).reverse(),
+    ];
+    ordered.forEach((period, index) => {
+      const current = index === 0;
+      group.push({
+        key: current ? task.id : `${task.id}~${period.id}`,
+        task,
+        namePeriod: period,
+        name: period.name,
+        current,
+        disabled: retired,
+      });
+    });
   }
 
   return groups;

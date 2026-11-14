@@ -1,4 +1,4 @@
-import type { Checkin, Task } from "../domain/types";
+import type { Checkin } from "../domain/types";
 import { measureTextWidth } from "./textWidth";
 
 /** 自动列宽上限：超过后格子内换行。 */
@@ -51,9 +51,9 @@ export function buildDateColumnWidths(
   );
 }
 
-/** 任务列宽：所有任务名取最宽，160px 起步、320px 封顶。 */
+/** 任务列宽：所有任务名（含历史名称段）取最宽，160px 起步、320px 封顶。 */
 export function buildTaskColumnWidth(
-  tasks: Iterable<Task>,
+  tasks: Iterable<{ name: string }>,
   fontSize: number,
   minWidth = TASK_COLUMN_MIN_WIDTH,
   maxWidth = AUTO_COLUMN_MAX_WIDTH,

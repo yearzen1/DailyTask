@@ -65,4 +65,44 @@ describe("buildStats", () => {
     expect(data.rows[0].streak).toBe(1);
     expect(data.rows[0].rate).toBeCloseTo(1 / 29);
   });
+
+  it("splits stats at each name period", () => {
+    const renamed: Task = {
+      ...task("a", 0),
+      name: "每天两个",
+      namePeriods: [
+        {
+          id: "p1",
+          taskId: "a",
+          name: "每天一个",
+          start: "2026-10-01",
+          end: "2026-10-31",
+        },
+        {
+          id: "p2",
+          taskId: "a",
+          name: "每天两个",
+          start: "2026-11-01",
+          end: null,
+        },
+      ],
+    };
+    const checkins = new Map<string, Checkin>([
+      [checkinKey("a", "2026-10-30"), checkin("a", "2026-10-30", "done")],
+      [checkinKey("a", "2026-10-31"), checkin("a", "2026-10-31", "done")],
+      [checkinKey("a", "2026-11-10"), checkin("a", "2026-11-10", "done")],
+    ]);
+
+    const data = buildStats([renamed], checkins, DEFAULT_SETTINGS, NOW);
+
+    expect(data.rows.map((row) => row.key)).toEqual(["a", "a~p1"]);
+    expect(data.rows.map((row) => row.name)).toEqual([
+      "每天两个",
+      "每天一个",
+    ]);
+    expect(data.rows[0]).toMatchObject({ current: true, streak: 1 });
+    expect(data.rows[0].rate).toBeCloseTo(1 / 10);
+    expect(data.rows[1]).toMatchObject({ current: false, streak: 2 });
+    expect(data.rows[1].rate).toBeCloseTo(2 / 30);
+  });
 });

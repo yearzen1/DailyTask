@@ -64,7 +64,7 @@ function todo(id: string, createdAt: string): Todo {
 }
 
 describe("buildExportBundle", () => {
-  it("uses JSON v1 with tasks and intervals split apart", () => {
+  it("uses JSON v2 with tasks, name periods and intervals split apart", () => {
     const bundle = buildExportBundle(
       [task("t1", 0)],
       [checkin("t1", "2026-11-02")],
@@ -73,7 +73,7 @@ describe("buildExportBundle", () => {
       NOW,
     );
 
-    expect(bundle.version).toBe(1);
+    expect(bundle.version).toBe(2);
     expect(bundle.exportedAt).toBe(NOW.toISOString());
     expect(bundle.tasks).toEqual([
       {
@@ -86,6 +86,15 @@ describe("buildExportBundle", () => {
       },
     ]);
     expect(bundle.tasks[0]).not.toHaveProperty("intervals");
+    expect(bundle.namePeriods).toEqual([
+      {
+        id: "t1",
+        taskId: "t1",
+        name: "任务t1",
+        start: "2026-10-01",
+        end: null,
+      },
+    ]);
     expect(bundle.intervals.map((interval) => interval.id)).toEqual([
       "t1-1",
       "t1-2",
@@ -94,7 +103,7 @@ describe("buildExportBundle", () => {
     expect(bundle.settings).toEqual(DEFAULT_SETTINGS);
   });
 
-  it("sorts intervals and checkins by task then date", () => {
+  it("sorts intervals, name periods and checkins by task then date", () => {
     const bundle = buildExportBundle(
       [task("b", 1), task("a", 0)],
       [checkin("a", "2026-11-02"), checkin("a", "2026-11-01"), checkin("b", "2026-11-02")],
@@ -111,6 +120,9 @@ describe("buildExportBundle", () => {
       "b:2026-10-01",
       "b:2026-11-01",
     ]);
+    expect(
+      bundle.namePeriods.map((period) => `${period.taskId}:${period.start}`),
+    ).toEqual(["a:2026-10-01", "b:2026-10-01"]);
     expect(
       bundle.checkins.map((item) => `${item.taskId}:${item.date}`),
     ).toEqual(["a:2026-11-01", "a:2026-11-02", "b:2026-11-02"]);
@@ -132,15 +144,81 @@ describe("parseImportBundle", () => {
     const bundle = parseImportBundle(JSON.stringify(valid));
 
     expect(bundle.version).toBe(1);
+    expect(bundle.namePeriods).toEqual([]);
     expect(bundle.settings.gridZoom).toBe(40);
     expect(bundle.settings.theme).toBe(DEFAULT_SETTINGS.theme);
+  });
+
+  it("accepts a v2 bundle with explicit name periods", () => {
+    const bundle = parseImportBundle(
+      JSON.stringify({
+        ...valid,
+        version: 2,
+        namePeriods: [
+          {
+            id: "p1",
+            taskId: "t1",
+            name: "跑步",
+            start: "2026-10-01",
+            end: null,
+          },
+        ],
+      }),
+    );
+
+    expect(bundle.version).toBe(2);
+    expect(bundle.namePeriods).toEqual([
+      {
+        id: "p1",
+        taskId: "t1",
+        name: "跑步",
+        start: "2026-10-01",
+        end: null,
+      },
+    ]);
   });
 
   it("rejects malformed JSON and unsupported versions", () => {
     expect(() => parseImportBundle("{")).toThrow("invalid-json");
     expect(() =>
-      parseImportBundle(JSON.stringify({ ...valid, version: 2 })),
+      parseImportBundle(JSON.stringify({ ...valid, version: 3 })),
     ).toThrow("unsupported-version");
+  });
+
+  it("synthesizes one name period per task for v1 bundles", () => {
+    const bundle = parseImportBundle(
+      JSON.stringify({
+        ...valid,
+        tasks: [
+          {
+            id: "t1",
+            name: "跑步",
+            category: "voluntary",
+            order: 0,
+            createdAt: "2026-10-01T00:00:00.000Z",
+            updatedAt: "2026-10-01T00:00:00.000Z",
+          },
+        ],
+        intervals: [
+          {
+            id: "i1",
+            taskId: "t1",
+            start: "2026-10-02",
+            end: null,
+          },
+        ],
+      }),
+    );
+
+    expect(bundle.namePeriods).toEqual([
+      {
+        id: "t1:name",
+        taskId: "t1",
+        name: "跑步",
+        start: "2026-10-02",
+        end: null,
+      },
+    ]);
   });
 
   it("rejects a bundle with broken entity fields", () => {
@@ -213,6 +291,10 @@ const MIGRATION_004 = readFileSync(
   resolve(process.cwd(), "src-tauri/migrations/004_drop_recorded_status.sql"),
   "utf8",
 );
+const MIGRATION_005 = readFileSync(
+  resolve(process.cwd(), "src-tauri/migrations/005_task_name_periods.sql"),
+  "utf8",
+);
 
 function createDb(seed = true): SqlDatabase {
   const sqlite = new DatabaseSync(":memory:");
@@ -220,6 +302,7 @@ function createDb(seed = true): SqlDatabase {
   sqlite.exec(MIGRATION_002);
   sqlite.exec(MIGRATION_003);
   sqlite.exec(MIGRATION_004);
+  sqlite.exec(MIGRATION_005);
   if (seed) {
     sqlite.exec(
       "INSERT INTO tasks (id, name, category, sort_order, created_at, updated_at) " +
@@ -228,6 +311,10 @@ function createDb(seed = true): SqlDatabase {
     sqlite.exec(
       "INSERT INTO task_intervals (id, task_id, start_date, end_date) " +
         "VALUES ('i1', 't1', '2026-10-01', NULL)",
+    );
+    sqlite.exec(
+      "INSERT INTO task_name_periods (id, task_id, name, start_date, end_date) " +
+        "VALUES ('p1', 't1', '跑步', '2026-10-01', NULL)",
     );
     sqlite.exec(
       "INSERT INTO todos (id, title, due_date, done, completed_at, created_at, updated_at) " +
@@ -294,10 +381,20 @@ describe("importData", () => {
 
     const counts = await importData(db, bundle);
 
-    expect(counts).toEqual({ tasks: 2, intervals: 3, checkins: 2, todos: 1 });
+    expect(counts).toEqual({
+      tasks: 2,
+      namePeriods: 2,
+      intervals: 3,
+      checkins: 2,
+      todos: 1,
+    });
 
     const tasks = await listTasks(db);
     expect(tasks.map((task) => task.name)).toEqual(["晨跑", "阅读"]);
+    expect(tasks[0].namePeriods?.map((period) => period.name)).toEqual([
+      "跑步",
+      "晨跑",
+    ]);
     expect(tasks[0].intervals.map((interval) => interval.id)).toEqual([
       "i1",
       "i3",

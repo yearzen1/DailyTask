@@ -5,7 +5,7 @@ import {
   computeHorizontalWindowByOffsets,
   scrollLeftForToday,
 } from "./useHorizontalWindow";
-import { buildColumnOffsets } from "./gridColumnLayout";
+import { buildColumnOffsets, findColumnAtOffset } from "./gridColumnLayout";
 
 describe("computeHorizontalWindow", () => {
   it("renders the first screen plus two screens of overscan", () => {
@@ -93,5 +93,60 @@ describe("computeHorizontalWindowByOffsets", () => {
       leftPad: 0,
       rightPad: 0,
     });
+  });
+
+  it("keeps overscan within one screen instead of five", () => {
+    const offsets = buildColumnOffsets(new Array<number>(1200).fill(32));
+    const visible = Math.ceil((832 - 160) / 32);
+    const win = computeHorizontalWindowByOffsets(300 * 32, 832, offsets);
+
+    expect(win.end - win.start).toBeLessThanOrEqual(visible * 2);
+    expect(win.start).toBeLessThanOrEqual(300);
+    expect(win.end).toBeGreaterThanOrEqual(300 + visible);
+  });
+
+  it("never renders more columns than the cell budget", () => {
+    const offsets = buildColumnOffsets(new Array<number>(1200).fill(32));
+    // 21 行 → floor(2000 / 21) = 95 列
+    const budget = Math.floor(2000 / 21);
+
+    for (const scrollLeft of [0, 300 * 32, 900 * 32, 1199 * 32]) {
+      const win = computeHorizontalWindowByOffsets(
+        scrollLeft,
+        832,
+        offsets,
+        160,
+        budget,
+      );
+      const firstVisible = findColumnAtOffset(offsets, scrollLeft);
+      const lastVisible = findColumnAtOffset(
+        offsets,
+        scrollLeft + (832 - 160) - 1,
+      );
+
+      expect(win.end - win.start).toBeLessThanOrEqual(budget);
+      expect(win.start).toBeLessThanOrEqual(firstVisible);
+      expect(win.end).toBeGreaterThan(lastVisible);
+      expect(win.leftPad).toBe(offsets[win.start]);
+      expect(win.leftPad + offsets[win.end] - offsets[win.start] + win.rightPad)
+        .toBe(offsets[1200]);
+    }
+  });
+
+  it("keeps the window start monotonic while scrolling right", () => {
+    const offsets = buildColumnOffsets(new Array<number>(1200).fill(32));
+    let previous = -1;
+
+    for (let index = 0; index < 1200; index += 17) {
+      const win = computeHorizontalWindowByOffsets(
+        index * 32,
+        832,
+        offsets,
+        160,
+        95,
+      );
+      expect(win.start).toBeGreaterThanOrEqual(previous);
+      previous = win.start;
+    }
   });
 });

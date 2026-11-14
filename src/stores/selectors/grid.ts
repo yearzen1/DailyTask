@@ -6,8 +6,10 @@ import {
   groupTasks,
   type DateAxis,
   type GridGroups,
+  type GridRow,
 } from "../../domain/grid";
 import { checkinKey } from "../../domain/keys";
+import { isDateInNamePeriod } from "../../domain/names";
 import { projectCell, type CellState } from "../../domain/settle";
 import type { Checkin, Settings, Task } from "../../domain/types";
 import { useCheckinsStore } from "../checkinsStore";
@@ -22,8 +24,13 @@ export interface GridData {
   groups: GridGroups;
   settings: Settings;
   checkins: Map<string, Checkin>;
-  /** taskId|date → 五态投影，渲染时直接查表。 */
+  /**
+   * rowKey|date → 五态投影缓存。只有真正渲染到的格子才写入，
+   * 挂载时不再做「行 × 全轴」的一次性投影。
+   */
   states: Map<string, CellState>;
+  /** 按需投影：命中缓存直接返回，未命中算一次并写回。 */
+  cellState: (row: GridRow, date: string) => CellState;
 }
 
 export function buildGridData(
@@ -37,25 +44,35 @@ export function buildGridData(
   const groups = groupTasks(tasks, today);
   const states = new Map<string, CellState>();
 
-  for (const group of [groups.voluntary, groups.forced, groups.disabled]) {
-    for (const row of group) {
-      for (const date of axis.dates) {
-        const key = checkinKey(row.task.id, date);
-        states.set(
-          key,
-          projectCell(
-            row.task,
-            date,
-            checkins.get(key),
-            settings,
-            today,
-          ),
-        );
-      }
+  const cellState = (row: GridRow, date: string): CellState => {
+    const key = checkinKey(row.key, date);
+    const cached = states.get(key);
+    if (cached !== undefined) {
+      return cached;
     }
-  }
+    const state = isDateInNamePeriod(row.namePeriod, date)
+      ? projectCell(
+          row.task,
+          date,
+          checkins.get(checkinKey(row.task.id, date)),
+          settings,
+          today,
+        )
+      : "none";
+    states.set(key, state);
+    return state;
+  };
 
-  return { today, tasks, axis, groups, settings, checkins, states };
+  return {
+    today,
+    tasks,
+    axis,
+    groups,
+    settings,
+    checkins,
+    states,
+    cellState,
+  };
 }
 
 export function useGridData(): GridData {
