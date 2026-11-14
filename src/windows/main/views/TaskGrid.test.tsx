@@ -682,6 +682,73 @@ describe("TaskGrid", () => {
     ).toBeInTheDocument();
   });
 
+  it("keeps former name rows collapsed and counts tasks once", () => {
+    useTasksStore.setState({
+      loaded: true,
+      tasks: [
+        {
+          ...task(
+            "t1",
+            "每天两个",
+            "voluntary",
+            "2026-10-01",
+            null,
+            0,
+          ),
+          namePeriods: [
+            {
+              id: "p1",
+              taskId: "t1",
+              name: "每天一个",
+              start: "2026-10-01",
+              end: "2026-10-31",
+            },
+            {
+              id: "p2",
+              taskId: "t1",
+              name: "每天两个",
+              start: "2026-11-01",
+              end: null,
+            },
+          ],
+        },
+      ],
+    });
+
+    const { container } = render(<TaskGrid />);
+
+    const header = container.querySelector(
+      '[data-group-header="voluntary"]',
+    ) as HTMLElement;
+    expect(header).toHaveTextContent("1");
+    expect(container.querySelector('[data-grid-row="t1"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-grid-row="t1~p1"]')).toBeNull();
+
+    fireEvent.click(
+      container.querySelector('[data-name-history-toggle="t1"]') as Element,
+    );
+
+    const oldRow = container.querySelector(
+      '[data-grid-row="t1~p1"]',
+    ) as HTMLElement;
+    expect(oldRow).toBeInTheDocument();
+    const label = oldRow.querySelector("[data-task-name]");
+    expect(label).toHaveTextContent("每天一个");
+    expect(label?.querySelector("span")).toHaveAttribute(
+      "title",
+      "10/01 – 10/31",
+    );
+    expect(
+      oldRow.querySelector('[data-date="2026-11-02"]'),
+    ).toHaveAttribute("data-state", "none");
+    expect(
+      oldRow.querySelector('[data-date="2026-10-15"]'),
+    ).toHaveAttribute("data-state", "missed");
+    expect(
+      container.querySelector('[data-grid-row="t1"] [data-date="2026-10-15"]'),
+    ).toHaveAttribute("data-state", "none");
+  });
+
   it("reorders rows within the same group", () => {
     useTasksStore.setState({
       tasks: [

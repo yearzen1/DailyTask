@@ -30,7 +30,7 @@ describe("Settings", () => {
   const exportToFile = vi.fn(async () => "C:/Users/me/dailytask.json" as string | null);
   const importFromFile = vi.fn(async () => ({
     path: "C:/Users/me/backup.json",
-    counts: { tasks: 2, intervals: 3, checkins: 4, todos: 5 },
+    counts: { tasks: 2, namePeriods: 2, intervals: 3, checkins: 4, todos: 5 },
   }));
   const reload = vi.fn(async () => undefined);
   const checkForUpdate = vi.fn(async () => undefined);

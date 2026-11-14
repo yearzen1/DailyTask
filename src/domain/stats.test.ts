@@ -131,6 +131,39 @@ describe("taskStreak", () => {
       ),
     ).toBe(0);
   });
+
+  it("stops a historical name period at its end date", () => {
+    const checkins = withCheckins([
+      ["2026-10-30", "done"],
+      ["2026-10-31", "done"],
+      ["2026-11-01", "done"],
+      ["2026-11-10", "done"],
+    ]);
+
+    expect(
+      taskStreak(makeTask(), checkins, TODAY, settings, {
+        start: "2026-10-01",
+        end: "2026-10-31",
+      }),
+    ).toBe(2);
+  });
+
+  it("does not count dates outside the current name period", () => {
+    const off = { ...settings, autoSettleMissed: false };
+    const checkins = withCheckins([
+      ["2026-10-31", "done"],
+      ["2026-11-01", "done"],
+      ["2026-11-10", "done"],
+    ]);
+
+    // 10-31 属于旧段，不能计入当前段的连续天数。
+    expect(
+      taskStreak(makeTask(), checkins, TODAY, off, {
+        start: "2026-11-01",
+        end: TODAY,
+      }),
+    ).toBe(2);
+  });
 });
 
 describe("completionRate30", () => {
@@ -183,5 +216,40 @@ describe("completionRate30", () => {
         settings,
       ),
     ).toBe(0);
+  });
+
+  it("limits the denominator to a historical name period", () => {
+    const checkins = withCheckins([
+      ["2026-10-30", "done"],
+      ["2026-10-31", "done"],
+      ["2026-11-01", "done"],
+      ["2026-11-10", "done"],
+    ]);
+
+    // 10-02..10-31：2 done + 28 投影 missed。
+    expect(
+      completionRate30(makeTask(), checkins, TODAY, settings, {
+        start: "2026-10-01",
+        end: "2026-10-31",
+      }),
+    ).toBeCloseTo(2 / 30);
+  });
+
+  it("anchors the 30 day window at the current period start", () => {
+    const checkins = withCheckins([
+      ["2026-10-31", "done"],
+      ["2026-11-01", "done"],
+      ["2026-11-02", "done"],
+      ["2026-11-09", "done"],
+      ["2026-11-10", "done"],
+    ]);
+
+    // 11-01..11-10：4 done + 6 投影 missed。
+    expect(
+      completionRate30(makeTask(), checkins, TODAY, settings, {
+        start: "2026-11-01",
+        end: TODAY,
+      }),
+    ).toBeCloseTo(4 / 10);
   });
 });

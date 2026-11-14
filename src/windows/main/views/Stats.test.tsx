@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { checkinKey } from "../../../domain/keys";
@@ -85,7 +85,7 @@ describe("Stats", () => {
   it("explains the denominator and shows an empty state without tasks", () => {
     const { container } = render(<Stats />);
     expect(
-      screen.getByText(/近 30 天的分母只含完成与未完成/),
+      screen.getByText(/每段名称独立统计/),
     ).toBeInTheDocument();
 
     useTasksStore.setState({ tasks: [] });
@@ -93,5 +93,47 @@ describe("Stats", () => {
     render(<Stats />);
 
     expect(screen.getByText("还没有任务，先去「任务管理」新建一个")).toBeInTheDocument();
+  });
+
+  it("keeps former name periods collapsed until expanded", () => {
+    const renamed: Task = {
+      ...task("a", "每天两个", 0),
+      namePeriods: [
+        {
+          id: "p1",
+          taskId: "a",
+          name: "每天一个",
+          start: "2026-10-01",
+          end: "2026-10-31",
+        },
+        {
+          id: "p2",
+          taskId: "a",
+          name: "每天两个",
+          start: "2026-11-01",
+          end: null,
+        },
+      ],
+    };
+    useTasksStore.setState({ tasks: [renamed] });
+
+    const { container } = render(<Stats />);
+
+    expect(container.querySelector('[data-stats-row="a"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-stats-row="a~p1"]')).toBeNull();
+    expect(container.querySelector('[data-stats-row="a"]')).toHaveTextContent(
+      "每天两个",
+    );
+
+    fireEvent.click(
+      container.querySelector(
+        '[data-name-history-toggle="a"]',
+      ) as HTMLElement,
+    );
+
+    const former = container.querySelector('[data-stats-row="a~p1"]');
+    expect(former).toBeInTheDocument();
+    expect(former).toHaveTextContent("每天一个");
+    expect(former).toHaveTextContent("10/01 – 10/31");
   });
 });

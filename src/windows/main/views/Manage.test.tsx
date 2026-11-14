@@ -46,7 +46,7 @@ const appendInterval = vi.fn(
 const update = vi.fn(
   async (
     taskId: string,
-    patch: { name?: string; category?: Task["category"]; order?: number },
+    patch: { category?: Task["category"]; order?: number },
   ) => {
     useTasksStore.setState({
       tasks: useTasksStore
@@ -57,6 +57,14 @@ const update = vi.fn(
     });
   },
 );
+
+const rename = vi.fn(async (taskId: string, name: string) => {
+  useTasksStore.setState({
+    tasks: useTasksStore
+      .getState()
+      .tasks.map((task) => (task.id === taskId ? { ...task, name } : task)),
+  });
+});
 
 const updateInterval = vi.fn(
   async (
@@ -142,6 +150,7 @@ describe("Manage", () => {
     closeInterval.mockClear();
     appendInterval.mockClear();
     update.mockClear();
+    rename.mockClear();
     updateInterval.mockClear();
     remove.mockClear();
 
@@ -152,6 +161,7 @@ describe("Manage", () => {
       closeInterval,
       appendInterval,
       update,
+      rename,
       updateInterval,
       remove,
       tasks: [
@@ -460,10 +470,13 @@ describe("Manage", () => {
     });
     fireEvent.click(container.querySelector("[data-edit-submit]") as Element);
 
-    expect(update).toHaveBeenCalledWith("t1", {
-      name: "晨跑",
-      category: "voluntary",
-    });
+    expect(rename).toHaveBeenCalledWith(
+      "t1",
+      "晨跑",
+      "2026-11-04",
+      "from-today",
+    );
+    expect(update).not.toHaveBeenCalled();
     expect(updateInterval).toHaveBeenCalledWith("t1-1", {
       start: "2026-10-20",
       end: null,
@@ -472,6 +485,63 @@ describe("Manage", () => {
     expect(
       container.querySelector('[data-manage-row="t1"]'),
     ).toHaveTextContent("晨跑");
+  });
+
+  it("shows name history and rewrites the current name in typo mode", () => {
+    useTasksStore.setState({
+      loaded: true,
+      tasks: [
+        {
+          ...task("t1", "每天两个", "voluntary", 0, [
+            { start: "2026-10-01", end: null },
+          ]),
+          namePeriods: [
+            {
+              id: "p1",
+              taskId: "t1",
+              name: "每天一个",
+              start: "2026-10-01",
+              end: "2026-10-31",
+            },
+            {
+              id: "p2",
+              taskId: "t1",
+              name: "每天两个",
+              start: "2026-11-01",
+              end: null,
+            },
+          ],
+        },
+      ],
+    });
+
+    const { container } = render(<Manage />);
+    fireEvent.click(
+      container.querySelector(
+        '[data-manage-row="t1"] [data-manage-action="edit"]',
+      ) as Element,
+    );
+
+    expect(screen.getByText("每天一个")).toBeInTheDocument();
+    expect(container.querySelector('[data-name-history="p1"]')).toHaveTextContent(
+      "10/01 – 10/31",
+    );
+    expect(screen.getByText(/改名从今天起生效/)).toBeInTheDocument();
+
+    fireEvent.change(container.querySelector("[data-edit-name]") as Element, {
+      target: { value: "每天两个俯卧撑" },
+    });
+    fireEvent.click(
+      container.querySelector("[data-edit-name-typo]") as Element,
+    );
+    fireEvent.click(container.querySelector("[data-edit-submit]") as Element);
+
+    expect(rename).toHaveBeenCalledWith(
+      "t1",
+      "每天两个俯卧撑",
+      "2026-11-04",
+      "rewrite-current",
+    );
   });
 
   it("rejects an end before the start and an overlapping start", () => {
@@ -513,7 +583,7 @@ describe("Manage", () => {
     );
     expect(screen.getByRole("dialog", { name: "删除「开会」" })).toBeInTheDocument();
     expect(screen.getByRole("dialog")).toHaveTextContent(
-      "启用区间与全部打卡记录会一并删除",
+      "启用区间、名称历史与全部打卡记录会一并删除",
     );
 
     fireEvent.click(

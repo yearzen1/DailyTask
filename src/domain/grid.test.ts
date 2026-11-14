@@ -10,7 +10,7 @@ import {
   monthTicks,
 } from "./grid";
 import { addDays } from "./date";
-import type { Interval, Task } from "./types";
+import type { Interval, NamePeriod, Task } from "./types";
 
 const TODAY = "2026-11-02";
 
@@ -103,6 +103,64 @@ describe("groupTasks", () => {
 
   it("treats a task without intervals as retired", () => {
     expect(isRetired(task("empty", []), TODAY)).toBe(true);
+  });
+
+  it("emits one row per name period, current first", () => {
+    const renamed: Task = {
+      ...task("renamed", [interval("2026-10-01", null)]),
+      name: "每天两个",
+      namePeriods: [
+        {
+          id: "p1",
+          taskId: "renamed",
+          name: "每天一个",
+          start: "2026-10-01",
+          end: "2026-10-31",
+        },
+        {
+          id: "p2",
+          taskId: "renamed",
+          name: "每天两个",
+          start: "2026-11-01",
+          end: null,
+        },
+      ] satisfies NamePeriod[],
+    };
+
+    const rows = groupTasks([renamed], TODAY).voluntary;
+
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.name)).toEqual(["每天两个", "每天一个"]);
+    expect(rows.map((row) => row.key)).toEqual(["renamed", "renamed~p1"]);
+    expect(rows.map((row) => row.current)).toEqual([true, false]);
+    expect(rows.every((row) => row.task.id === "renamed")).toBe(true);
+  });
+
+  it("applies the retired flag to every name period row", () => {
+    const retired: Task = {
+      ...task("retired-name", [interval("2026-09-01", "2026-10-01")]),
+      namePeriods: [
+        {
+          id: "p1",
+          taskId: "retired-name",
+          name: "旧名",
+          start: "2026-09-01",
+          end: "2026-09-30",
+        },
+        {
+          id: "p2",
+          taskId: "retired-name",
+          name: "新名",
+          start: "2026-10-01",
+          end: null,
+        },
+      ],
+    };
+
+    const rows = groupTasks([retired], TODAY).disabled;
+
+    expect(rows).toHaveLength(2);
+    expect(rows.every((row) => row.disabled)).toBe(true);
   });
 });
 
