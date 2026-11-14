@@ -1,0 +1,3 @@
+# sqlx 按字节对迁移脚本做 SHA-384 校验，行尾从 LF 变 CRLF 会导致
+# 「migration N was previously applied but has been modified」。固定为 LF。
+src-tauri/migrations/** text eol=lf
