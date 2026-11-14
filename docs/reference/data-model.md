@@ -39,6 +39,17 @@ CREATE TABLE task_intervals (
 );
 CREATE INDEX idx_intervals_task ON task_intervals(task_id);
 
+CREATE TABLE task_name_periods (
+  id         TEXT PRIMARY KEY,
+  task_id    TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  name       TEXT NOT NULL,
+  start_date TEXT NOT NULL,               -- 含当天
+  end_date   TEXT,                        -- NULL = 至今
+  CHECK (end_date IS NULL OR end_date >= start_date)
+);
+CREATE UNIQUE INDEX idx_name_periods_task_start
+  ON task_name_periods(task_id, start_date);
+
 CREATE TABLE checkins (
   id          TEXT PRIMARY KEY,
   task_id     TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
@@ -65,6 +76,10 @@ CREATE INDEX idx_todos_due ON todos(done, due_date);
 CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 ```
 
+### 2.1 任务名与名称段
+
+`tasks.name` 保留为「当前名字」缓存；读取任务时以最新 `task_name_periods` 段为准。改名不再原地覆盖，而是把当前段截到昨天、从今天追加一段。这样历史打卡永远挂在原名下，不会被新名字追溯覆盖。
+
 ## 3. 迁移历史
 
 | 版本 | 文件 | 内容 |
@@ -73,6 +88,7 @@ CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 | 2 | `002_checkin_value.sql` | 打卡加 `value`，状态加 `recorded` |
 | 3 | `003_task_interval_every_days.sql` | 区间加 `every_days` |
 | 4 | `004_drop_recorded_status.sql` | 重建 checkins，移除 `recorded`，旧值转 `done` |
+| 5 | `005_task_name_periods.sql` | 新增 `task_name_periods`，按最早区间启用日回填一段 |
 
 规则：
 
@@ -94,13 +110,14 @@ CASE WHEN status = 'recorded' THEN 'done' ELSE status END
 
 旧 JSON 导入时也做同样归一。
 
-## 4. JSON v1 导出 / 导入
+## 4. JSON v2 导出 / 导入
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "exportedAt": "2026-11-05T00:00:00.000Z",
   "tasks": [],
+  "namePeriods": [],
   "intervals": [],
   "checkins": [],
   "todos": [],
@@ -108,9 +125,11 @@ CASE WHEN status = 'recorded' THEN 'done' ELSE status END
 }
 ```
 
-- 任务与区间分开放，导入按 id upsert
+- 任务、名称段与区间分开放，导入按 id upsert
+- 名称段以 `(task_id, start_date)` 为语义键合并，重名不产生重复行
 - 打卡按 `(task_id, date)` 语义键合并
 - 本地多出来的行保留，不删数据
+- v1 文件仍可导入：每个任务按最早区间启用日合成一段名称
 - 旧 JSON 的 `recorded` 转 `done`
 - 旧 JSON 缺少 `everyDays` 按 `1` 处理
 - 导出不包含备份文件和 WebView localStorage
@@ -128,7 +147,7 @@ CASE WHEN status = 'recorded' THEN 'done' ELSE status END
 
 ## 6. 删除策略
 
-- 删除任务：显式删除 `checkins → task_intervals → tasks`，不依赖 SQLite 外键开关
+- 删除任务：显式删除 `checkins → task_name_periods → task_intervals → tasks`，不依赖 SQLite 外键开关
 - 删除待办：单表删除
 - 所有 UI 删除入口必须走 `ConfirmDeleteButton`
 - store 删除方法要求 `DeleteConfirmation` 令牌
@@ -138,9 +157,9 @@ CASE WHEN status = 'recorded' THEN 'done' ELSE status END
 | 文件 | 职责 |
 |---|---|
 | `src/db/client.ts` | `Database.load` + 迁移入口 |
-| `src/db/tasks.ts` | 任务/区间 CRUD、级联删除 |
+| `src/db/tasks.ts` | 任务/区间/名称段 CRUD、改名、级联删除 |
 | `src/db/checkins.ts` | 状态、值、备注、删除 |
 | `src/db/todos.ts` | 待办 CRUD |
 | `src/db/settings.ts` | kv JSON 读写与 sanitize |
 | `src/db/backup.ts` | 每日轮转 + 更新前快照 |
-| `src/db/transfer.ts` | JSON v1 导入导出 |
+| `src/db/transfer.ts` | JSON v2 导入导出（兼容 v1） |

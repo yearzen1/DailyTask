@@ -12,9 +12,10 @@
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `id` | string | UUID |
-| `name` | string | 任务名 |
+| `name` | string | 当前名字；有 `namePeriods` 时以最新段为准 |
 | `category` | `voluntary` / `forced` | 只影响分组与颜色 |
 | `intervals` | Interval[] | 至少一段 |
+| `namePeriods` | NamePeriod[] | 名称历史；缺省时按 `name` 合成一段 |
 | `order` | number | `sort_order` |
 | `createdAt` | ISO string | |
 | `updatedAt` | ISO string | |
@@ -28,6 +29,29 @@
 | `start` | `YYYY-MM-DD` | 含当天 |
 | `end` | `YYYY-MM-DD \| null` | 截止日期，含当天；null = 一直有效 |
 | `everyDays` | number | 1 = 每天；N = 每 N 天；缺省 1 |
+
+## 2.5 NamePeriod
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `id` | string | UUID；旧数据/测试数据的合成段用 taskId |
+| `taskId` | string | |
+| `name` | string | 该段显示的名字 |
+| `start` | `YYYY-MM-DD` | 含当天 |
+| `end` | `YYYY-MM-DD \| null` | null = 至今 |
+
+- 一个任务至少有一段
+- 按 `start` 升序读取；最新一段就是当前名字
+- 同一任务同日只能有一段（唯一索引）
+- `tasks.name` 只作为当前名字缓存，读取时以最新段为准
+
+## 2.6 改名
+
+- 默认从逻辑今天起生效：当前段 `end = today − 1`，追加一段从 `today` 开始
+- 同名不操作
+- 当前段已经 `start >= today`、任务今天刚创建、或勾选「只修正当前名字」时，原地改写当前段
+- 改名不改任何打卡记录
+- 网格与统计按名称段拆行；旧段以段结束日为统计终点
 
 ## 3. 适用性
 
@@ -69,7 +93,7 @@ isApplicable(intervals, date)
 显式级联：
 
 ```text
-checkins → task_intervals → tasks
+checkins → task_name_periods → task_intervals → tasks
 ```
 
 不依赖 SQLite 外键开关。
