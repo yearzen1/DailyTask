@@ -27,7 +27,14 @@ export interface TasksState {
   }) => Promise<Task>;
   update: (
     id: string,
-    patch: { name?: string; category?: TaskCategory; order?: number },
+    patch: { category?: TaskCategory; order?: number },
+  ) => Promise<void>;
+  /** 改名；默认从 today 起生效，rewrite-current 用于修正错别字。 */
+  rename: (
+    id: string,
+    name: string,
+    today: string,
+    mode?: repo.RenameMode,
   ) => Promise<void>;
   remove: (id: string, confirmation: DeleteConfirmation) => Promise<void>;
   closeInterval: (taskId: string, endDate: string) => Promise<void>;
@@ -72,6 +79,26 @@ export const useTasksStore = create<TasksState>()((set, get) => ({
       set({
         tasks: get().tasks.map((task) =>
           task.id === id ? { ...task, ...patch, updatedAt: now() } : task,
+        ),
+      });
+      notifyTasksChanged();
+    }),
+
+  rename: (id, name, today, mode) =>
+    enqueueWrite(async () => {
+      const periods = await repo.renameTask(
+        await getDb(),
+        id,
+        name,
+        today,
+        mode,
+      );
+      const stamp = now();
+      set({
+        tasks: get().tasks.map((task) =>
+          task.id === id
+            ? { ...task, name, namePeriods: periods, updatedAt: stamp }
+            : task,
         ),
       });
       notifyTasksChanged();

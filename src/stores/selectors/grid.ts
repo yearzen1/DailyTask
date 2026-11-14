@@ -8,6 +8,7 @@ import {
   type GridGroups,
 } from "../../domain/grid";
 import { checkinKey } from "../../domain/keys";
+import { isDateInNamePeriod } from "../../domain/names";
 import { projectCell, type CellState } from "../../domain/settle";
 import type { Checkin, Settings, Task } from "../../domain/types";
 import { useCheckinsStore } from "../checkinsStore";
@@ -22,7 +23,7 @@ export interface GridData {
   groups: GridGroups;
   settings: Settings;
   checkins: Map<string, Checkin>;
-  /** taskId|date → 五态投影，渲染时直接查表。 */
+  /** rowKey|date → 五态投影，渲染时直接查表；rowKey 可能是历史名称段。 */
   states: Map<string, CellState>;
 }
 
@@ -40,17 +41,16 @@ export function buildGridData(
   for (const group of [groups.voluntary, groups.forced, groups.disabled]) {
     for (const row of group) {
       for (const date of axis.dates) {
-        const key = checkinKey(row.task.id, date);
-        states.set(
-          key,
-          projectCell(
-            row.task,
-            date,
-            checkins.get(key),
-            settings,
-            today,
-          ),
-        );
+        const state = isDateInNamePeriod(row.namePeriod, date)
+          ? projectCell(
+              row.task,
+              date,
+              checkins.get(checkinKey(row.task.id, date)),
+              settings,
+              today,
+            )
+          : "none";
+        states.set(checkinKey(row.key, date), state);
       }
     }
   }

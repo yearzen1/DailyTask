@@ -24,11 +24,26 @@ export interface Interval {
   everyDays?: number;
 }
 
+/** 名称段：任务名在某段时间内的取值；end 为 null 表示至今有效。 */
+export interface NamePeriod {
+  id: string;
+  taskId: string;
+  name: string;
+  start: string;
+  end: string | null;
+}
+
 export interface Task {
   id: string;
+  /** 当前名字；有 namePeriods 时以最新名称段为准。 */
   name: string;
   category: TaskCategory;
   intervals: Interval[];
+  /**
+   * 名称历史。缺省（旧测试数据）按 task.name 生成一段覆盖全历史。
+   * 顺序不保证，使用方通过 domain/names 读取。
+   */
+  namePeriods?: NamePeriod[];
   order: number;
   createdAt: string;
   updatedAt: string;

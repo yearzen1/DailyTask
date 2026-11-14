@@ -135,10 +135,18 @@ export default function TaskGrid() {
   const taskFontSize = overview
     ? TASK_FONT_SIZE_OVERVIEW
     : TASK_FONT_SIZE_DETAIL;
-  /** 任务列与日期列都按内容取宽；同一列所有行共享同一宽度。 */
+  /** 任务列与日期列都按内容取宽；同一列所有行共享同一宽度（含折叠的历史名称段）。 */
   const taskColWidth = useMemo(
-    () => buildTaskColumnWidth(data.tasks, taskFontSize),
-    [data.tasks, taskFontSize],
+    () =>
+      buildTaskColumnWidth(
+        [
+          ...data.groups.voluntary,
+          ...data.groups.forced,
+          ...data.groups.disabled,
+        ],
+        taskFontSize,
+      ),
+    [data.groups, taskFontSize],
   );
   const columnWidths = useMemo(
     () =>
@@ -201,7 +209,12 @@ export default function TaskGrid() {
     forced: false,
     disabled: true,
   });
+  /** 历史名称段默认折叠；值是该任务展开过的 taskId 集合。 */
+  const [expandedNames, setExpandedNames] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [focused, setFocused] = useState<{
+    rowKey: string;
     taskId: string;
     date: string;
   } | null>(null);
@@ -435,10 +448,33 @@ export default function TaskGrid() {
     { key: "forced", rows: data.groups.forced },
     { key: "disabled", rows: data.groups.disabled },
   ];
+  const nameHistoryCounts = new Map<string, number>();
+  for (const group of baseGroups) {
+    for (const row of group.rows) {
+      if (!row.current) {
+        nameHistoryCounts.set(
+          row.task.id,
+          (nameHistoryCounts.get(row.task.id) ?? 0) + 1,
+        );
+      }
+    }
+  }
+  const toggleNameHistory = (taskId: string) => {
+    setExpandedNames((current) => {
+      const next = new Set(current);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
+  };
   const allGroups = baseGroups.map((group) => ({
     ...group,
     rows: group.rows.filter(
       (row) =>
+        (row.current || expandedNames.has(row.task.id)) &&
         (filter.category === "all" ||
           row.task.category === filter.category) &&
         (filter.taskId === null || row.task.id === filter.taskId),
@@ -455,7 +491,7 @@ export default function TaskGrid() {
     if (!group) {
       return;
     }
-    const ids = group.rows.map((row) => row.task.id);
+    const ids = [...new Set(group.rows.map((row) => row.task.id))];
     const from = ids.indexOf(fromId);
     const to = ids.indexOf(toId);
     if (from < 0 || to < 0 || from === to) {
@@ -466,7 +502,9 @@ export default function TaskGrid() {
 
     // 组内顺序改完后，按「自愿 → 被迫 → 已停用」的展示顺序展开成全局顺序。
     const allIds = groups.flatMap((item) =>
-      item.key === groupKey ? ids : item.rows.map((row) => row.task.id),
+      item.key === groupKey
+        ? ids
+        : [...new Set(item.rows.map((row) => row.task.id))],
     );
     void reorder(allIds);
   };
@@ -477,7 +515,11 @@ export default function TaskGrid() {
     .flatMap((group) => group.rows);
   const defaultFocus =
     visibleRows.length > 0
-      ? { taskId: visibleRows[0].task.id, date: data.today }
+      ? {
+          rowKey: visibleRows[0].key,
+          taskId: visibleRows[0].task.id,
+          date: data.today,
+        }
       : null;
   const clampIndex = (value: number, min: number, max: number) =>
     Math.min(max, Math.max(min, value));
@@ -496,12 +538,13 @@ export default function TaskGrid() {
       dates.length - 1,
     );
     const rowIndex = clampIndex(
-      visibleRows.findIndex((row) => row.task.id === current.taskId) +
+      visibleRows.findIndex((row) => row.key === current.rowKey) +
         rowDelta,
       0,
       visibleRows.length - 1,
     );
     setFocused({
+      rowKey: visibleRows[rowIndex].key,
       taskId: visibleRows[rowIndex].task.id,
       date: dates[dateIndex],
     });
@@ -542,9 +585,10 @@ export default function TaskGrid() {
         }
         const rowIndex = Math.max(
           0,
-          visibleRows.findIndex((row) => row.task.id === current.taskId),
+          visibleRows.findIndex((row) => row.key === current.rowKey),
         );
         setFocused({
+          rowKey: visibleRows[rowIndex].key,
           taskId: visibleRows[rowIndex].task.id,
           date: dates[homeIndex],
         });
@@ -567,7 +611,7 @@ export default function TaskGrid() {
     }
     const element =
       scrollerRef.current?.querySelector<HTMLElement>(
-        `[data-task="${focused.taskId}"][data-date="${focused.date}"]`,
+        `[data-row="${focused.rowKey}"][data-date="${focused.date}"]`,
       );
     if (element) {
       element.focus({ preventScroll: true });
@@ -576,7 +620,7 @@ export default function TaskGrid() {
   }, [focused, scrollLeft, viewportWindow.start, viewportWindow.end]);
 
   const focusRowVisible = focused
-    ? visibleRows.some((row) => row.task.id === focused.taskId)
+    ? visibleRows.some((row) => row.key === focused.rowKey)
     : true;
 
   useEffect(() => {
@@ -967,13 +1011,18 @@ export default function TaskGrid() {
                   checkins={data.checkins}
                   focused={focused}
                   defaultFocus={defaultFocus}
-                  onFocusCell={(taskId, date) => setFocused({ taskId, date })}
+                  onFocusCell={(rowKey, taskId, date) =>
+                    setFocused({ rowKey, taskId, date })
+                  }
                   onOpenEditor={openEditor}
                   onReorder={(fromId, toId) =>
                     handleReorder(group.key, fromId, toId)
                   }
                   dragEnabled={!filterActive}
                   onZoomDate={zoomToDate}
+                  nameHistoryCounts={nameHistoryCounts}
+                  expandedNames={expandedNames}
+                  onToggleNameHistory={toggleNameHistory}
                 />
               ))}
             </div>
@@ -1203,6 +1252,9 @@ function GridGroup({
   onReorder,
   dragEnabled,
   onZoomDate,
+  nameHistoryCounts,
+  expandedNames,
+  onToggleNameHistory,
 }: {
   groupKey: GroupKey;
   rows: GridRow[];
@@ -1220,19 +1272,23 @@ function GridGroup({
   today: string;
   states: Map<string, CellState>;
   checkins: Map<string, Checkin>;
-  focused: { taskId: string; date: string } | null;
-  defaultFocus: { taskId: string; date: string } | null;
-  onFocusCell: (taskId: string, date: string) => void;
+  focused: { rowKey: string; taskId: string; date: string } | null;
+  defaultFocus: { rowKey: string; taskId: string; date: string } | null;
+  onFocusCell: (rowKey: string, taskId: string, date: string) => void;
   onOpenEditor: (taskId: string, date: string, taskName: string) => void;
   onReorder: (fromId: string, toId: string) => void;
   dragEnabled: boolean;
   onZoomDate: (date: string) => void;
+  nameHistoryCounts: Map<string, number>;
+  expandedNames: Set<string>;
+  onToggleNameHistory: (taskId: string) => void;
 }) {
   const t = useT();
   const meta = GROUP_META[groupKey];
   const label = t(meta.labelKey);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const taskCount = new Set(rows.map((row) => row.task.id)).size;
 
   return (
     <>
@@ -1255,7 +1311,7 @@ function GridGroup({
           />
           {label}
           <span className="ml-auto pr-1 font-normal tabular-nums">
-            {rows.length}
+            {taskCount}
           </span>
         </button>
         <div
@@ -1267,8 +1323,9 @@ function GridGroup({
       {open
         ? rows.map((row) => (
             <div
-              key={row.task.id}
-              data-grid-row={row.task.id}
+              key={row.key}
+              data-grid-row={row.key}
+              data-name-current={row.current ? "" : undefined}
               data-disabled={row.disabled ? "" : undefined}
               data-dragging={draggingId === row.task.id ? "" : undefined}
               data-drop-target={dropTargetId === row.task.id ? "" : undefined}
@@ -1344,12 +1401,13 @@ function GridGroup({
                     : undefined
                 }
                 title={dragEnabled ? t("grid.drag") : undefined}
-                data-task-name={row.task.id}
+                data-task-name={row.key}
                 style={{ width: taskColWidth, minHeight: rowHeight }}
                 className={clsx(
                   "sticky left-0 z-10 flex shrink-0 cursor-grab items-center gap-1.5 border-b border-r border-[var(--color-border)] bg-[var(--color-surface)] px-2 active:cursor-grabbing",
                   overview ? "text-[var(--text-2xs)]" : "text-xs",
-                  row.disabled && "text-[var(--color-text-muted)]",
+                  (row.disabled || !row.current) &&
+                    "text-[var(--color-text-muted)]",
                 )}
               >
                 <i
@@ -1359,10 +1417,62 @@ function GridGroup({
                       groupKey === "disabled"
                         ? "var(--color-border-strong)"
                         : meta.color,
-                    opacity: row.disabled ? 0.35 : 1,
+                    opacity: row.disabled || !row.current ? 0.35 : 1,
                   }}
                 />
-                <span className="min-w-0 break-words">{row.task.name}</span>
+                <span
+                  className="min-w-0 break-words"
+                  title={
+                    row.current
+                      ? undefined
+                      : t("grid.nameHistory.range", {
+                          start: format(
+                            parseISO(row.namePeriod.start),
+                            "MM/dd",
+                          ),
+                          end: row.namePeriod.end
+                            ? format(
+                                parseISO(row.namePeriod.end),
+                                "MM/dd",
+                              )
+                            : t("manage.ongoing"),
+                        })
+                  }
+                >
+                  {row.current ? null : (
+                    <span aria-hidden="true" className="mr-0.5 opacity-60">
+                      ↳
+                    </span>
+                  )}
+                  {row.name}
+                </span>
+                {row.current &&
+                (nameHistoryCounts.get(row.task.id) ?? 0) > 0 ? (
+                  <button
+                    type="button"
+                    data-name-history-toggle={row.task.id}
+                    aria-expanded={expandedNames.has(row.task.id)}
+                    aria-label={t(
+                      expandedNames.has(row.task.id)
+                        ? "grid.nameHistory.hide"
+                        : "grid.nameHistory",
+                      { count: nameHistoryCounts.get(row.task.id) ?? 0 },
+                    )}
+                    title={t("grid.nameHistory", {
+                      count: nameHistoryCounts.get(row.task.id) ?? 0,
+                    })}
+                    onMouseDown={(event) => event.stopPropagation()}
+                    onDragStart={(event) => event.preventDefault()}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onToggleNameHistory(row.task.id);
+                    }}
+                    className="shrink-0 whitespace-nowrap rounded-[var(--radius-pill)] border border-[var(--color-border)] px-1 text-[9px] leading-4 tabular-nums hover:bg-[var(--state-hover)]"
+                  >
+                    {expandedNames.has(row.task.id) ? "▾" : "▸"}{" "}
+                    {nameHistoryCounts.get(row.task.id)}
+                  </button>
+                ) : null}
                 {dragEnabled ? (
                   <span
                     aria-hidden="true"
@@ -1375,22 +1485,23 @@ function GridGroup({
 
               <div style={{ width: leftPad }} />
               {dates.map((date, index) => {
-                const key = checkinKey(row.task.id, date);
-                const state = states.get(key) ?? "none";
-                const checkin = checkins.get(key);
+                const stateKey = checkinKey(row.key, date);
+                const state = states.get(stateKey) ?? "none";
+                const checkin = checkins.get(checkinKey(row.task.id, date));
                 const note = checkin?.note ?? null;
                 const value = checkin?.value ?? null;
                 const isFocused =
-                  focused?.taskId === row.task.id &&
+                  focused?.rowKey === row.key &&
                   focused.date === date;
                 const isDefault =
-                  defaultFocus?.taskId === row.task.id &&
+                  defaultFocus?.rowKey === row.key &&
                   defaultFocus.date === date;
                 return (
                   <GridCell
                     key={date}
+                    rowKey={row.key}
                     taskId={row.task.id}
-                    taskName={row.task.name}
+                    taskName={row.name}
                     date={date}
                     state={state}
                     value={value}
@@ -1404,9 +1515,9 @@ function GridGroup({
                     disabled={
                       row.disabled || (!overview && state === "none")
                     }
-                    onFocus={() => onFocusCell(row.task.id, date)}
+                    onFocus={() => onFocusCell(row.key, row.task.id, date)}
                     onOpenEditor={() =>
-                      onOpenEditor(row.task.id, date, row.task.name)
+                      onOpenEditor(row.task.id, date, row.name)
                     }
                     onActivate={
                       overview ? () => onZoomDate(date) : undefined
@@ -1441,6 +1552,7 @@ function overviewBackground(state: CellState): string | undefined {
 }
 
 function GridCell({
+  rowKey,
   taskId,
   taskName,
   date,
@@ -1458,6 +1570,7 @@ function GridCell({
   onOpenEditor,
   onActivate,
 }: {
+  rowKey: string;
   taskId: string;
   taskName: string;
   date: string;
@@ -1503,6 +1616,7 @@ function GridCell({
         type="button"
         data-grid-cell={taskId}
         data-task={taskId}
+        data-row={rowKey}
         data-date={date}
         data-state={state}
         data-today={isToday ? "" : undefined}
