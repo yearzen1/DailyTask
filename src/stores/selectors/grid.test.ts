@@ -33,11 +33,24 @@ describe("buildGridData", () => {
     const elapsed = performance.now() - started;
 
     expect(data.axis.dates).toHaveLength(1200);
-    expect(data.states.size).toBe(1200 * 15);
+    // 投影按需计算：没渲染过的格子不进缓存，避免 1200 × 15 的一次性开销。
+    expect(data.states.size).toBe(0);
     expect(data.groups.voluntary).toHaveLength(8);
     expect(data.groups.forced).toHaveLength(7);
     // 宽松上限：只用来拦住 O(n²) 之类的退化，不追求机器无关的精确耗时。
     expect(elapsed).toBeLessThan(500);
+  });
+
+  it("fills the cell cache only for the cells it is asked about", () => {
+    const data = buildGridData([task(0)], new Map(), DEFAULT_SETTINGS, NOW);
+    const [row] = data.groups.voluntary;
+
+    expect(data.cellState(row, "2026-10-15")).toBe("missed");
+    expect(data.states.size).toBe(1);
+
+    // 同一个格子再问一次走缓存，不重复投影。
+    expect(data.cellState(row, "2026-10-15")).toBe("missed");
+    expect(data.states.size).toBe(1);
   });
 
   it("computes one cell set per name period and blanks dates outside it", () => {
@@ -67,10 +80,11 @@ describe("buildGridData", () => {
       "新名",
       "旧名",
     ]);
+    const [current, history] = data.groups.voluntary;
     // 当前段不覆盖 10-15，旧段覆盖；反过来旧段不覆盖 11-02。
-    expect(data.states.get(`${base.id}|2026-10-15`)).toBe("none");
-    expect(data.states.get(`${base.id}~p1|2026-10-15`)).toBe("missed");
-    expect(data.states.get(`${base.id}|2026-11-02`)).toBe("pending");
-    expect(data.states.get(`${base.id}~p1|2026-11-02`)).toBe("none");
+    expect(data.cellState(current, "2026-10-15")).toBe("none");
+    expect(data.cellState(history, "2026-10-15")).toBe("missed");
+    expect(data.cellState(current, "2026-11-02")).toBe("pending");
+    expect(data.cellState(history, "2026-11-02")).toBe("none");
   });
 });

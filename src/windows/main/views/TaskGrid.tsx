@@ -1,20 +1,23 @@
 import { clsx } from "clsx";
 import { format, parseISO } from "date-fns";
 import {
+  memo,
   useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
+  type FocusEvent as ReactFocusEvent,
   type KeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
 } from "react";
 
 import type { GridRow } from "../../../domain/grid";
 import { monthTicks } from "../../../domain/grid";
 import { checkinKey } from "../../../domain/keys";
 import type { CellState } from "../../../domain/settle";
-import type { Checkin, CheckinStatus, Language } from "../../../domain/types";
+import type { Checkin, CheckinStatus } from "../../../domain/types";
 import type { MessageKey } from "../../../shared/i18n";
 import { dateLocale } from "../../../shared/i18n";
 import { useCheckinsStore } from "../../../stores/checkinsStore";
@@ -23,10 +26,7 @@ import { useSettingsStore } from "../../../stores/settingsStore";
 import { useTasksStore } from "../../../stores/tasksStore";
 import { useUiStore } from "../../../stores/uiStore";
 import { DateField } from "../../../ui/DateField";
-import {
-  CELL_LABEL_KEYS,
-  CELL_SYMBOLS,
-} from "../../../ui/CheckCell";
+import { CELL_LABEL_KEYS } from "../../../ui/CheckCell";
 import {
   buildColumnOffsets,
   buildDateColumnWidths,
@@ -36,8 +36,13 @@ import {
   TASK_FONT_SIZE_DETAIL,
   TASK_FONT_SIZE_OVERVIEW,
 } from "../../../ui/gridColumnLayout";
-import { useHorizontalWindowByOffsets } from "../../../ui/useHorizontalWindow";
-import { useT } from "../../../ui/useT";
+import {
+  RENDERED_CELL_BUDGET,
+  useHorizontalWindowByOffsets,
+} from "../../../ui/useHorizontalWindow";
+import { useLocale, useT } from "../../../ui/useT";
+import { DateHeader } from "./DateHeader";
+import { GridCell } from "./GridCell";
 
 const MONTH_ROW_HEIGHT = 22;
 const DATE_ROW_HEIGHT = 34;
@@ -67,8 +72,21 @@ const GROUP_META: Record<
   },
 };
 
+/** 每格文案一类的常量，随语言变化重建一次。 */
+interface GridLabels {
+  status: Record<CellState, string>;
+  noteAdd: string;
+  noteHas: string;
+  noteTitle: string;
+  drag: string;
+}
+
+/** 分组只在自身数据变化时重渲染：聚焦、滚动都不该让整组格子重新构图。 */
+const GridGroup = memo(GridGroupInner);
+
 export default function TaskGrid() {
   const t = useT();
+  const locale = useLocale();
   const data = useGridData();
   const setStatus = useCheckinsStore((state) => state.setStatus);
   const setNote = useCheckinsStore((state) => state.setNote);
@@ -80,6 +98,16 @@ export default function TaskGrid() {
   const filter = useUiStore((state) => state.gridFilter);
   const setGridFilter = useUiStore((state) => state.setGridFilter);
   const ready = tasksLoaded && checkinsLoaded && settingsLoaded;
+
+  const [collapsed, setCollapsed] = useState<Record<GroupKey, boolean>>({
+    voluntary: false,
+    forced: false,
+    disabled: true,
+  });
+  /** 历史名称段默认折叠；值是该任务展开过的 taskId 集合。 */
+  const [expandedNames, setExpandedNames] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   /** 日期筛选超出轴范围时夹回轴首尾，避免出现 0 列空网格。 */
   const clampToAxis = (date: string | null): string | null => {
@@ -162,6 +190,71 @@ export default function TaskGrid() {
   const columnsTotalWidth = columnOffsets[columnOffsets.length - 1] ?? 0;
   const totalWidth = taskColWidth + columnsTotalWidth;
 
+  /** 折叠状态 + 筛选后的分组；行数组要稳定，否则 memo 的分组每帧都白渲染。 */
+  const groups = useMemo(() => {
+    const base: { key: GroupKey; rows: GridRow[] }[] = [
+      { key: "voluntary", rows: data.groups.voluntary },
+      { key: "forced", rows: data.groups.forced },
+      { key: "disabled", rows: data.groups.disabled },
+    ];
+    return base
+      .map((group) => ({
+        ...group,
+        rows: group.rows.filter(
+          (row) =>
+            (row.current || expandedNames.has(row.task.id)) &&
+            (filter.category === "all" ||
+              row.task.category === filter.category) &&
+            (filter.taskId === null || row.task.id === filter.taskId),
+        ),
+      }))
+      .filter((group) => group.rows.length > 0);
+  }, [data.groups, expandedNames, filter.category, filter.taskId]);
+
+  const allRows = useMemo(() => groups.flatMap((group) => group.rows), [groups]);
+  const visibleRows = useMemo(
+    () =>
+      groups
+        .filter((group) => !collapsed[group.key])
+        .flatMap((group) => group.rows),
+    [groups, collapsed],
+  );
+  const rowByKey = useMemo(
+    () => new Map(allRows.map((row) => [row.key, row])),
+    [allRows],
+  );
+  const nameHistoryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const group of [
+      data.groups.voluntary,
+      data.groups.forced,
+      data.groups.disabled,
+    ]) {
+      for (const row of group) {
+        if (!row.current) {
+          counts.set(row.task.id, (counts.get(row.task.id) ?? 0) + 1);
+        }
+      }
+    }
+    return counts;
+  }, [data.groups]);
+  const labels = useMemo<GridLabels>(
+    () => ({
+      status: {
+        done: t(CELL_LABEL_KEYS.done),
+        missed: t(CELL_LABEL_KEYS.missed),
+        skipped: t(CELL_LABEL_KEYS.skipped),
+        pending: t(CELL_LABEL_KEYS.pending),
+        none: t(CELL_LABEL_KEYS.none),
+      },
+      noteAdd: t("grid.note.add"),
+      noteHas: t("grid.note.has"),
+      noteTitle: t("grid.note.title"),
+      drag: t("grid.drag"),
+    }),
+    [t, locale],
+  );
+
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [viewportWidth, setViewportWidth] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(() =>
@@ -192,27 +285,49 @@ export default function TaskGrid() {
     totalWidth,
   };
 
+  /** 渲染行数决定列预算：行多了就少画几列，格子总数封在 2000 以内。 */
+  const columnBudget = Math.floor(
+    RENDERED_CELL_BUDGET / Math.max(1, visibleRows.length),
+  );
   const viewportWindow = useHorizontalWindowByOffsets(
     scrollLeft,
     effectiveWidth,
     columnOffsets,
     taskColWidth,
+    columnBudget,
   );
-  const visibleDates = dates.slice(viewportWindow.start, viewportWindow.end);
-  const visibleWidths = columnWidths.slice(
-    viewportWindow.start,
-    viewportWindow.end,
+  const windowStart = viewportWindow.start;
+  const windowEnd = viewportWindow.end;
+  const visibleDates = useMemo(
+    () => dates.slice(windowStart, windowEnd),
+    [dates, windowStart, windowEnd],
   );
+  const visibleWidths = useMemo(
+    () => columnWidths.slice(windowStart, windowEnd),
+    [columnWidths, windowStart, windowEnd],
+  );
+  /** 每格标题里的 MM/dd 只按窗口生成一次，格子里不再 parseISO。 */
+  const dateLabels = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const date of visibleDates) {
+      map.set(date, format(parseISO(date), "MM/dd"));
+    }
+    return map;
+  }, [visibleDates]);
+  const headerCells = useMemo(
+    () =>
+      visibleDates.map((date) => {
+        const parsed = parseISO(date);
+        return {
+          date,
+          day: format(parsed, "d"),
+          weekday: format(parsed, "EEEEEE", { locale: dateLocale(locale) }),
+        };
+      }),
+    [visibleDates, locale],
+  );
+  const ticks = useMemo(() => monthTicks(dates), [dates]);
 
-  const [collapsed, setCollapsed] = useState<Record<GroupKey, boolean>>({
-    voluntary: false,
-    forced: false,
-    disabled: true,
-  });
-  /** 历史名称段默认折叠；值是该任务展开过的 taskId 集合。 */
-  const [expandedNames, setExpandedNames] = useState<Set<string>>(
-    () => new Set(),
-  );
   const [focused, setFocused] = useState<{
     rowKey: string;
     taskId: string;
@@ -246,7 +361,10 @@ export default function TaskGrid() {
       if (element && element.scrollLeft !== next) {
         element.scrollLeft = next;
       }
-      setScrollLeft(next);
+      // 值没变就完全别碰 state：否则挂载期的 clamp 会白白多提交一次。
+      if (viewRef.current.scrollLeft !== next) {
+        setScrollLeft(next);
+      }
     },
     [effectiveWidth, maxScrollLeft],
   );
@@ -264,28 +382,36 @@ export default function TaskGrid() {
     );
   }, [columnOffsets, effectiveWidth, homeIndex, scrollTo, taskColWidth]);
 
+  // 挂载：量视口 + 一次性定位首屏，两次 setState 合并成一次提交。
   useLayoutEffect(() => {
     const element = scrollerRef.current;
     if (!element) {
       return;
     }
-    const measure = () => setViewportWidth(element.clientWidth);
-    measure();
-    if (typeof ResizeObserver === "undefined") {
+    const width = element.clientWidth || effectiveWidth;
+    const target = Math.min(
+      Math.max(
+        0,
+        scrollLeftForColumn(homeIndex, columnOffsets, width, taskColWidth),
+      ),
+      Math.max(0, totalWidth - width),
+    );
+    if (element.scrollLeft !== target) {
+      element.scrollLeft = target;
+    }
+    setViewportWidth(width);
+    if (viewRef.current.scrollLeft !== target) {
+      setScrollLeft(target);
+    }
+  }, []);
+
+  // 时间段筛选变化后：今天在范围内就回今天，否则回到范围开头。挂载时不重复跑。
+  const filterEffectRan = useRef(false);
+  useEffect(() => {
+    if (!filterEffectRan.current) {
+      filterEffectRan.current = true;
       return;
     }
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
-
-  // 打开即定位到今天，右侧留 4 天。
-  useLayoutEffect(() => {
-    jumpToToday();
-  }, []);
-
-  // 时间段筛选变化后：今天在范围内就回今天，否则回到范围开头。
-  useEffect(() => {
     const element = scrollerRef.current;
     if (!element) {
       return;
@@ -443,23 +569,7 @@ export default function TaskGrid() {
     [],
   );
 
-  const baseGroups: { key: GroupKey; rows: GridRow[] }[] = [
-    { key: "voluntary", rows: data.groups.voluntary },
-    { key: "forced", rows: data.groups.forced },
-    { key: "disabled", rows: data.groups.disabled },
-  ];
-  const nameHistoryCounts = new Map<string, number>();
-  for (const group of baseGroups) {
-    for (const row of group.rows) {
-      if (!row.current) {
-        nameHistoryCounts.set(
-          row.task.id,
-          (nameHistoryCounts.get(row.task.id) ?? 0) + 1,
-        );
-      }
-    }
-  }
-  const toggleNameHistory = (taskId: string) => {
+  const toggleNameHistory = useCallback((taskId: string) => {
     setExpandedNames((current) => {
       const next = new Set(current);
       if (next.has(taskId)) {
@@ -469,58 +579,45 @@ export default function TaskGrid() {
       }
       return next;
     });
-  };
-  const allGroups = baseGroups.map((group) => ({
-    ...group,
-    rows: group.rows.filter(
-      (row) =>
-        (row.current || expandedNames.has(row.task.id)) &&
-        (filter.category === "all" ||
-          row.task.category === filter.category) &&
-        (filter.taskId === null || row.task.id === filter.taskId),
-    ),
-  }));
-  const groups = allGroups.filter((group) => group.rows.length > 0);
+  }, []);
 
-  const handleReorder = (
-    groupKey: GroupKey,
-    fromId: string,
-    toId: string,
-  ) => {
-    const group = groups.find((item) => item.key === groupKey);
-    if (!group) {
-      return;
-    }
-    const ids = [...new Set(group.rows.map((row) => row.task.id))];
-    const from = ids.indexOf(fromId);
-    const to = ids.indexOf(toId);
-    if (from < 0 || to < 0 || from === to) {
-      return;
-    }
-    const [moved] = ids.splice(from, 1);
-    ids.splice(to, 0, moved);
+  const handleReorder = useCallback(
+    (groupKey: GroupKey, fromId: string, toId: string) => {
+      const group = groups.find((item) => item.key === groupKey);
+      if (!group) {
+        return;
+      }
+      const ids = [...new Set(group.rows.map((row) => row.task.id))];
+      const from = ids.indexOf(fromId);
+      const to = ids.indexOf(toId);
+      if (from < 0 || to < 0 || from === to) {
+        return;
+      }
+      const [moved] = ids.splice(from, 1);
+      ids.splice(to, 0, moved);
 
-    // 组内顺序改完后，按「自愿 → 被迫 → 已停用」的展示顺序展开成全局顺序。
-    const allIds = groups.flatMap((item) =>
-      item.key === groupKey
-        ? ids
-        : [...new Set(item.rows.map((row) => row.task.id))],
-    );
-    void reorder(allIds);
-  };
+      // 组内顺序改完后，按「自愿 → 被迫 → 已停用」的展示顺序展开成全局顺序。
+      const allIds = groups.flatMap((item) =>
+        item.key === groupKey
+          ? ids
+          : [...new Set(item.rows.map((row) => row.task.id))],
+      );
+      void reorder(allIds);
+    },
+    [groups, reorder],
+  );
 
-  const allRows = groups.flatMap((group) => group.rows);
-  const visibleRows = groups
-    .filter((group) => !collapsed[group.key])
-    .flatMap((group) => group.rows);
-  const defaultFocus =
-    visibleRows.length > 0
-      ? {
-          rowKey: visibleRows[0].key,
-          taskId: visibleRows[0].task.id,
-          date: data.today,
-        }
-      : null;
+  const defaultFocus = useMemo(
+    () =>
+      visibleRows.length > 0
+        ? {
+            rowKey: visibleRows[0].key,
+            taskId: visibleRows[0].task.id,
+            date: data.today,
+          }
+        : null,
+    [visibleRows, data.today],
+  );
   const clampIndex = (value: number, min: number, max: number) =>
     Math.min(max, Math.max(min, value));
 
@@ -641,7 +738,6 @@ export default function TaskGrid() {
         month: monthDate.getMonth() + 1,
       })
     : "";
-  const ticks = monthTicks(dates);
 
   const openEditor = (taskId: string, date: string, taskName: string) => {
     const cell = scrollerRef.current?.querySelector<HTMLElement>(
@@ -666,6 +762,90 @@ export default function TaskGrid() {
     setValueDraft(checkin?.value ?? "");
     setNoteDraft(checkin?.note ?? "");
     setCellTarget({ taskId, date, taskName, left, top });
+  };
+
+  /** 委托入口：从包住格子的 `[data-cell-row]` 反推行与日期。 */
+  const openCellAt = (wrapper: Element | null) => {
+    if (!wrapper || overview) {
+      return;
+    }
+    const rowKey = (wrapper as HTMLElement).dataset.cellRow;
+    const date = (wrapper as HTMLElement).dataset.cellDate;
+    if (!rowKey || !date) {
+      return;
+    }
+    const row = rowByKey.get(rowKey);
+    if (!row || row.disabled || data.cellState(row, date) === "none") {
+      return;
+    }
+    openEditor(row.task.id, date, row.name);
+  };
+
+  const handleGridClick = (event: ReactMouseEvent<HTMLDivElement>) => {
+    const target = event.target as Element;
+    const groupHeader = target.closest<HTMLElement>("[data-group-header]");
+    if (groupHeader) {
+      const key = groupHeader.dataset.groupHeader as GroupKey | undefined;
+      if (key) {
+        setCollapsed((current) => ({ ...current, [key]: !current[key] }));
+      }
+      return;
+    }
+    const nameToggle = target.closest<HTMLElement>("[data-name-history-toggle]");
+    if (nameToggle) {
+      const taskId = nameToggle.dataset.nameHistoryToggle;
+      if (taskId) {
+        toggleNameHistory(taskId);
+      }
+      return;
+    }
+    if (target.closest("[data-note-button]")) {
+      openCellAt(target.closest("[data-cell-row]"));
+      return;
+    }
+    if (!overview) {
+      return;
+    }
+    const wrapper = target.closest<HTMLElement>("[data-cell-row]");
+    const date = wrapper?.dataset.cellDate;
+    if (date) {
+      zoomToDate(date);
+    }
+  };
+
+  const handleGridFocus = (event: ReactFocusEvent<HTMLDivElement>) => {
+    const wrapper = (event.target as Element).closest<HTMLElement>(
+      "[data-cell-row]",
+    );
+    if (!wrapper) {
+      return;
+    }
+    const { cellRow: rowKey, cellTask: taskId, cellDate: date } = wrapper.dataset;
+    if (!rowKey || !taskId || !date) {
+      return;
+    }
+    setFocused((current) =>
+      current?.rowKey === rowKey && current.date === date
+        ? current
+        : { rowKey, taskId, date },
+    );
+  };
+
+  const handleGridContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
+    const wrapper = (event.target as Element).closest<HTMLElement>(
+      "[data-cell-row]",
+    );
+    if (!wrapper) {
+      return;
+    }
+    event.preventDefault();
+    openCellAt(wrapper);
+  };
+
+  const handleGridDoubleClick = (event: ReactMouseEvent<HTMLDivElement>) => {
+    openCellAt(
+      (event.target as Element).closest<HTMLElement>("[data-cell-row]"),
+    );
   };
 
   /** 保存按「状态 → 值 → 备注」顺序落库，确保备注写入时打卡行已存在。 */
@@ -929,6 +1109,10 @@ export default function TaskGrid() {
             ref={scrollerRef}
             onScroll={handleScroll}
             onKeyDown={handleKeyDown}
+            onClick={handleGridClick}
+            onFocus={handleGridFocus}
+            onDoubleClick={handleGridDoubleClick}
+            onContextMenu={handleGridContextMenu}
             className="relative z-0 min-h-0 flex-1 overflow-auto"
             data-grid-scroller
           >
@@ -972,14 +1156,16 @@ export default function TaskGrid() {
                   {t("grid.corner")}
                 </div>
                 <div style={{ width: viewportWindow.leftPad }} />
-                {visibleDates.map((date, index) => (
+                {headerCells.map((cell, index) => (
                   <DateHeader
-                    key={date}
-                    date={date}
+                    key={cell.date}
+                    date={cell.date}
+                    day={cell.day}
+                    weekday={cell.weekday}
                     width={visibleWidths[index] ?? cellSize}
-                    isToday={date === data.today}
+                    height={DATE_ROW_HEIGHT}
+                    isToday={cell.date === data.today}
                     overview={overview}
-                    language={data.settings.language}
                   />
                 ))}
                 <div style={{ width: viewportWindow.rightPad }} />
@@ -991,13 +1177,8 @@ export default function TaskGrid() {
                   groupKey={group.key}
                   rows={group.rows}
                   open={!collapsed[group.key]}
-                  onToggle={() =>
-                    setCollapsed((current) => ({
-                      ...current,
-                      [group.key]: !current[group.key],
-                    }))
-                  }
                   dates={visibleDates}
+                  dateLabels={dateLabels}
                   widths={visibleWidths}
                   taskColWidth={taskColWidth}
                   leftPad={viewportWindow.leftPad}
@@ -1007,22 +1188,15 @@ export default function TaskGrid() {
                   groupHeight={groupHeight}
                   overview={overview}
                   today={data.today}
-                  states={data.states}
+                  stateOf={data.cellState}
                   checkins={data.checkins}
                   focused={focused}
                   defaultFocus={defaultFocus}
-                  onFocusCell={(rowKey, taskId, date) =>
-                    setFocused({ rowKey, taskId, date })
-                  }
-                  onOpenEditor={openEditor}
-                  onReorder={(fromId, toId) =>
-                    handleReorder(group.key, fromId, toId)
-                  }
+                  labels={labels}
+                  onReorder={handleReorder}
                   dragEnabled={!filterActive}
-                  onZoomDate={zoomToDate}
                   nameHistoryCounts={nameHistoryCounts}
                   expandedNames={expandedNames}
-                  onToggleNameHistory={toggleNameHistory}
                 />
               ))}
             </div>
@@ -1183,57 +1357,12 @@ function GridSkeleton() {
   );
 }
 
-function DateHeader({
-  date,
-  width,
-  isToday,
-  overview,
-  language,
-}: {
-  date: string;
-  width: number;
-  isToday: boolean;
-  overview: boolean;
-  language: Language;
-}) {
-  const parsed = parseISO(date);
-  return (
-    <div
-      data-date-header={date}
-      data-today={isToday ? "" : undefined}
-      className={clsx(
-        "flex shrink-0 flex-col items-center justify-center gap-px border-b border-l tabular-nums",
-        overview ? "text-[9px]" : "text-[var(--text-2xs)]",
-        isToday
-          ? "font-bold text-[var(--color-voluntary)]"
-          : "text-[var(--color-text)]",
-      )}
-      style={{
-        width,
-        height: DATE_ROW_HEIGHT,
-        background: isToday
-          ? "color-mix(in srgb, var(--color-voluntary) 9%, transparent)"
-          : undefined,
-        borderLeftColor:
-          "color-mix(in srgb, var(--color-border) 55%, transparent)",
-      }}
-    >
-      <b className="font-medium leading-none">{format(parsed, "d")}</b>
-      {overview ? null : (
-        <small className="text-[9px] font-normal leading-none text-[var(--color-text-muted)]">
-          {format(parsed, "EEEEEE", { locale: dateLocale(language) })}
-        </small>
-      )}
-    </div>
-  );
-}
-
-function GridGroup({
+function GridGroupInner({
   groupKey,
   rows,
   open,
-  onToggle,
   dates,
+  dateLabels,
   widths,
   taskColWidth,
   leftPad,
@@ -1243,24 +1372,21 @@ function GridGroup({
   groupHeight,
   overview,
   today,
-  states,
+  stateOf,
   checkins,
   focused,
   defaultFocus,
-  onFocusCell,
-  onOpenEditor,
+  labels,
   onReorder,
   dragEnabled,
-  onZoomDate,
   nameHistoryCounts,
   expandedNames,
-  onToggleNameHistory,
 }: {
   groupKey: GroupKey;
   rows: GridRow[];
   open: boolean;
-  onToggle: () => void;
   dates: string[];
+  dateLabels: Map<string, string>;
   widths: number[];
   taskColWidth: number;
   leftPad: number;
@@ -1270,25 +1396,25 @@ function GridGroup({
   groupHeight: number;
   overview: boolean;
   today: string;
-  states: Map<string, CellState>;
+  stateOf: (row: GridRow, date: string) => CellState;
   checkins: Map<string, Checkin>;
   focused: { rowKey: string; taskId: string; date: string } | null;
   defaultFocus: { rowKey: string; taskId: string; date: string } | null;
-  onFocusCell: (rowKey: string, taskId: string, date: string) => void;
-  onOpenEditor: (taskId: string, date: string, taskName: string) => void;
-  onReorder: (fromId: string, toId: string) => void;
+  labels: GridLabels;
+  onReorder: (groupKey: GroupKey, fromId: string, toId: string) => void;
   dragEnabled: boolean;
-  onZoomDate: (date: string) => void;
   nameHistoryCounts: Map<string, number>;
   expandedNames: Set<string>;
-  onToggleNameHistory: (taskId: string) => void;
 }) {
   const t = useT();
   const meta = GROUP_META[groupKey];
   const label = t(meta.labelKey);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
-  const taskCount = new Set(rows.map((row) => row.task.id)).size;
+  const taskCount = useMemo(
+    () => new Set(rows.map((row) => row.task.id)).size,
+    [rows],
+  );
 
   return (
     <>
@@ -1300,7 +1426,6 @@ function GridGroup({
           aria-label={t(open ? "grid.collapse" : "grid.expand", {
             group: label,
           })}
-          onClick={onToggle}
           style={{ width: taskColWidth, height: groupHeight }}
           className="sticky left-0 z-10 flex shrink-0 items-center gap-1.5 border-b border-r border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-[var(--text-2xs)] font-semibold text-[var(--color-text-muted)] hover:bg-[var(--state-hover)]"
         >
@@ -1321,389 +1446,209 @@ function GridGroup({
       </div>
 
       {open
-        ? rows.map((row) => (
-            <div
-              key={row.key}
-              data-grid-row={row.key}
-              data-name-current={row.current ? "" : undefined}
-              data-disabled={row.disabled ? "" : undefined}
-              data-dragging={draggingId === row.task.id ? "" : undefined}
-              data-drop-target={dropTargetId === row.task.id ? "" : undefined}
-              className={clsx(
-                "group/row flex",
-                draggingId === row.task.id && "opacity-60",
-              )}
-              style={{
-                width: totalWidth,
-                minHeight: rowHeight,
-                boxShadow:
-                  dropTargetId === row.task.id
-                    ? "inset 0 2px 0 var(--color-voluntary)"
-                    : undefined,
-              }}
-              onDragOver={
-                dragEnabled
-                  ? (event) => {
-                      if (!draggingId || draggingId === row.task.id) {
-                        return;
-                      }
-                      event.preventDefault();
-                      if (event.dataTransfer) {
-                        event.dataTransfer.dropEffect = "move";
-                      }
-                      setDropTargetId(row.task.id);
-                    }
-                  : undefined
-              }
-              onDragLeave={
-                dragEnabled
-                  ? () =>
-                      setDropTargetId((current) =>
-                        current === row.task.id ? null : current,
-                      )
-                  : undefined
-              }
-              onDrop={
-                dragEnabled
-                  ? (event) => {
-                      event.preventDefault();
-                      if (draggingId && draggingId !== row.task.id) {
-                        onReorder(draggingId, row.task.id);
-                      }
-                      setDraggingId(null);
-                      setDropTargetId(null);
-                    }
-                  : undefined
-              }
-              onDragEnd={
-                dragEnabled
-                  ? () => {
-                      setDraggingId(null);
-                      setDropTargetId(null);
-                    }
-                  : undefined
-              }
-            >
+        ? rows.map((row) => {
+            const ariaPrefix = t("checkin.aria", {
+              task: row.name,
+              status: "",
+            });
+            return (
               <div
-                draggable={dragEnabled}
-                onDragStart={
+                key={row.key}
+                data-grid-row={row.key}
+                data-name-current={row.current ? "" : undefined}
+                data-disabled={row.disabled ? "" : undefined}
+                data-dragging={draggingId === row.task.id ? "" : undefined}
+                data-drop-target={dropTargetId === row.task.id ? "" : undefined}
+                className={clsx(
+                  "group/row flex",
+                  draggingId === row.task.id && "opacity-60",
+                )}
+                style={{
+                  width: totalWidth,
+                  minHeight: rowHeight,
+                  boxShadow:
+                    dropTargetId === row.task.id
+                      ? "inset 0 2px 0 var(--color-voluntary)"
+                      : undefined,
+                }}
+                onDragOver={
                   dragEnabled
                     ? (event) => {
-                        setDraggingId(row.task.id);
-                        if (event.dataTransfer) {
-                          event.dataTransfer.setData(
-                            "text/plain",
-                            row.task.id,
-                          );
-                          event.dataTransfer.effectAllowed = "move";
+                        if (!draggingId || draggingId === row.task.id) {
+                          return;
                         }
+                        event.preventDefault();
+                        if (event.dataTransfer) {
+                          event.dataTransfer.dropEffect = "move";
+                        }
+                        setDropTargetId(row.task.id);
                       }
                     : undefined
                 }
-                title={dragEnabled ? t("grid.drag") : undefined}
-                data-task-name={row.key}
-                style={{ width: taskColWidth, minHeight: rowHeight }}
-                className={clsx(
-                  "sticky left-0 z-10 flex shrink-0 cursor-grab items-center gap-1.5 border-b border-r border-[var(--color-border)] bg-[var(--color-surface)] px-2 active:cursor-grabbing",
-                  overview ? "text-[var(--text-2xs)]" : "text-xs",
-                  (row.disabled || !row.current) &&
-                    "text-[var(--color-text-muted)]",
-                )}
+                onDragLeave={
+                  dragEnabled
+                    ? () =>
+                        setDropTargetId((current) =>
+                          current === row.task.id ? null : current,
+                        )
+                    : undefined
+                }
+                onDrop={
+                  dragEnabled
+                    ? (event) => {
+                        event.preventDefault();
+                        if (draggingId && draggingId !== row.task.id) {
+                          onReorder(groupKey, draggingId, row.task.id);
+                        }
+                        setDraggingId(null);
+                        setDropTargetId(null);
+                      }
+                    : undefined
+                }
+                onDragEnd={
+                  dragEnabled
+                    ? () => {
+                        setDraggingId(null);
+                        setDropTargetId(null);
+                      }
+                    : undefined
+                }
               >
-                <i
-                  className="size-[5px] shrink-0 rounded-full"
-                  style={{
-                    background:
-                      groupKey === "disabled"
-                        ? "var(--color-border-strong)"
-                        : meta.color,
-                    opacity: row.disabled || !row.current ? 0.35 : 1,
-                  }}
-                />
-                <span
-                  className="min-w-0 break-words"
-                  title={
-                    row.current
-                      ? undefined
-                      : t("grid.nameHistory.range", {
-                          start: format(
-                            parseISO(row.namePeriod.start),
-                            "MM/dd",
-                          ),
-                          end: row.namePeriod.end
-                            ? format(
-                                parseISO(row.namePeriod.end),
-                                "MM/dd",
-                              )
-                            : t("manage.ongoing"),
-                        })
+                <div
+                  draggable={dragEnabled}
+                  onDragStart={
+                    dragEnabled
+                      ? (event) => {
+                          setDraggingId(row.task.id);
+                          if (event.dataTransfer) {
+                            event.dataTransfer.setData(
+                              "text/plain",
+                              row.task.id,
+                            );
+                            event.dataTransfer.effectAllowed = "move";
+                          }
+                        }
+                      : undefined
                   }
-                >
-                  {row.current ? null : (
-                    <span aria-hidden="true" className="mr-0.5 opacity-60">
-                      ↳
-                    </span>
+                  title={dragEnabled ? labels.drag : undefined}
+                  data-task-name={row.key}
+                  style={{ width: taskColWidth, minHeight: rowHeight }}
+                  className={clsx(
+                    "sticky left-0 z-10 flex shrink-0 cursor-grab items-center gap-1.5 border-b border-r border-[var(--color-border)] bg-[var(--color-surface)] px-2 active:cursor-grabbing",
+                    overview ? "text-[var(--text-2xs)]" : "text-xs",
+                    (row.disabled || !row.current) &&
+                      "text-[var(--color-text-muted)]",
                   )}
-                  {row.name}
-                </span>
-                {row.current &&
-                (nameHistoryCounts.get(row.task.id) ?? 0) > 0 ? (
-                  <button
-                    type="button"
-                    data-name-history-toggle={row.task.id}
-                    aria-expanded={expandedNames.has(row.task.id)}
-                    aria-label={t(
-                      expandedNames.has(row.task.id)
-                        ? "grid.nameHistory.hide"
-                        : "grid.nameHistory",
-                      { count: nameHistoryCounts.get(row.task.id) ?? 0 },
-                    )}
-                    title={t("grid.nameHistory", {
-                      count: nameHistoryCounts.get(row.task.id) ?? 0,
-                    })}
-                    onMouseDown={(event) => event.stopPropagation()}
-                    onDragStart={(event) => event.preventDefault()}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onToggleNameHistory(row.task.id);
+                >
+                  <i
+                    className="size-[5px] shrink-0 rounded-full"
+                    style={{
+                      background:
+                        groupKey === "disabled"
+                          ? "var(--color-border-strong)"
+                          : meta.color,
+                      opacity: row.disabled || !row.current ? 0.35 : 1,
                     }}
-                    className="shrink-0 whitespace-nowrap rounded-[var(--radius-pill)] border border-[var(--color-border)] px-1 text-[9px] leading-4 tabular-nums hover:bg-[var(--state-hover)]"
-                  >
-                    {expandedNames.has(row.task.id) ? "▾" : "▸"}{" "}
-                    {nameHistoryCounts.get(row.task.id)}
-                  </button>
-                ) : null}
-                {dragEnabled ? (
-                  <span
-                    aria-hidden="true"
-                    className="ml-auto shrink-0 text-[9px] text-[var(--color-border-strong)] opacity-0 group-hover/row:opacity-100"
-                  >
-                    ⋮⋮
-                  </span>
-                ) : null}
-              </div>
-
-              <div style={{ width: leftPad }} />
-              {dates.map((date, index) => {
-                const stateKey = checkinKey(row.key, date);
-                const state = states.get(stateKey) ?? "none";
-                const checkin = checkins.get(checkinKey(row.task.id, date));
-                const note = checkin?.note ?? null;
-                const value = checkin?.value ?? null;
-                const isFocused =
-                  focused?.rowKey === row.key &&
-                  focused.date === date;
-                const isDefault =
-                  defaultFocus?.rowKey === row.key &&
-                  defaultFocus.date === date;
-                return (
-                  <GridCell
-                    key={date}
-                    rowKey={row.key}
-                    taskId={row.task.id}
-                    taskName={row.name}
-                    date={date}
-                    state={state}
-                    value={value}
-                    width={widths[index] ?? 32}
-                    height={rowHeight}
-                    isToday={date === today}
-                    overview={overview}
-                    focused={isFocused}
-                    tabIndex={isFocused || (!focused && isDefault) ? 0 : -1}
-                    hasNote={Boolean(note)}
-                    disabled={
-                      row.disabled || (!overview && state === "none")
-                    }
-                    onFocus={() => onFocusCell(row.key, row.task.id, date)}
-                    onOpenEditor={() =>
-                      onOpenEditor(row.task.id, date, row.name)
-                    }
-                    onActivate={
-                      overview ? () => onZoomDate(date) : undefined
-                    }
                   />
-                );
-              })}
-              <div style={{ width: rightPad }} />
-            </div>
-          ))
+                  <span
+                    className="min-w-0 break-words"
+                    title={
+                      row.current
+                        ? undefined
+                        : t("grid.nameHistory.range", {
+                            start: format(
+                              parseISO(row.namePeriod.start),
+                              "MM/dd",
+                            ),
+                            end: row.namePeriod.end
+                              ? format(
+                                  parseISO(row.namePeriod.end),
+                                  "MM/dd",
+                                )
+                              : t("manage.ongoing"),
+                          })
+                    }
+                  >
+                    {row.current ? null : (
+                      <span aria-hidden="true" className="mr-0.5 opacity-60">
+                        ↳
+                      </span>
+                    )}
+                    {row.name}
+                  </span>
+                  {row.current &&
+                  (nameHistoryCounts.get(row.task.id) ?? 0) > 0 ? (
+                    <button
+                      type="button"
+                      data-name-history-toggle={row.task.id}
+                      aria-expanded={expandedNames.has(row.task.id)}
+                      aria-label={t(
+                        expandedNames.has(row.task.id)
+                          ? "grid.nameHistory.hide"
+                          : "grid.nameHistory",
+                        { count: nameHistoryCounts.get(row.task.id) ?? 0 },
+                      )}
+                      title={t("grid.nameHistory", {
+                        count: nameHistoryCounts.get(row.task.id) ?? 0,
+                      })}
+                      onMouseDown={(event) => event.stopPropagation()}
+                      onDragStart={(event) => event.preventDefault()}
+                      className="shrink-0 whitespace-nowrap rounded-[var(--radius-pill)] border border-[var(--color-border)] px-1 text-[9px] leading-4 tabular-nums hover:bg-[var(--state-hover)]"
+                    >
+                      {expandedNames.has(row.task.id) ? "▾" : "▸"}{" "}
+                      {nameHistoryCounts.get(row.task.id)}
+                    </button>
+                  ) : null}
+                  {dragEnabled ? (
+                    <span
+                      aria-hidden="true"
+                      className="ml-auto shrink-0 text-[9px] text-[var(--color-border-strong)] opacity-0 group-hover/row:opacity-100"
+                    >
+                      ⋮⋮
+                    </span>
+                  ) : null}
+                </div>
+
+                <div style={{ width: leftPad }} />
+                {dates.map((date, index) => {
+                  const state = stateOf(row, date);
+                  const checkin = checkins.get(checkinKey(row.task.id, date));
+                  const value = checkin?.value ?? null;
+                  const isFocused =
+                    focused?.rowKey === row.key && focused.date === date;
+                  const isDefault =
+                    defaultFocus?.rowKey === row.key &&
+                    defaultFocus.date === date;
+                  return (
+                    <GridCell
+                      key={date}
+                      rowKey={row.key}
+                      taskId={row.task.id}
+                      taskName={row.name}
+                      date={date}
+                      dateLabel={dateLabels.get(date) ?? ""}
+                      ariaPrefix={`${ariaPrefix}${labels.status[state]}`}
+                      state={state}
+                      value={value}
+                      width={widths[index] ?? 32}
+                      height={rowHeight}
+                      isToday={date === today}
+                      overview={overview}
+                      focused={isFocused}
+                      tabIndex={isFocused || (!focused && isDefault) ? 0 : -1}
+                      hasNote={Boolean(checkin?.note)}
+                      disabled={row.disabled || (!overview && state === "none")}
+                      noteAddLabel={labels.noteAdd}
+                      noteHasLabel={labels.noteHas}
+                      noteTitle={labels.noteTitle}
+                    />
+                  );
+                })}
+                <div style={{ width: rightPad }} />
+              </div>
+            );
+          })
         : null}
     </>
-  );
-}
-
-const TODAY_TINT =
-  "color-mix(in srgb, var(--color-voluntary) 8%, transparent)";
-
-function overviewBackground(state: CellState): string | undefined {
-  switch (state) {
-    case "done":
-      return "var(--color-voluntary)";
-    case "missed":
-      return "color-mix(in srgb, var(--color-missed) 55%, var(--color-surface))";
-    case "skipped":
-      return "color-mix(in srgb, var(--color-forced) 35%, var(--color-surface))";
-    case "none":
-      return "var(--color-na)";
-    case "pending":
-      return undefined;
-  }
-}
-
-function GridCell({
-  rowKey,
-  taskId,
-  taskName,
-  date,
-  state,
-  value,
-  width,
-  height,
-  isToday,
-  overview,
-  focused,
-  tabIndex,
-  hasNote,
-  disabled,
-  onFocus,
-  onOpenEditor,
-  onActivate,
-}: {
-  rowKey: string;
-  taskId: string;
-  taskName: string;
-  date: string;
-  state: CellState;
-  value: string | null;
-  width: number;
-  height: number;
-  isToday: boolean;
-  overview: boolean;
-  focused: boolean;
-  tabIndex: number;
-  hasNote: boolean;
-  disabled: boolean;
-  onFocus: () => void;
-  onOpenEditor: () => void;
-  onActivate?: () => void;
-}) {
-  const t = useT();
-  const symbol = state === "none" ? "▫" : CELL_SYMBOLS[state];
-  const text = !overview && value ? value : symbol;
-  const canEdit = !overview && !disabled;
-  const canNote =
-    !overview &&
-    (state === "done" || state === "missed" || state === "skipped");
-  const statusLabel = t(CELL_LABEL_KEYS[state]);
-  const ariaLabel = value
-    ? `${t("checkin.aria", { task: taskName, status: statusLabel })} · ${value}`
-    : t("checkin.aria", { task: taskName, status: statusLabel });
-
-  /** 今天列绿底只覆盖真要打卡的三态；「今天不做」和区间外保持自己的底色。 */
-  const tinted = state === "pending" || state === "done" || state === "missed";
-  const todayTint = isToday && tinted ? TODAY_TINT : undefined;
-  const background = overview
-    ? (overviewBackground(state) ?? todayTint)
-    : (todayTint ?? (state === "none" ? "var(--color-na)" : undefined));
-
-  return (
-    <div
-      className="group relative flex shrink-0"
-      style={{ width, minHeight: height }}
-    >
-      <button
-        type="button"
-        data-grid-cell={taskId}
-        data-task={taskId}
-        data-row={rowKey}
-        data-date={date}
-        data-state={state}
-        data-today={isToday ? "" : undefined}
-        data-today-tint={todayTint ? "" : undefined}
-        data-focused={focused ? "" : undefined}
-        data-value={value ?? undefined}
-        tabIndex={tabIndex}
-        disabled={disabled}
-        title={`${taskName} · ${format(parseISO(date), "MM/dd")}${
-          value ? ` · ${value}` : ""
-        }`}
-        aria-label={ariaLabel}
-        onFocus={onFocus}
-        onClick={onActivate}
-        onDoubleClick={canEdit ? onOpenEditor : undefined}
-        onContextMenu={
-          canEdit
-            ? (event) => {
-                event.preventDefault();
-                onOpenEditor();
-              }
-            : undefined
-        }
-        className={clsx(
-          "flex w-full min-w-0 items-center justify-center border-b border-l tabular-nums outline-none",
-          overview ? "text-[0px]" : value ? "px-0.5 text-[10px]" : "text-xs",
-          !overview &&
-            state === "done" &&
-            "font-semibold text-[var(--color-voluntary)]",
-          !overview && state === "missed" && "text-[var(--color-missed)]",
-          !overview &&
-            state === "skipped" &&
-            "text-[var(--color-text-muted)]",
-          !overview && state === "pending" && "text-[var(--color-text)]",
-          disabled
-            ? "cursor-not-allowed"
-            : overview
-              ? "cursor-zoom-in hover:brightness-105"
-              : "cursor-default hover:bg-[var(--state-hover)]",
-        )}
-        style={{
-          minHeight: height,
-          background,
-          color:
-            !overview && state === "none"
-              ? "color-mix(in srgb, var(--color-text) 28%, transparent)"
-              : undefined,
-          boxShadow: focused
-            ? "inset 0 0 0 2px var(--color-voluntary)"
-            : isToday
-              ? "inset -1px 0 0 color-mix(in srgb, var(--color-voluntary) 45%, transparent)"
-              : undefined,
-          borderLeftColor:
-            "color-mix(in srgb, var(--color-border) 50%, transparent)",
-          borderBottomColor:
-            "color-mix(in srgb, var(--color-border) 50%, transparent)",
-        }}
-      >
-        <span
-          aria-hidden="true"
-          className="max-w-full break-words text-center leading-tight"
-        >
-          {overview ? "" : text}
-        </span>
-      </button>
-
-      {canNote ? (
-        <button
-          type="button"
-          data-note-button={checkinKey(taskId, date)}
-          tabIndex={focused ? 0 : -1}
-          aria-label={t(hasNote ? "grid.note.has" : "grid.note.add")}
-          title={t("grid.note.title")}
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpenEditor();
-          }}
-          className={clsx(
-            "absolute right-0 top-0 grid size-3 place-items-center rounded-bl-[4px] text-[8px] leading-none",
-            hasNote
-              ? "bg-[color-mix(in_srgb,var(--color-warning)_18%,transparent)] text-[var(--color-warning)]"
-              : "text-[var(--color-text-muted)] opacity-0 hover:bg-[var(--state-active)] focus:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100",
-          )}
-        >
-          <span aria-hidden="true">{hasNote ? "•" : "✎"}</span>
-        </button>
-      ) : null}
-    </div>
   );
 }
