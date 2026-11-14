@@ -259,6 +259,19 @@
 
 ---
 
+## 14. v0.1.19 完成记录（2026-11-14）
+
+全量校验：`npm run test` **399 passed**、`npm run lint`、`npm run typecheck`、`cargo check`、`npm run docs:check`、`tauri build` 全绿。已发布 v0.1.19：<https://github.com/yearzen1/DailyTask/releases/tag/v0.1.19>。
+
+- 任务名按日期分段：新增 `task_name_periods` 表（迁移 `005_task_name_periods.sql` 回填，每个任务一段，起点取最早区间启用日），`tasks.name` 只做当前名缓存；`domain/names.ts` 提供分段判定与拼装，`db/tasks.ts` 的 `renameTask` 支持 `rewrite-current` / `from-today` 两种模式，`today` 一律取 `logicalToday`。
+- 编辑任务默认「只修正当前名字」：勾选走 `rewrite-current`，不改段边界；取消勾选才把当前段 `end_date` 收在今天前一天、新段从今天开始。管理弹窗显示名称历史与改名生效提示。
+- 网格与统计按名称段拆行：当前段恒显示，历史段默认折叠，段名右侧 `▸ N` 展开后置灰并标日期范围；分组计数与拖拽按任务去重，历史段在自身范围外不可点。统计列头改为「连续 / 完成率」，30 天窗口不越过段起点。
+- JSON 导出升级 v2（新增 `namePeriods`），v1 导入按最早区间启用日合成一段，按 id upsert 保持幂等。
+- 任务表性能：横向窗口按 DOM 预算截断（`RENDERED_CELL_BUDGET = 2000`，`budget = max(visible, floor(2000 / 渲染行数))`），拆出 `GridCell` 与 `DateHeader` 并记忆化单元格；新增 `scripts/perf-grid.mjs` 首屏实测、`bench` 与 `test:perf` 脚本。
+- 迁移脚本行尾固定为 LF：新增 `.gitattributes`，避免 sqlx 校验和因 CRLF 失效，排查路径记录在 `docs/how-to/troubleshoot.md`。
+
+---
+
 ## 13. v0.1.18 完成记录（2026-11-13）
 
 全量校验：`npm run test` **357 passed**、`npm run lint`、`npm run typecheck`、`npm run docs:check`、`npm run build`、`tauri build` 全绿。已发布 v0.1.18：<https://github.com/yearzen1/DailyTask/releases/tag/v0.1.18>。
