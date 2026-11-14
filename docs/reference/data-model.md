@@ -78,7 +78,12 @@ CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 
 ### 2.1 任务名与名称段
 
-`tasks.name` 保留为「当前名字」缓存；读取任务时以最新 `task_name_periods` 段为准。改名不再原地覆盖，而是把当前段截到昨天、从今天追加一段。这样历史打卡永远挂在原名下，不会被新名字追溯覆盖。
+`tasks.name` 保留为「当前名字」缓存；读取任务时以最新 `task_name_periods` 段为准。
+
+改名有两种模式，由编辑弹窗的「只修正当前名字」开关决定（**默认开启**）：
+
+- 默认 `rewrite-current`：原地改写当前段，不新增段
+- 取消勾选 → `from-today`：当前段截到昨天、从今天追加一段；历史打卡永远挂在原名下，不会被新名字追溯覆盖
 
 ## 3. 迁移历史
 
