@@ -121,6 +121,7 @@ export const zhCN = {
   "manage.history": "更早区间（只读）",
   "manage.ongoing": "至今",
   "manage.renameHint": "改名从今天起生效；今天之前的记录仍显示原名。",
+  "manage.renameHintTypo": "只改写当前名字，历史记录仍挂在原名下。",
   "manage.nameHistory": "名称历史（只读）",
   "manage.nameHistory.typo": "只修正当前名字（不按日期拆分）",
   "manage.save": "保存",

@@ -355,7 +355,7 @@ function EditTaskDialog({
 
   const [name, setName] = useState(task.name);
   const [category, setCategory] = useState(task.category);
-  const [typoOnly, setTypoOnly] = useState(false);
+  const [typoOnly, setTypoOnly] = useState(true);
   const [start, setStart] = useState(latest?.start ?? "");
   const [end, setEnd] = useState(latest?.end ?? "");
   const [openEnded, setOpenEnded] = useState(latest?.end === null);
@@ -433,7 +433,9 @@ function EditTaskDialog({
             onChange={(event) => setName(event.target.value)}
             className="rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1 text-sm text-[var(--color-text)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
           />
-          <span className="leading-tight">{t("manage.renameHint")}</span>
+          <span className="leading-tight">
+            {t(typoOnly ? "manage.renameHintTypo" : "manage.renameHint")}
+          </span>
         </label>
 
         <label className="flex items-center gap-1.5 text-[var(--text-2xs)] text-[var(--color-text-muted)]">

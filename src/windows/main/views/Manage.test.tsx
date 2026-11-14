@@ -474,7 +474,7 @@ describe("Manage", () => {
       "t1",
       "晨跑",
       "2026-11-04",
-      "from-today",
+      "rewrite-current",
     );
     expect(update).not.toHaveBeenCalled();
     expect(updateInterval).toHaveBeenCalledWith("t1-1", {
@@ -487,7 +487,7 @@ describe("Manage", () => {
     ).toHaveTextContent("晨跑");
   });
 
-  it("shows name history and rewrites the current name in typo mode", () => {
+  it("defaults to typo mode and rewrites the current name", () => {
     useTasksStore.setState({
       loaded: true,
       tasks: [
@@ -526,14 +526,16 @@ describe("Manage", () => {
     expect(container.querySelector('[data-name-history="p1"]')).toHaveTextContent(
       "10/01 – 10/31",
     );
-    expect(screen.getByText(/改名从今天起生效/)).toBeInTheDocument();
+    expect(
+      container.querySelector("[data-edit-name-typo]"),
+    ).toBeChecked();
+    expect(
+      screen.getByText("只改写当前名字，历史记录仍挂在原名下。"),
+    ).toBeInTheDocument();
 
     fireEvent.change(container.querySelector("[data-edit-name]") as Element, {
       target: { value: "每天两个俯卧撑" },
     });
-    fireEvent.click(
-      container.querySelector("[data-edit-name-typo]") as Element,
-    );
     fireEvent.click(container.querySelector("[data-edit-submit]") as Element);
 
     expect(rename).toHaveBeenCalledWith(
@@ -541,6 +543,35 @@ describe("Manage", () => {
       "每天两个俯卧撑",
       "2026-11-04",
       "rewrite-current",
+    );
+  });
+
+  it("splits history from today when typo mode is turned off", () => {
+    const { container } = render(<Manage />);
+    fireEvent.click(
+      container.querySelector(
+        '[data-manage-row="t1"] [data-manage-action="edit"]',
+      ) as Element,
+    );
+
+    fireEvent.click(container.querySelector("[data-edit-name-typo]") as Element);
+    expect(
+      container.querySelector("[data-edit-name-typo]"),
+    ).not.toBeChecked();
+    expect(
+      screen.getByText("改名从今天起生效；今天之前的记录仍显示原名。"),
+    ).toBeInTheDocument();
+
+    fireEvent.change(container.querySelector("[data-edit-name]") as Element, {
+      target: { value: "晨跑" },
+    });
+    fireEvent.click(container.querySelector("[data-edit-submit]") as Element);
+
+    expect(rename).toHaveBeenCalledWith(
+      "t1",
+      "晨跑",
+      "2026-11-04",
+      "from-today",
     );
   });
 

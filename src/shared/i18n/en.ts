@@ -120,6 +120,7 @@ export const en: Messages = {
   "manage.history": "Earlier segments (read-only)",
   "manage.ongoing": "Ongoing",
   "manage.renameHint": "Renaming takes effect today; earlier records keep the old name.",
+  "manage.renameHintTypo": "Only rewrites the current name; history stays under the old name.",
   "manage.nameHistory": "Name history (read-only)",
   "manage.nameHistory.typo": "Only fix the current name (do not split history)",
   "manage.save": "Save",
