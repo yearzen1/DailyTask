@@ -259,6 +259,17 @@
 
 ---
 
+## 15. v0.1.20 完成记录（2026-11-15）
+
+全量校验：`npm run test` **420 passed**、`npm run lint`、`npm run typecheck`、`cargo check`、`npm run docs:check`、`tauri build` 全绿。已发布 v0.1.20：<https://github.com/yearzen1/DailyTask/releases/tag/v0.1.20>。
+
+- 任务管理列宽可拖：6 列改为百分比列宽（`domain/manageColumns.ts`），拖动表头分隔线只改两侧两列、总宽恒等于卡片宽，每列有最小 / 最大宽。
+- 双击复位：双击分隔线复位左侧列、双击列头复位该列，差值按其余列余量分摊。
+- 列宽持久化：`settings.manageColumnWidths` 存百分比数组，松手才写库一次，切视图、重启、导入导出都保留，坏值回退默认。
+- 手柄走 `role="separator"` + i18n aria-label，悬停 / 拖动显示 2px 竖线，拖动中禁用文本选中。
+
+---
+
 ## 14. v0.1.19 完成记录（2026-11-14）
 
 全量校验：`npm run test` **399 passed**、`npm run lint`、`npm run typecheck`、`cargo check`、`npm run docs:check`、`tauri build` 全绿。已发布 v0.1.19：<https://github.com/yearzen1/DailyTask/releases/tag/v0.1.19>。
