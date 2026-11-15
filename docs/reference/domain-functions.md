@@ -142,6 +142,19 @@ missed            → null（删除该行）
 
 今日页、挂件、网格状态编辑共用同一规则。
 
+## 7.5 任务管理列宽
+
+```ts
+sanitizeManageColumnWidths(raw: unknown): number[]
+resizeBoundary(widths: number[], boundary: number, delta: number): number[]
+resetColumnWidth(widths: number[], index: number): number[]
+```
+
+- 6 列百分比，和 100；默认 `[20, 11, 15, 15, 16, 23]`
+- `resizeBoundary` 只改分隔线两侧两列，两侧夹在各自最小 / 最大宽之间
+- `resetColumnWidth` 让目标列精确回到默认宽，差值按其余列余量分摊
+- 规则细节见 [specs/manage-column-resize.md](../specs/manage-column-resize.md)
+
 ## 8. 边界与测试
 
 必须覆盖：

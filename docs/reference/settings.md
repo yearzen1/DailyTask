@@ -19,10 +19,12 @@
 | `alwaysOnTop` | boolean | true | 挂件置顶 |
 | `autoLaunch` | boolean | false | 开机自启（安装版） |
 | `navOrder` | string[] | `[]` | 侧栏顺序；空 = 默认 |
+| `manageColumnWidths` | number[6] | `[20, 11, 15, 15, 16, 23]` | 任务管理列宽，百分比，和 100 |
 
 ## 约束
 
 - 坏值回退默认，不阻塞启动
 - `autoLaunch` 以系统状态为准，settings 只是缓存
 - `navOrder` 启动优先读库，localStorage 只做首屏缓存
+- `manageColumnWidths` 长度必须为 6，和偏离 100 超过 0.5 时等比缩放，越界回退默认
 - 导出 / 导入包含全部设置
