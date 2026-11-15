@@ -79,6 +79,7 @@ export const zhCN = {
   "manage.col.end": "截止日期",
   "manage.col.status": "状态",
   "manage.col.actions": "操作",
+  "manage.resizeColumn": "拖动调整列宽",
   "manage.category.voluntary": "自愿",
   "manage.category.forced": "被迫",
   "manage.status.active": "进行中",

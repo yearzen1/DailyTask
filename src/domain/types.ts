@@ -3,6 +3,8 @@
  * 这里只放类型与默认值，不放任何 IO 或业务计算。
  */
 
+import { DEFAULT_MANAGE_COLUMN_WIDTHS } from "./manageColumns";
+
 export type TaskCategory = "voluntary" | "forced";
 /**
  * 打卡状态只有三种判定；值（value）是独立附加字段。
@@ -80,6 +82,8 @@ export interface Settings {
   autoLaunch: boolean;
   /** 侧边栏顺序；空数组表示使用默认顺序。 */
   navOrder: string[];
+  /** 任务管理列宽，6 个百分比，和 100。 */
+  manageColumnWidths: number[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -91,4 +95,5 @@ export const DEFAULT_SETTINGS: Settings = {
   alwaysOnTop: true,
   autoLaunch: false,
   navOrder: [],
+  manageColumnWidths: [...DEFAULT_MANAGE_COLUMN_WIDTHS],
 };

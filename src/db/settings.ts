@@ -4,6 +4,7 @@ import {
   type Settings,
   type Theme,
 } from "../domain/types";
+import { sanitizeManageColumnWidths } from "../domain/manageColumns";
 import type { SqlDatabase } from "./client";
 
 interface SettingRow {
@@ -64,6 +65,7 @@ export function sanitizeSettings(raw: Record<string, unknown>): Settings {
       raw.navOrder.every((item) => typeof item === "string")
         ? (raw.navOrder as string[])
         : DEFAULT_SETTINGS.navOrder,
+    manageColumnWidths: sanitizeManageColumnWidths(raw.manageColumnWidths),
   };
 }
 

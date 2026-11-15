@@ -1,5 +1,12 @@
+import { clsx } from "clsx";
 import { format, parseISO } from "date-fns";
-import { useState, type FormEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useState,
+  type FormEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from "react";
 
 import { addDays } from "../../../domain/date";
 import {
@@ -7,6 +14,12 @@ import {
   validateInterval,
   type IntervalError,
 } from "../../../domain/intervals";
+import {
+  MANAGE_COLUMNS,
+  resetColumnWidth,
+  sanitizeManageColumnWidths,
+  type ManageColumnKey,
+} from "../../../domain/manageColumns";
 import { namePeriodsOf } from "../../../domain/names";
 import type { MessageKey } from "../../../shared/i18n";
 import type { Task, TaskCategory } from "../../../domain/types";
@@ -15,11 +28,13 @@ import {
   type ManageRow,
   type ManageStatus,
 } from "../../../stores/selectors/manage";
+import { useSettingsStore } from "../../../stores/settingsStore";
 import { useTasksStore } from "../../../stores/tasksStore";
 import { Chip, type ChipVariant } from "../../../ui/Chip";
 import { ConfirmDeleteButton } from "../../../ui/ConfirmDeleteButton";
 import { DateField } from "../../../ui/DateField";
 import { useT } from "../../../ui/useT";
+import { useColumnResize } from "./useColumnResize";
 
 const CARD =
   "rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-card)]";
@@ -35,10 +50,49 @@ const STATUS_META: Record<
   disabled: { labelKey: "manage.status.disabled", variant: "neutral" },
 };
 
+const COLUMN_LABEL_KEY: Record<ManageColumnKey, MessageKey> = {
+  task: "manage.col.task",
+  category: "manage.col.category",
+  start: "manage.col.start",
+  end: "manage.col.end",
+  status: "manage.col.status",
+  actions: "manage.col.actions",
+};
+
 export default function Manage() {
   const t = useT();
   const { today, rows } = useManageRows();
   const [creating, setCreating] = useState(false);
+  const storedWidths = useSettingsStore(
+    (state) => state.settings.manageColumnWidths,
+  );
+  const saveSettings = useSettingsStore((state) => state.update);
+  const [widths, setWidths] = useState(() =>
+    sanitizeManageColumnWidths(storedWidths),
+  );
+
+  // 落库后（或其它窗口改了设置）以 settings 为准。
+  useEffect(() => {
+    setWidths(sanitizeManageColumnWidths(storedWidths));
+  }, [storedWidths]);
+
+  const persistWidths = (next: number[]) => {
+    void saveSettings({ manageColumnWidths: next }).catch((error: unknown) => {
+      console.error("[manage] 保存列宽失败", error);
+    });
+  };
+
+  const resize = useColumnResize({
+    widths,
+    onChange: setWidths,
+    onCommit: persistWidths,
+  });
+
+  const resetWidth = (index: number) => {
+    const next = resetColumnWidth(widths, index);
+    setWidths(next);
+    persistWidths(next);
+  };
 
   return (
     <>
@@ -72,24 +126,32 @@ export default function Manage() {
         <section className={`${CARD} min-h-0 flex-1 overflow-auto`}>
           <table
             data-manage-table
-            className="w-full table-fixed border-collapse text-sm"
+            className={clsx(
+              "w-full table-fixed border-collapse text-sm",
+              resize.resizing !== null && "cursor-col-resize select-none",
+            )}
           >
             <colgroup>
-              <col />
-              <col className="w-[92px]" />
-              <col className="w-[124px]" />
-              <col className="w-[124px]" />
-              <col className="w-[132px]" />
-              <col className="w-[190px]" />
+              {MANAGE_COLUMNS.map((column, index) => (
+                <col key={column} style={{ width: `${widths[index]}%` }} />
+              ))}
             </colgroup>
             <thead>
-              <tr className="sticky top-0 z-10 bg-[var(--color-surface)] text-left text-xs text-[var(--color-text-muted)]">
-                <Th>{t("manage.col.task")}</Th>
-                <Th>{t("manage.col.category")}</Th>
-                <Th>{t("manage.col.start")}</Th>
-                <Th>{t("manage.col.end")}</Th>
-                <Th>{t("manage.col.status")}</Th>
-                <Th>{t("manage.col.actions")}</Th>
+              <tr className="sticky top-0 z-10 select-none bg-[var(--color-surface)] text-left text-xs text-[var(--color-text-muted)]">
+                {MANAGE_COLUMNS.map((column, index) => (
+                  <Th
+                    key={column}
+                    column={column}
+                    resizable={index < MANAGE_COLUMNS.length - 1}
+                    resizing={resize.resizing === index}
+                    onReset={() => resetWidth(index)}
+                    onResizeStart={(event) => resize.begin(index, event)}
+                    onResizeMove={resize.move}
+                    onResizeEnd={resize.end}
+                  >
+                    {t(COLUMN_LABEL_KEY[column])}
+                  </Th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -711,13 +773,57 @@ function IntervalDialog({
   );
 }
 
-function Th({ children }: { children: ReactNode }) {
+function Th({
+  column,
+  resizable,
+  resizing,
+  onReset,
+  onResizeStart,
+  onResizeMove,
+  onResizeEnd,
+  children,
+}: {
+  column: ManageColumnKey;
+  resizable: boolean;
+  resizing: boolean;
+  onReset: () => void;
+  onResizeStart: (event: ReactPointerEvent<HTMLElement>) => void;
+  onResizeMove: (event: ReactPointerEvent<HTMLElement>) => void;
+  onResizeEnd: (event: ReactPointerEvent<HTMLElement>) => void;
+  children: ReactNode;
+}) {
+  const t = useT();
+
   return (
     <th
       scope="col"
-      className="h-9 border-b border-[var(--color-border)] px-3 font-medium"
+      data-manage-col={column}
+      onDoubleClick={onReset}
+      className="relative h-9 border-b border-[var(--color-border)] px-3 font-medium"
     >
       {children}
+      {resizable ? (
+        <span
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={t("manage.resizeColumn")}
+          data-manage-col-resize={column}
+          onPointerDown={onResizeStart}
+          onPointerMove={onResizeMove}
+          onPointerUp={onResizeEnd}
+          onPointerCancel={onResizeEnd}
+          onDoubleClick={(event) => {
+            event.stopPropagation();
+            onReset();
+          }}
+          className={clsx(
+            "absolute -right-1 top-0 z-20 h-full w-2 cursor-col-resize touch-none",
+            resizing
+              ? "bg-[var(--color-border-strong)]"
+              : "hover:bg-[var(--color-border-strong)]",
+          )}
+        />
+      ) : null}
     </th>
   );
 }

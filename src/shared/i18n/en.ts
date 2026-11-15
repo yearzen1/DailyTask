@@ -78,6 +78,7 @@ export const en: Messages = {
   "manage.col.end": "Deadline",
   "manage.col.status": "Status",
   "manage.col.actions": "Actions",
+  "manage.resizeColumn": "Drag to resize column",
   "manage.category.voluntary": "Voluntary",
   "manage.category.forced": "Forced",
   "manage.status.active": "Active",
