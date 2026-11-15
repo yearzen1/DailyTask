@@ -1,12 +1,49 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { DEFAULT_SETTINGS, type Interval, type Task } from "../../../domain/types";
+import { DEFAULT_SETTINGS, type Interval, type Settings, type Task } from "../../../domain/types";
 import { useSettingsStore } from "../../../stores/settingsStore";
 import { useTasksStore } from "../../../stores/tasksStore";
 import Manage from "./Manage";
 
 const NOW = new Date(2026, 10, 4, 9, 0, 0);
+
+const updateSettings = vi.fn(async (patch: Partial<Settings>) => {
+  useSettingsStore.setState((state) => ({
+    settings: { ...state.settings, ...patch },
+  }));
+});
+
+function pointer(type: string, clientX: number) {
+  const event = new Event(type, { bubbles: true });
+  Object.defineProperties(event, {
+    clientX: { value: clientX },
+    button: { value: 0 },
+    pointerId: { value: 1 },
+  });
+  return event;
+}
+
+function mockTableWidth(table: HTMLElement, width: number) {
+  table.getBoundingClientRect = () =>
+    ({
+      top: 0,
+      bottom: 0,
+      height: 0,
+      left: 0,
+      right: width,
+      width,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    }) as DOMRect;
+}
+
+function columnWidths(container: HTMLElement): string[] {
+  return [...container.querySelectorAll("col")].map(
+    (col) => (col as HTMLElement).style.width,
+  );
+}
 
 function withIntervals(taskId: string, change: (task: Task) => Task["intervals"]) {
   useTasksStore.setState({
@@ -153,8 +190,13 @@ describe("Manage", () => {
     rename.mockClear();
     updateInterval.mockClear();
     remove.mockClear();
+    updateSettings.mockClear();
 
-    useSettingsStore.setState({ settings: DEFAULT_SETTINGS, loaded: true });
+    useSettingsStore.setState({
+      settings: DEFAULT_SETTINGS,
+      loaded: true,
+      update: updateSettings,
+    });
     useTasksStore.setState({
       loaded: true,
       create,
@@ -655,5 +697,143 @@ describe("Manage", () => {
     );
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     consoleError.mockRestore();
+  });
+
+  it("renders the column widths stored in settings", () => {
+    useSettingsStore.setState({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        manageColumnWidths: [25, 12, 14, 14, 15, 20],
+      },
+      loaded: true,
+      update: updateSettings,
+    });
+    const { container } = render(<Manage />);
+
+    expect(container.querySelectorAll("[data-manage-col-resize]")).toHaveLength(
+      5,
+    );
+    expect(columnWidths(container)).toEqual([
+      "25%",
+      "12%",
+      "14%",
+      "14%",
+      "15%",
+      "20%",
+    ]);
+  });
+
+  it("resizes only the two columns around a divider and saves once", () => {
+    const { container } = render(<Manage />);
+    mockTableWidth(
+      container.querySelector("[data-manage-table]") as HTMLElement,
+      800,
+    );
+    const handle = container.querySelector(
+      '[data-manage-col-resize="category"]',
+    ) as HTMLElement;
+
+    fireEvent(handle, pointer("pointerdown", 100));
+    fireEvent(handle, pointer("pointermove", 116));
+
+    expect(columnWidths(container)).toEqual([
+      "20%",
+      "13%",
+      "13%",
+      "15%",
+      "16%",
+      "23%",
+    ]);
+    expect(updateSettings).not.toHaveBeenCalled();
+
+    fireEvent(handle, pointer("pointerup", 116));
+
+    expect(updateSettings).toHaveBeenCalledTimes(1);
+    expect(updateSettings).toHaveBeenCalledWith({
+      manageColumnWidths: [20, 13, 13, 15, 16, 23],
+    });
+  });
+
+  it("stops at the minimum width while dragging", () => {
+    const { container } = render(<Manage />);
+    mockTableWidth(
+      container.querySelector("[data-manage-table]") as HTMLElement,
+      800,
+    );
+    const handle = container.querySelector(
+      '[data-manage-col-resize="category"]',
+    ) as HTMLElement;
+
+    fireEvent(handle, pointer("pointerdown", 200));
+    fireEvent(handle, pointer("pointermove", 0));
+
+    expect(columnWidths(container)[1]).toBe("10%");
+    expect(columnWidths(container)[2]).toBe("16%");
+  });
+
+  it("ignores a drag when the table has no measured width", () => {
+    const { container } = render(<Manage />);
+    const handle = container.querySelector(
+      '[data-manage-col-resize="category"]',
+    ) as HTMLElement;
+
+    fireEvent(handle, pointer("pointerdown", 100));
+    fireEvent(handle, pointer("pointermove", 140));
+    fireEvent(handle, pointer("pointerup", 140));
+
+    expect(columnWidths(container)).toEqual([
+      "20%",
+      "11%",
+      "15%",
+      "15%",
+      "16%",
+      "23%",
+    ]);
+    expect(updateSettings).not.toHaveBeenCalled();
+  });
+
+  it("restores a column width by double clicking its header", () => {
+    useSettingsStore.setState({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        manageColumnWidths: [20, 20, 10, 10, 16, 24],
+      },
+      loaded: true,
+      update: updateSettings,
+    });
+    const { container } = render(<Manage />);
+
+    fireEvent.doubleClick(
+      container.querySelector('[data-manage-col="category"]') as HTMLElement,
+    );
+
+    const widths = columnWidths(container);
+    expect(widths[1]).toBe("11%");
+    expect(parseFloat(widths[0])).toBeGreaterThan(20);
+    expect(
+      widths.reduce((sum, width) => sum + parseFloat(width), 0),
+    ).toBeCloseTo(100, 5);
+    expect(updateSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores the left column by double clicking a divider", () => {
+    useSettingsStore.setState({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        manageColumnWidths: [20, 20, 10, 10, 16, 24],
+      },
+      loaded: true,
+      update: updateSettings,
+    });
+    const { container } = render(<Manage />);
+
+    fireEvent.doubleClick(
+      container.querySelector(
+        '[data-manage-col-resize="category"]',
+      ) as HTMLElement,
+    );
+
+    expect(columnWidths(container)[1]).toBe("11%");
+    expect(updateSettings).toHaveBeenCalledTimes(1);
   });
 });

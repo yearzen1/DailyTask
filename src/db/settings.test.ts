@@ -53,6 +53,31 @@ describe("sanitizeSettings", () => {
     expect(sanitizeSettings({ navOrder: order }).navOrder).toEqual(order);
     expect(sanitizeSettings({ navOrder: ["today", 3] }).navOrder).toEqual([]);
   });
+
+  it("keeps a valid manage column layout and rejects broken ones", () => {
+    const widths = [25, 12, 14, 14, 15, 20];
+
+    expect(sanitizeSettings({ manageColumnWidths: widths }).manageColumnWidths)
+      .toEqual(widths);
+    expect(
+      sanitizeSettings({ manageColumnWidths: [20, 11, 15] })
+        .manageColumnWidths,
+    ).toEqual(DEFAULT_SETTINGS.manageColumnWidths);
+    expect(
+      sanitizeSettings({ manageColumnWidths: "20,11,15,15,16,23" })
+        .manageColumnWidths,
+    ).toEqual(DEFAULT_SETTINGS.manageColumnWidths);
+  });
+
+  it("scales drifted manage column widths back to 100", () => {
+    const settings = sanitizeSettings({
+      manageColumnWidths: [40, 22, 30, 30, 32, 46],
+    });
+
+    expect(
+      settings.manageColumnWidths.reduce((sum, width) => sum + width, 0),
+    ).toBeCloseTo(100, 5);
+  });
 });
 
 describe("getSettings", () => {
