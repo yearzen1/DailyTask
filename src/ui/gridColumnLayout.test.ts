@@ -51,10 +51,10 @@ describe("buildDateColumnWidths", () => {
       32,
     );
 
-    // 10 个 ASCII 字符 ≈ 62px + 10px 留白。
-    expect(widths[0]).toBeCloseTo(72);
-    // 20 个小写 ASCII 字符 ≈ 110px + 10px 留白。
-    expect(widths[1]).toBeCloseTo(120);
+    // 10 个数字 ≈ 74px + 10px 留白（12px 字号）。
+    expect(widths[0]).toBeCloseTo(84.4);
+    // 20 个小写 ASCII 字符 ≈ 132px + 10px 留白。
+    expect(widths[1]).toBeCloseTo(142);
     expect(widths[2]).toBe(32);
   });
 

@@ -27,6 +27,7 @@ import { useTasksStore } from "../../../stores/tasksStore";
 import { useUiStore } from "../../../stores/uiStore";
 import { DateField } from "../../../ui/DateField";
 import { CELL_LABEL_KEYS } from "../../../ui/CheckCell";
+import { Icon } from "../../../ui/Icon";
 import {
   buildColumnOffsets,
   buildDateColumnWidths,
@@ -44,10 +45,10 @@ import { useLocale, useT } from "../../../ui/useT";
 import { DateHeader } from "./DateHeader";
 import { GridCell } from "./GridCell";
 
-const MONTH_ROW_HEIGHT = 22;
-const DATE_ROW_HEIGHT = 34;
-const GROUP_ROW_HEIGHT = 26;
-const TASK_ROW_HEIGHT = 34;
+const MONTH_ROW_HEIGHT = 24;
+const DATE_ROW_HEIGHT = 40;
+const GROUP_ROW_HEIGHT = 28;
+const TASK_ROW_HEIGHT = 36;
 const MIN_ZOOM = 14;
 const MAX_ZOOM = 44;
 const ZOOM_STEP = 2;
@@ -108,6 +109,30 @@ export default function TaskGrid() {
   const [expandedNames, setExpandedNames] = useState<Set<string>>(
     () => new Set(),
   );
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterAnchorRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!filterOpen) {
+      return;
+    }
+    const onPointerDown = (event: MouseEvent) => {
+      if (!filterAnchorRef.current?.contains(event.target as Node)) {
+        setFilterOpen(false);
+      }
+    };
+    const onKeyDown = (event: Event) => {
+      if (event instanceof KeyboardEvent && event.key === "Escape") {
+        setFilterOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [filterOpen]);
 
   /** 日期筛选超出轴范围时夹回轴首尾，避免出现 0 列空网格。 */
   const clampToAxis = (date: string | null): string | null => {
@@ -739,6 +764,30 @@ export default function TaskGrid() {
       })
     : "";
 
+  const activeFilterCount =
+    (filter.category !== "all" ? 1 : 0) +
+    (filter.taskId ? 1 : 0) +
+    (filter.from || filter.to ? 1 : 0);
+  const activeTaskName = filter.taskId
+    ? (data.tasks.find((task) => task.id === filter.taskId)?.name ?? null)
+    : null;
+  const categoryLabel =
+    filter.category === "all"
+      ? null
+      : filter.category === "voluntary"
+        ? t("grid.filter.voluntary")
+        : t("grid.filter.forced");
+  const rangeLabelFilter = `${filter.from ? format(parseISO(filter.from), "MM/dd") : "…"} – ${
+    filter.to ? format(parseISO(filter.to), "MM/dd") : "…"
+  }`;
+  const resetFilters = () =>
+    setGridFilter({
+      category: "all",
+      taskId: null,
+      from: null,
+      to: null,
+    });
+
   const openEditor = (taskId: string, date: string, taskName: string) => {
     const cell = scrollerRef.current?.querySelector<HTMLElement>(
       `[data-task="${taskId}"][data-date="${date}"]`,
@@ -750,12 +799,12 @@ export default function TaskGrid() {
     const cellRect = cell.getBoundingClientRect();
     const cardRect = card.getBoundingClientRect();
     const left = Math.min(
-      Math.max(cellRect.left - cardRect.left - 88, 8),
-      Math.max(8, cardRect.width - 248),
+      Math.max(cellRect.left - cardRect.left - 100, 8),
+      Math.max(8, cardRect.width - 272),
     );
     const top = Math.min(
       Math.max(cellRect.bottom - cardRect.top + 8, 8),
-      Math.max(8, cardRect.height - 272),
+      Math.max(8, cardRect.height - 360),
     );
     const checkin = data.checkins.get(checkinKey(taskId, date));
     setStatusDraft(checkin?.status ?? null);
@@ -919,36 +968,45 @@ export default function TaskGrid() {
     void useSettingsStore.getState().update({ gridZoom: next });
   };
 
+  const axisStart = parseISO(data.axis.start);
+  const axisEnd = parseISO(data.axis.end);
+  const rangeStart = dates.length > 0 ? parseISO(dates[0]) : axisStart;
+  const rangeEnd =
+    dates.length > 0 ? parseISO(dates[dates.length - 1]) : axisEnd;
+  const rangeFmt =
+    rangeStart.getFullYear() === rangeEnd.getFullYear()
+      ? "MM/dd"
+      : "yyyy/MM/dd";
   const rangeLabel = t("grid.range", {
-    start: format(parseISO(data.axis.start), "MM/dd"),
-    end: format(parseISO(data.axis.end), "MM/dd"),
+    start: format(rangeStart, rangeFmt),
+    end: format(rangeEnd, rangeFmt),
     days: dates.length,
   });
 
   return (
     <>
       <header className="flex flex-none items-center gap-3">
-        <h1 className="m-0 text-[var(--text-lg)] font-semibold tracking-[.2px]">
+        <h1 className="m-0 text-lg font-semibold leading-tight tracking-[-.01em]">
           {t("grid.title")}
         </h1>
-        <span className="text-sm text-[var(--color-text-muted)]">
+        <span className="text-sm text-[var(--color-text-tertiary)]">
           {rangeLabel}
         </span>
         <div className="ml-auto flex items-center gap-2">
           <div
             role="group"
             aria-label={t("grid.mode.aria")}
-            className="flex gap-0.5 rounded-[var(--radius-pill)] border border-[var(--color-border)] bg-[var(--color-bg)] p-0.5"
+            className="flex gap-0.5 rounded-[var(--radius-pill)] border border-[var(--color-border)] bg-[var(--color-surface-2)] p-0.5"
           >
             <button
               type="button"
               aria-pressed={!overview}
               onClick={() => setZoom(32)}
               className={clsx(
-                "rounded-[var(--radius-pill)] px-2.5 py-0.5 text-[var(--text-2xs)]",
+                "rounded-[var(--radius-pill)] px-3 py-1 text-xs",
                 !overview
-                  ? "bg-[var(--color-surface)] text-[var(--color-text)] shadow-[0_1px_2px_rgba(0,0,0,.06)]"
-                  : "text-[var(--color-text-muted)]",
+                  ? "bg-[var(--color-surface)] font-semibold text-[var(--color-text)] shadow-[0_1px_2px_rgba(0,0,0,.06)]"
+                  : "text-[var(--color-text-tertiary)] hover:bg-[var(--state-hover)]",
               )}
             >
               {t("grid.mode.detail")}
@@ -958,10 +1016,10 @@ export default function TaskGrid() {
               aria-pressed={overview}
               onClick={() => setZoom(16)}
               className={clsx(
-                "rounded-[var(--radius-pill)] px-2.5 py-0.5 text-[var(--text-2xs)]",
+                "rounded-[var(--radius-pill)] px-3 py-1 text-xs",
                 overview
-                  ? "bg-[var(--color-surface)] text-[var(--color-text)] shadow-[0_1px_2px_rgba(0,0,0,.06)]"
-                  : "text-[var(--color-text-muted)]",
+                  ? "bg-[var(--color-surface)] font-semibold text-[var(--color-text)] shadow-[0_1px_2px_rgba(0,0,0,.06)]"
+                  : "text-[var(--color-text-tertiary)] hover:bg-[var(--state-hover)]",
               )}
             >
               {t("grid.mode.overview")}
@@ -970,105 +1028,232 @@ export default function TaskGrid() {
           <button
             type="button"
             onClick={jumpToToday}
-            className="rounded-[var(--radius-pill)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1 text-[var(--text-2xs)] text-[var(--color-text-muted)] hover:bg-[var(--state-hover)]"
+            className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-secondary)] shadow-[var(--shadow-card)] hover:bg-[var(--state-hover)]"
           >
+            <Icon
+              name="today"
+              className="size-3.5 text-[var(--color-text-tertiary)]"
+            />
             {t("grid.today")}
           </button>
         </div>
       </header>
 
       <div
+        ref={filterAnchorRef}
         data-grid-filters
-        className="flex flex-none flex-wrap items-center gap-2 text-[var(--text-2xs)] text-[var(--color-text-muted)]"
+        className="relative flex flex-none flex-wrap items-center gap-2"
       >
-        <span>{t("grid.filter.label")}</span>
-        <div
-          role="group"
-          aria-label={t("grid.filter.aria")}
-          className="flex gap-0.5 rounded-[var(--radius-pill)] border border-[var(--color-border)] bg-[var(--color-bg)] p-0.5"
+        <button
+          type="button"
+          data-filter-trigger
+          aria-expanded={filterOpen}
+          aria-controls="grid-filter-panel"
+          onClick={() => setFilterOpen((open) => !open)}
+          className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-secondary)] shadow-[var(--shadow-card)] hover:bg-[var(--state-hover)]"
         >
-          {(["all", "voluntary", "forced"] as const).map((category) => (
+          <Icon
+            name="filter"
+            className="size-3.5 text-[var(--color-text-tertiary)]"
+          />
+          {t("grid.filter.label")}
+          {activeFilterCount > 0 ? (
+            <span className="grid h-[17px] min-w-[17px] place-items-center rounded-[var(--radius-pill)] bg-[var(--color-green-solid)] px-1 text-[10px] font-bold tabular-nums text-[var(--color-on-green)]">
+              {activeFilterCount}
+            </span>
+          ) : null}
+        </button>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          {categoryLabel ? (
             <button
-              key={category}
               type="button"
-              data-filter-category={category}
-              aria-pressed={filter.category === category}
-              onClick={() => setGridFilter({ category })}
-              className={clsx(
-                "rounded-[var(--radius-pill)] px-2 py-0.5",
-                filter.category === category
-                  ? "bg-[var(--color-surface)] text-[var(--color-text)] shadow-[0_1px_2px_rgba(0,0,0,.06)]"
-                  : "hover:bg-[var(--state-hover)]",
-              )}
+              data-filter-chip="category"
+              aria-label={t("grid.filter.remove", { name: categoryLabel })}
+              onClick={() => setGridFilter({ category: "all" })}
+              className="inline-flex h-6 items-center gap-1 rounded-[var(--radius-pill)] bg-[var(--state-selected)] px-2 text-xs text-[var(--color-voluntary)]"
             >
-              {t(
-                category === "all"
-                  ? "grid.filter.all"
-                  : category === "voluntary"
-                    ? "grid.filter.voluntary"
-                    : "grid.filter.forced",
-              )}
+              {categoryLabel}
+              <span aria-hidden="true">×</span>
             </button>
-          ))}
+          ) : null}
+          {activeTaskName ? (
+            <button
+              type="button"
+              data-filter-chip="task"
+              aria-label={t("grid.filter.remove", { name: activeTaskName })}
+              onClick={() => setGridFilter({ taskId: null })}
+              className="inline-flex h-6 items-center gap-1 rounded-[var(--radius-pill)] bg-[var(--state-selected)] px-2 text-xs text-[var(--color-voluntary)]"
+            >
+              {activeTaskName}
+              <span aria-hidden="true">×</span>
+            </button>
+          ) : null}
+          {filter.from || filter.to ? (
+            <button
+              type="button"
+              data-filter-chip="range"
+              aria-label={t("grid.filter.remove", { name: rangeLabelFilter })}
+              onClick={() => setGridFilter({ from: null, to: null })}
+              className="inline-flex h-6 items-center gap-1 rounded-[var(--radius-pill)] bg-[var(--state-selected)] px-2 text-xs tabular-nums text-[var(--color-voluntary)]"
+            >
+              {rangeLabelFilter}
+              <span aria-hidden="true">×</span>
+            </button>
+          ) : null}
+          {filterActive ? (
+            <button
+              type="button"
+              data-filter-clear
+              onClick={resetFilters}
+              className="h-6 rounded-[var(--radius-control)] px-2 text-xs text-[var(--color-text-tertiary)] hover:bg-[var(--state-hover)]"
+            >
+              {t("grid.filter.clear")}
+            </button>
+          ) : null}
         </div>
 
-        <select
-          data-filter-task
-          aria-label={t("grid.filter.task")}
-          value={filter.taskId ?? ""}
-          onChange={(event) =>
-            setGridFilter({ taskId: event.target.value || null })
-          }
-          className="rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] px-1.5 py-0.5 text-[var(--text-2xs)] text-[var(--color-text)]"
+        <div
+          role="group"
+          aria-label={t("grid.filter.legend")}
+          className="ml-auto flex items-center gap-3 text-xs text-[var(--color-text-tertiary)]"
         >
-          <option value="">{t("grid.filter.allTasks")}</option>
-          {data.tasks.map((task) => (
-            <option key={task.id} value={task.id}>
-              {task.name}
-            </option>
-          ))}
-        </select>
+          <span className="inline-flex items-center gap-1.5">
+            <i className="grid size-4 place-items-center rounded-[4px] bg-[color-mix(in_srgb,var(--color-voluntary)_13%,transparent)] text-[10px] font-semibold not-italic text-[var(--color-voluntary)]">
+              ✓
+            </i>
+            {t("grid.cell.done")}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <i className="grid size-4 place-items-center rounded-[4px] bg-[color-mix(in_srgb,var(--color-missed)_11%,transparent)] text-[10px] font-semibold not-italic text-[var(--color-missed)]">
+              ✗
+            </i>
+            {t("grid.cell.missed")}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <i className="grid size-4 place-items-center rounded-[4px] border border-dashed border-[var(--color-border-strong)] text-[10px] font-semibold not-italic text-[var(--color-text-tertiary)]">
+              –
+            </i>
+            {t("grid.cell.skipped")}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <i className="size-4 rounded-[4px] border-[1.5px] border-[var(--color-border-strong)]" />
+            {t("grid.cell.pending")}
+          </span>
+        </div>
 
-        <label className="flex shrink-0 items-center gap-1">
-          {t("grid.filter.from")}
-          <DateField
-            data-filter-from
-            value={filter.from}
-            onChange={(next) => setGridFilter({ from: next })}
-            aria-label={t("grid.filter.from")}
-            allowClear
-            className="w-[124px] shrink-0 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] px-1 py-0.5 text-[var(--text-2xs)] text-[var(--color-text)]"
-          />
-        </label>
-        <label className="flex shrink-0 items-center gap-1">
-          {t("grid.filter.to")}
-          <DateField
-            data-filter-to
-            value={filter.to}
-            onChange={(next) => setGridFilter({ to: next })}
-            aria-label={t("grid.filter.to")}
-            allowClear
-            className="w-[124px] shrink-0 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] px-1 py-0.5 text-[var(--text-2xs)] text-[var(--color-text)]"
-          />
-        </label>
+        <div
+          id="grid-filter-panel"
+          data-filter-panel
+          data-open={filterOpen ? "" : undefined}
+          aria-hidden={!filterOpen}
+          style={{ display: filterOpen ? undefined : "none" }}
+          className="absolute left-0 top-[calc(100%+8px)] z-40 w-[360px] rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-popover)]"
+        >
+          <div className="mb-3 flex items-baseline justify-between gap-2">
+            <b className="text-sm font-semibold text-[var(--color-text)]">
+              {t("grid.filter.label")}
+            </b>
+            <span className="text-xs text-[var(--color-text-tertiary)]">
+              {t("grid.filter.hint")}
+            </span>
+          </div>
 
-        {filterActive ? (
-          <button
-            type="button"
-            data-filter-clear
-            onClick={() =>
-              setGridFilter({
-                category: "all",
-                taskId: null,
-                from: null,
-                to: null,
-              })
-            }
-            className="rounded-[var(--radius-control)] px-2 py-0.5 hover:bg-[var(--state-hover)]"
-          >
-            {t("grid.filter.clear")}
-          </button>
-        ) : null}
+          <div className="mb-2.5 grid grid-cols-[52px_1fr] items-center gap-2">
+            <span className="text-xs text-[var(--color-text-secondary)]">
+              {t("grid.filter.type")}
+            </span>
+            <div
+              role="group"
+              aria-label={t("grid.filter.aria")}
+              className="flex w-fit gap-0.5 rounded-[var(--radius-pill)] border border-[var(--color-border)] bg-[var(--color-surface-2)] p-0.5"
+            >
+              {(["all", "voluntary", "forced"] as const).map((category) => (
+                <button
+                  key={category}
+                  type="button"
+                  data-filter-category={category}
+                  aria-pressed={filter.category === category}
+                  onClick={() => setGridFilter({ category })}
+                  className={clsx(
+                    "rounded-[var(--radius-pill)] px-2.5 py-1 text-xs",
+                    filter.category === category
+                      ? "bg-[var(--color-surface)] font-semibold text-[var(--color-text)] shadow-[0_1px_2px_rgba(0,0,0,.06)]"
+                      : "text-[var(--color-text-tertiary)] hover:bg-[var(--state-hover)]",
+                  )}
+                >
+                  {t(
+                    category === "all"
+                      ? "grid.filter.all"
+                      : category === "voluntary"
+                        ? "grid.filter.voluntary"
+                        : "grid.filter.forced",
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mb-2.5 grid grid-cols-[52px_1fr] items-center gap-2">
+            <span className="text-xs text-[var(--color-text-secondary)]">
+              {t("grid.filter.taskLabel")}
+            </span>
+            <select
+              data-filter-task
+              aria-label={t("grid.filter.task")}
+              value={filter.taskId ?? ""}
+              onChange={(event) =>
+                setGridFilter({ taskId: event.target.value || null })
+              }
+              className="h-8 w-full rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-xs text-[var(--color-text)]"
+            >
+              <option value="">{t("grid.filter.allTasks")}</option>
+              {data.tasks.map((task) => (
+                <option key={task.id} value={task.id}>
+                  {task.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="mb-1 grid grid-cols-[52px_1fr] items-center gap-2">
+            <span className="text-xs text-[var(--color-text-secondary)]">
+              {t("grid.filter.time")}
+            </span>
+            <div className="flex w-full min-w-0 items-center gap-1.5">
+              <DateField
+                data-filter-from
+                value={filter.from}
+                onChange={(next) => setGridFilter({ from: next })}
+                aria-label={t("grid.filter.from")}
+                allowClear
+                className="h-8 w-0 min-w-0 flex-1 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-xs text-[var(--color-text)]"
+              />
+              <span className="text-xs text-[var(--color-text-tertiary)]">
+                –
+              </span>
+              <DateField
+                data-filter-to
+                value={filter.to}
+                onChange={(next) => setGridFilter({ to: next })}
+                aria-label={t("grid.filter.to")}
+                allowClear
+                align="right"
+                className="h-8 w-0 min-w-0 flex-1 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-xs text-[var(--color-text)]"
+              />
+            </div>
+          </div>
+
+          <div className="mt-3 flex justify-end border-t border-[var(--color-divider)] pt-3">
+            <button
+              type="button"
+              onClick={() => setFilterOpen(false)}
+              className="inline-flex h-8 items-center rounded-[var(--radius-control)] bg-[var(--color-green-solid)] px-3 text-xs font-semibold text-[var(--color-on-green)] hover:brightness-95"
+            >
+              {t("grid.filter.close")}
+            </button>
+          </div>
+        </div>
       </div>
 
       {!ready ? (
@@ -1077,15 +1262,15 @@ export default function TaskGrid() {
         <section
           data-grid-empty
           aria-live="polite"
-          className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)]"
+          className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)]"
         >
-          <p className="text-sm text-[var(--color-text-muted)]">
+          <p className="m-0 text-sm text-[var(--color-text-secondary)]">
             {t(
               data.tasks.length > 0 ? "grid.filter.empty" : "grid.empty",
             )}
           </p>
           {data.tasks.length > 0 && filterActive ? (
-            <p className="text-[var(--text-2xs)] text-[var(--color-text-muted)] opacity-70">
+            <p className="m-0 text-xs text-[var(--color-text-tertiary)]">
               {t("grid.filter.emptyHint")}
             </p>
           ) : null}
@@ -1099,8 +1284,8 @@ export default function TaskGrid() {
           className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-card)]"
         >
           <div
-            className="pointer-events-none absolute top-0 z-30 flex h-[22px] items-center border-b border-r border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-[10px] text-[var(--color-text-muted)]"
-            style={{ left: taskColWidth }}
+            className="pointer-events-none absolute top-0 z-30 flex items-center border-b border-r border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 text-xs text-[var(--color-text-secondary)]"
+            style={{ left: taskColWidth, height: MONTH_ROW_HEIGHT }}
           >
             {monthLabel}
           </div>
@@ -1150,7 +1335,7 @@ export default function TaskGrid() {
                 style={{ top: MONTH_ROW_HEIGHT, height: DATE_ROW_HEIGHT }}
               >
                 <div
-                  className="sticky left-0 z-40 flex shrink-0 items-center border-b border-r border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-[var(--text-2xs)] text-[var(--color-text-muted)]"
+                  className="sticky left-0 z-40 flex shrink-0 items-center border-b border-r border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-xs text-[var(--color-text-tertiary)]"
                   style={{ width: taskColWidth, height: DATE_ROW_HEIGHT }}
                 >
                   {t("grid.corner")}
@@ -1205,30 +1390,50 @@ export default function TaskGrid() {
           {cellTarget ? (
             <div
               data-cell-editor
-              className="absolute z-40 w-[240px] rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2 shadow-[var(--shadow-popover)]"
+              className="absolute z-40 w-[272px] rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-popover)]"
               style={{ left: cellTarget.left, top: cellTarget.top }}
             >
-              <div className="mb-1 flex items-center gap-2 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
-                <span className="truncate">
+              <div className="mb-3 min-w-0">
+                <div className="truncate text-sm font-semibold text-[var(--color-text)]">
                   {format(parseISO(cellTarget.date), "MM/dd")}{" "}
                   {cellTarget.taskName}
-                </span>
-                <span className="ml-auto shrink-0">
+                </div>
+                <div className="mt-0.5 text-xs text-[var(--color-text-tertiary)]">
                   {t("grid.cell.title")}
-                </span>
+                </div>
               </div>
 
               <div
                 role="group"
                 aria-label={t("grid.cell.status")}
-                className="mb-1.5 flex gap-1"
+                className="mb-3 grid grid-cols-2 gap-1.5"
               >
                 {(
                   [
-                    { value: "done", label: t("grid.cell.done") },
-                    { value: "missed", label: t("grid.cell.missed") },
-                    { value: "skipped", label: t("grid.cell.skipped") },
-                    { value: null, label: t("grid.cell.clear") },
+                    {
+                      value: "done",
+                      label: t("grid.cell.done"),
+                      icon: "✓",
+                      tone: "bg-[var(--color-voluntary)] text-white",
+                    },
+                    {
+                      value: "missed",
+                      label: t("grid.cell.missed"),
+                      icon: "✗",
+                      tone: "bg-[var(--color-missed)] text-white",
+                    },
+                    {
+                      value: "skipped",
+                      label: t("grid.cell.skipped"),
+                      icon: "–",
+                      tone: "bg-[var(--color-forced)] text-white",
+                    },
+                    {
+                      value: null,
+                      label: t("grid.cell.clear"),
+                      icon: "○",
+                      tone: "bg-[var(--color-surface-2)] text-[var(--color-text-tertiary)]",
+                    },
                   ] as const
                 ).map((option) => (
                   <button
@@ -1237,19 +1442,32 @@ export default function TaskGrid() {
                     aria-pressed={statusDraft === option.value}
                     onClick={() => setStatusDraft(option.value)}
                     className={clsx(
-                      "flex-1 rounded-[var(--radius-control)] px-1 py-0.5 text-[10px]",
+                      "flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border px-2 text-xs",
                       statusDraft === option.value
-                        ? "bg-[var(--color-voluntary)] font-semibold text-white"
-                        : "text-[var(--color-text-muted)] hover:bg-[var(--state-hover)]",
+                        ? "border-[var(--color-voluntary)] bg-[var(--state-selected)] font-semibold text-[var(--color-voluntary)]"
+                        : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--state-hover)]",
                     )}
                   >
+                    <span
+                      aria-hidden="true"
+                      className={clsx(
+                        "grid size-[18px] shrink-0 place-items-center rounded-[5px] text-[10px] font-bold leading-none",
+                        statusDraft === option.value
+                          ? option.tone
+                          : "bg-[var(--color-surface-2)] text-[var(--color-text-tertiary)]",
+                      )}
+                    >
+                      {option.icon}
+                    </span>
                     {option.label}
                   </button>
                 ))}
               </div>
 
-              <label className="mb-1.5 flex items-center gap-1.5 text-[10px] text-[var(--color-text-muted)]">
-                {t("grid.cell.value")}
+              <label className="mb-2 flex flex-col gap-1.5">
+                <span className="text-xs text-[var(--color-text-secondary)]">
+                  {t("grid.cell.value")}
+                </span>
                 <input
                   value={valueDraft}
                   aria-label={t("grid.cell.value")}
@@ -1261,36 +1479,41 @@ export default function TaskGrid() {
                       setCellTarget(null);
                     }
                   }}
-                  className="min-w-0 flex-1 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-bg)] px-1 py-0.5 text-[10px] text-[var(--color-text)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
+                  className="h-8 w-full rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-tertiary)] focus-visible:border-[var(--color-voluntary)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
                 />
               </label>
 
-              <textarea
-                value={noteDraft}
-                aria-label={t("grid.note.title")}
-                placeholder={t("grid.note.placeholder")}
-                onChange={(event) => setNoteDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Escape") {
-                    event.stopPropagation();
-                    setCellTarget(null);
-                  }
-                }}
-                className="h-14 w-full resize-none rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-bg)] p-1.5 text-xs text-[var(--color-text)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
-              />
+              <label className="mb-3 flex flex-col gap-1.5">
+                <span className="text-xs text-[var(--color-text-secondary)]">
+                  {t("grid.note.title")}
+                </span>
+                <textarea
+                  value={noteDraft}
+                  aria-label={t("grid.note.title")}
+                  placeholder={t("grid.note.placeholder")}
+                  onChange={(event) => setNoteDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      event.stopPropagation();
+                      setCellTarget(null);
+                    }
+                  }}
+                  className="h-[52px] w-full resize-none rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1.5 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-tertiary)] focus-visible:border-[var(--color-voluntary)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
+                />
+              </label>
 
-              <div className="mt-1.5 flex justify-end gap-1.5">
+              <div className="flex justify-end gap-1.5">
                 <button
                   type="button"
                   onClick={() => setCellTarget(null)}
-                  className="rounded-[var(--radius-control)] px-2 py-1 text-[var(--text-2xs)] text-[var(--color-text-muted)] hover:bg-[var(--state-hover)]"
+                  className="h-8 rounded-[var(--radius-control)] px-2.5 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--state-hover)]"
                 >
                   {t("grid.note.cancel")}
                 </button>
                 <button
                   type="button"
                   onClick={saveCell}
-                  className="rounded-[var(--radius-control)] bg-[var(--color-voluntary)] px-2 py-1 text-[var(--text-2xs)] font-semibold text-white"
+                  className="h-8 rounded-[var(--radius-control)] bg-[var(--color-green-solid)] px-3 text-xs font-semibold text-[var(--color-on-green)] hover:brightness-95"
                 >
                   {t("grid.note.save")}
                 </button>
@@ -1298,10 +1521,14 @@ export default function TaskGrid() {
             </div>
           ) : null}
 
-          <footer className="flex h-[30px] flex-none items-center gap-1.5 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-[10px] text-[var(--color-text-muted)]">
+          <footer className="flex h-9 flex-none items-center gap-2 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-xs text-[var(--color-text-tertiary)]">
             <span>{t("grid.taskCount", { count: allRows.length })}</span>
             <span className="text-[var(--color-border-strong)]">·</span>
             <span>{t("grid.dayCount", { count: dates.length })}</span>
+            <span className="text-[var(--color-border-strong)]">·</span>
+            <span className="tabular-nums">
+              {t("grid.today")} {format(parseISO(data.today), "MM/dd")}
+            </span>
             <span className="ml-auto">{t("grid.zoomHint")}</span>
           </footer>
         </section>
@@ -1322,13 +1549,13 @@ function GridSkeleton() {
       aria-label={t("grid.loading")}
       className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-card)]"
     >
-      <div className="flex h-[56px] flex-none items-center gap-2 border-b border-[var(--color-border)] px-3">
+      <div className="flex h-16 flex-none items-center gap-2 border-b border-[var(--color-border)] px-3">
         <span className={clsx(bar, "h-2.5 w-20")} />
         <span className={clsx(bar, "ml-auto h-5 w-16")} />
       </div>
 
       <div className="min-h-0 flex-1 overflow-hidden">
-        <div className="flex h-[56px] items-end gap-1 border-b border-[var(--color-border)] px-3 pb-2">
+        <div className="flex h-12 items-end gap-1 border-b border-[var(--color-border)] px-3 pb-2">
           {Array.from({ length: SKELETON_COLUMNS }, (_, column) => (
             <span key={column} className={clsx(bar, "h-2 flex-1")} />
           ))}
@@ -1336,7 +1563,7 @@ function GridSkeleton() {
         {Array.from({ length: SKELETON_ROWS }, (_, row) => (
           <div
             key={row}
-            className="flex h-[34px] items-center gap-1 border-b border-[var(--color-border)] px-3"
+            className="flex h-9 items-center gap-1 border-b border-[var(--color-border)] px-3"
           >
             <span className={clsx(bar, "h-2.5 w-24 shrink-0")} />
             {Array.from({ length: SKELETON_COLUMNS }, (_, column) => (
@@ -1349,7 +1576,7 @@ function GridSkeleton() {
         ))}
       </div>
 
-      <div className="flex h-[30px] flex-none items-center gap-2 border-t border-[var(--color-border)] px-3">
+      <div className="flex h-9 flex-none items-center gap-2 border-t border-[var(--color-border)] px-3">
         <span className={clsx(bar, "h-2 w-16")} />
         <span className={clsx(bar, "ml-auto h-2 w-24")} />
       </div>
@@ -1427,20 +1654,22 @@ function GridGroupInner({
             group: label,
           })}
           style={{ width: taskColWidth, height: groupHeight }}
-          className="sticky left-0 z-10 flex shrink-0 items-center gap-1.5 border-b border-r border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-[var(--text-2xs)] font-semibold text-[var(--color-text-muted)] hover:bg-[var(--state-hover)]"
+          className="sticky left-0 z-10 flex shrink-0 items-center gap-2 border-b border-r border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--state-hover)]"
         >
-          <span className="w-2 text-[9px]">{open ? "▾" : "▸"}</span>
+          <span className="w-3 text-xs text-[var(--color-text-tertiary)]">
+            {open ? "▾" : "▸"}
+          </span>
           <i
-            className="h-[11px] w-[3px] rounded-[2px]"
+            className="h-3 w-[3px] rounded-[2px]"
             style={{ background: meta.color }}
           />
           {label}
-          <span className="ml-auto pr-1 font-normal tabular-nums">
+          <span className="ml-auto pr-1 font-normal tabular-nums text-[var(--color-text-tertiary)]">
             {taskCount}
           </span>
         </button>
         <div
-          className="flex-1 border-b border-[var(--color-border)] bg-[var(--color-surface)]"
+          className="flex-1 border-b border-[var(--color-border)] bg-[var(--color-surface-2)]"
           style={{ minWidth: 0, height: groupHeight }}
         />
       </div>
@@ -1534,14 +1763,16 @@ function GridGroupInner({
                   data-task-name={row.key}
                   style={{ width: taskColWidth, minHeight: rowHeight }}
                   className={clsx(
-                    "sticky left-0 z-10 flex shrink-0 cursor-grab items-center gap-1.5 border-b border-r border-[var(--color-border)] bg-[var(--color-surface)] px-2 active:cursor-grabbing",
-                    overview ? "text-[var(--text-2xs)]" : "text-xs",
+                    "sticky left-0 z-10 flex shrink-0 cursor-grab items-center gap-2 border-b border-r border-[var(--color-border)] bg-[var(--color-surface)] px-3 active:cursor-grabbing group-hover/row:bg-[var(--color-surface-2)]",
+                    overview
+                      ? "text-xs"
+                      : "text-sm",
                     (row.disabled || !row.current) &&
-                      "text-[var(--color-text-muted)]",
+                      "text-[var(--color-text-tertiary)]",
                   )}
                 >
                   <i
-                    className="size-[5px] shrink-0 rounded-full"
+                    className="size-1.5 shrink-0 rounded-full"
                     style={{
                       background:
                         groupKey === "disabled"
@@ -1593,7 +1824,7 @@ function GridGroupInner({
                       })}
                       onMouseDown={(event) => event.stopPropagation()}
                       onDragStart={(event) => event.preventDefault()}
-                      className="shrink-0 whitespace-nowrap rounded-[var(--radius-pill)] border border-[var(--color-border)] px-1 text-[9px] leading-4 tabular-nums hover:bg-[var(--state-hover)]"
+                      className="shrink-0 whitespace-nowrap rounded-[4px] px-1 text-xs leading-4 tabular-nums text-[var(--color-text-tertiary)] hover:bg-[var(--state-hover)]"
                     >
                       {expandedNames.has(row.task.id) ? "▾" : "▸"}{" "}
                       {nameHistoryCounts.get(row.task.id)}
@@ -1602,7 +1833,7 @@ function GridGroupInner({
                   {dragEnabled ? (
                     <span
                       aria-hidden="true"
-                      className="ml-auto shrink-0 text-[9px] text-[var(--color-border-strong)] opacity-0 group-hover/row:opacity-100"
+                      className="ml-auto shrink-0 text-xs text-[var(--color-text-tertiary)] opacity-0 group-hover/row:opacity-100"
                     >
                       ⋮⋮
                     </span>

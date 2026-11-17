@@ -5,7 +5,7 @@ import type { CellState } from "../../../domain/settle";
 import { CELL_SYMBOLS } from "../../../ui/CheckCell";
 
 const TODAY_TINT =
-  "color-mix(in srgb, var(--color-voluntary) 8%, transparent)";
+  "color-mix(in srgb, var(--color-voluntary) 6%, transparent)";
 
 /** 概览色块：按状态给底色，`pending` 交给今天的浅绿。 */
 function overviewBackground(state: CellState): string | undefined {
@@ -13,9 +13,9 @@ function overviewBackground(state: CellState): string | undefined {
     case "done":
       return "var(--color-voluntary)";
     case "missed":
-      return "color-mix(in srgb, var(--color-missed) 55%, var(--color-surface))";
+      return "color-mix(in srgb, var(--color-missed) 60%, var(--color-surface))";
     case "skipped":
-      return "color-mix(in srgb, var(--color-forced) 35%, var(--color-surface))";
+      return "color-mix(in srgb, var(--color-forced) 34%, var(--color-surface))";
     case "none":
       return "var(--color-na)";
     case "pending":
@@ -83,7 +83,7 @@ export const GridCell = memo(function GridCell({
   }
 
   const symbol = state === "none" ? "▫" : CELL_SYMBOLS[state];
-  const text = !overview && value ? value : symbol;
+  const hasValue = !overview && Boolean(value);
   const canNote =
     !overview && (state === "done" || state === "missed" || state === "skipped");
   const ariaLabel = value ? `${ariaPrefix} · ${value}` : ariaPrefix;
@@ -93,7 +93,25 @@ export const GridCell = memo(function GridCell({
   const todayTint = isToday && tinted ? TODAY_TINT : undefined;
   const background = overview
     ? (overviewBackground(state) ?? todayTint)
-    : (todayTint ?? (state === "none" ? "var(--color-na)" : undefined));
+    : (todayTint ?? (state === "none" ? "transparent" : undefined));
+
+  const markerClass =
+    state === "done"
+      ? "bg-[color-mix(in_srgb,var(--color-voluntary)_13%,transparent)] text-[var(--color-voluntary)]"
+      : state === "missed"
+        ? "bg-[color-mix(in_srgb,var(--color-missed)_11%,transparent)] text-[var(--color-missed)]"
+        : state === "skipped"
+          ? "border border-dashed border-[var(--color-border-strong)] text-[var(--color-text-tertiary)]"
+          : state === "pending"
+            ? "border-[1.5px] border-[var(--color-border-strong)]"
+            : "text-[var(--color-text-tertiary)]";
+
+  const valueClass =
+    state === "done"
+      ? "text-[var(--color-voluntary)]"
+      : state === "missed"
+        ? "text-[var(--color-missed)]"
+        : "text-[var(--color-text-secondary)]";
 
   return (
     <div
@@ -119,46 +137,49 @@ export const GridCell = memo(function GridCell({
         title={`${taskName} · ${dateLabel}${value ? ` · ${value}` : ""}`}
         aria-label={ariaLabel}
         className={clsx(
-          "flex w-full min-w-0 items-center justify-center border-b border-l tabular-nums outline-none",
-          overview ? "text-[0px]" : value ? "px-0.5 text-[10px]" : "text-xs",
-          !overview &&
-            state === "done" &&
-            "font-semibold text-[var(--color-voluntary)]",
-          !overview && state === "missed" && "text-[var(--color-missed)]",
-          !overview &&
-            state === "skipped" &&
-            "text-[var(--color-text-muted)]",
-          !overview && state === "pending" && "text-[var(--color-text)]",
+          "flex w-full min-w-0 items-center justify-center border-b border-l outline-none transition-colors",
+          overview ? "text-[0px]" : "px-0.5",
           disabled
             ? "cursor-not-allowed"
             : overview
               ? "cursor-zoom-in hover:brightness-105"
-              : "cursor-default hover:bg-[var(--state-hover)]",
+              : "cursor-default",
         )}
         style={{
           minHeight: height,
           background,
-          color:
-            !overview && state === "none"
-              ? "color-mix(in srgb, var(--color-text) 28%, transparent)"
-              : undefined,
+          borderLeftColor:
+            "color-mix(in srgb, var(--color-border) 55%, transparent)",
+          borderBottomColor:
+            "color-mix(in srgb, var(--color-border) 55%, transparent)",
           boxShadow: focused
             ? "inset 0 0 0 2px var(--color-voluntary)"
             : isToday
-              ? "inset -1px 0 0 color-mix(in srgb, var(--color-voluntary) 45%, transparent)"
+              ? "inset -1px 0 0 color-mix(in srgb, var(--color-voluntary) 40%, transparent)"
               : undefined,
-          borderLeftColor:
-            "color-mix(in srgb, var(--color-border) 50%, transparent)",
-          borderBottomColor:
-            "color-mix(in srgb, var(--color-border) 50%, transparent)",
         }}
       >
-        <span
-          aria-hidden="true"
-          className="max-w-full break-words text-center leading-tight"
-        >
-          {overview ? "" : text}
-        </span>
+        {overview ? null : hasValue ? (
+          <span
+            className={clsx(
+              "max-w-full break-words text-center text-xs font-medium leading-tight tabular-nums",
+              valueClass,
+            )}
+          >
+            {value}
+          </span>
+        ) : (
+          <span
+            data-cell-marker={state === "none" ? undefined : ""}
+            aria-hidden="true"
+            className={clsx(
+              "grid size-5 shrink-0 place-items-center rounded-[6px] text-xs font-semibold leading-none",
+              markerClass,
+            )}
+          >
+            {symbol}
+          </span>
+        )}
       </button>
 
       {canNote ? (
@@ -169,13 +190,22 @@ export const GridCell = memo(function GridCell({
           aria-label={hasNote ? noteHasLabel : noteAddLabel}
           title={noteTitle}
           className={clsx(
-            "absolute right-0 top-0 grid size-3 place-items-center rounded-bl-[4px] text-[8px] leading-none",
+            "absolute right-0 top-0 grid size-3 place-items-center rounded-bl-[4px] leading-none",
             hasNote
-              ? "bg-[color-mix(in_srgb,var(--color-warning)_18%,transparent)] text-[var(--color-warning)]"
-              : "text-[var(--color-text-muted)] opacity-0 hover:bg-[var(--state-active)] focus:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100",
+              ? "text-[var(--color-warning)]"
+              : "text-[var(--color-text-tertiary)] opacity-0 hover:bg-[var(--state-active)] focus:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100",
           )}
         >
-          <span aria-hidden="true">{hasNote ? "•" : "✎"}</span>
+          {hasNote ? (
+            <span
+              aria-hidden="true"
+              className="size-1.5 rounded-full bg-[var(--color-warning)]"
+            />
+          ) : (
+            <span aria-hidden="true" className="text-[8px]">
+              ✎
+            </span>
+          )}
         </button>
       ) : null}
     </div>

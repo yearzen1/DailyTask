@@ -17,6 +17,16 @@
   --color-border-strong: #D2D2D2;
   --color-text: #1A1A1A;
   --color-text-muted: #8A8A8A;
+  --color-text-secondary: #565C64;   /* [新增] 标签 / 正文次级 */
+  --color-text-tertiary: #6E747C;    /* [新增] 说明 / 提示，白底对比 ≥ 4.5 */
+
+  /* ---- 表面 / 分隔（本次重设计新增） ---- */
+  --color-surface-2: #FAFBFC;
+  --color-divider: #F0F1F3;
+
+  /* ---- 主按钮绿：白字对比 ≥ 4.5 ---- */
+  --color-green-solid: #2F7F50;
+  --color-on-green: #FFFFFF;
 
   /* ---- 语义色 ---- */
   --color-voluntary: #3D9A62;   /* 自愿 / 完成 */
@@ -87,6 +97,14 @@
   --color-border-strong: #4A4A4A;
   --color-text: #F0F0F0;
   --color-text-muted: #9A9A9A;
+  --color-text-secondary: #C2C6CB;
+  --color-text-tertiary: #A0A6AD;
+
+  --color-surface-2: #26282B;
+  --color-divider: #2C2E32;
+
+  --color-green-solid: #4CAF7D;
+  --color-on-green: #102018;
 
   --color-voluntary: #4CAF7D;
   --color-forced: #8CA0C4;

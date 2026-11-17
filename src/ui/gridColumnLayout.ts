@@ -6,10 +6,10 @@ export const AUTO_COLUMN_MAX_WIDTH = 320;
 /** 左侧任务列最小宽度，保持原有视觉基准。 */
 export const TASK_COLUMN_MIN_WIDTH = 160;
 /** 自由值字号（详细模式）。 */
-export const VALUE_FONT_SIZE = 10;
-/** 任务名字号：详细 12px / 概览 11px。 */
-export const TASK_FONT_SIZE_DETAIL = 12;
-export const TASK_FONT_SIZE_OVERVIEW = 11;
+export const VALUE_FONT_SIZE = 12;
+/** 任务名字号：详细 13px / 概览 12px。 */
+export const TASK_FONT_SIZE_DETAIL = 13;
+export const TASK_FONT_SIZE_OVERVIEW = 12;
 
 /** 自由值左右留白，避免文字贴边。 */
 const VALUE_HORIZONTAL_PADDING = 10;
