@@ -151,6 +151,20 @@ describe("TaskGrid", () => {
     expect(todayCell).toHaveAttribute("data-today");
   });
 
+  it("renders the today date as a pill in the header", () => {
+    const { container } = render(<TaskGrid />);
+
+    const todayHeader = container.querySelector(
+      `[data-date-header="${TODAY}"]`,
+    ) as Element;
+    expect(todayHeader.querySelector("[data-today-pill]")).toBeInTheDocument();
+
+    const otherHeader = container.querySelector(
+      '[data-date-header="2026-11-01"]',
+    ) as Element;
+    expect(otherHeader.querySelector("[data-today-pill]")).not.toBeInTheDocument();
+  });
+
   it("keeps the today tint off cells that are skipped", () => {
     useCheckinsStore.setState({
       byKey: new Map([
@@ -604,6 +618,53 @@ describe("TaskGrid", () => {
     expect(
       container.querySelector('[data-grid-row="t1"]'),
     ).not.toBeInTheDocument();
+  });
+
+  it("opens the filter panel from the toolbar and closes it with Escape", () => {
+    const { container } = render(<TaskGrid />);
+    const trigger = container.querySelector(
+      "[data-filter-trigger]",
+    ) as HTMLElement;
+    const panel = container.querySelector(
+      "[data-filter-panel]",
+    ) as HTMLElement;
+
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(panel).not.toHaveAttribute("data-open");
+
+    fireEvent.click(trigger);
+
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(panel).toHaveAttribute("data-open");
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(panel).not.toHaveAttribute("data-open");
+  });
+
+  it("clears one filter condition from its chip", () => {
+    const { container } = render(<TaskGrid />);
+
+    fireEvent.click(
+      container.querySelector('[data-filter-category="forced"]') as Element,
+    );
+    const chip = container.querySelector(
+      '[data-filter-chip="category"]',
+    ) as HTMLElement;
+    expect(chip).toHaveTextContent("被迫");
+
+    fireEvent.click(chip);
+
+    expect(
+      container.querySelector('[data-filter-chip="category"]'),
+    ).not.toBeInTheDocument();
+    expect(
+      container.querySelector('[data-filter-category="all"]'),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      container.querySelector('[data-grid-row="t1"]'),
+    ).toBeInTheDocument();
   });
 
   it("clips the date axis to the selected range and clears it", () => {
