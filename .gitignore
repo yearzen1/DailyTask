@@ -12,7 +12,7 @@ coverage/
 
 src-tauri/target/
 src-tauri/gen/schemas/
-.playwright-mcp
+.playwright-mcp/
 
 
 *.xlsx
