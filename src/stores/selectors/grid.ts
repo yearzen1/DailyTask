@@ -11,15 +11,18 @@ import {
 import { checkinKey } from "../../domain/keys";
 import { isDateInNamePeriod } from "../../domain/names";
 import { projectCell, type CellState } from "../../domain/settle";
-import type { Checkin, Settings, Task } from "../../domain/types";
+import { DEFAULT_TASK_TYPES } from "../../domain/taskTypes";
+import type { Checkin, Settings, Task, TaskType } from "../../domain/types";
 import { useCheckinsStore } from "../checkinsStore";
 import { useDayNow } from "../dayStore";
 import { useSettingsStore } from "../settingsStore";
+import { useTaskTypesStore } from "../taskTypesStore";
 import { useTasksStore } from "../tasksStore";
 
 export interface GridData {
   today: string;
   tasks: Task[];
+  types: TaskType[];
   axis: DateAxis;
   groups: GridGroups;
   settings: Settings;
@@ -38,10 +41,11 @@ export function buildGridData(
   checkins: Map<string, Checkin>,
   settings: Settings,
   now: Date,
+  types: readonly TaskType[] = DEFAULT_TASK_TYPES,
 ): GridData {
   const today = logicalToday(now, settings.dayStartHour);
   const axis = buildDateAxis(tasks, today);
-  const groups = groupTasks(tasks, today);
+  const groups = groupTasks(tasks, today, types);
   const states = new Map<string, CellState>();
 
   const cellState = (row: GridRow, date: string): CellState => {
@@ -66,6 +70,7 @@ export function buildGridData(
   return {
     today,
     tasks,
+    types: [...types],
     axis,
     groups,
     settings,
@@ -77,12 +82,13 @@ export function buildGridData(
 
 export function useGridData(): GridData {
   const tasks = useTasksStore((state) => state.tasks);
+  const types = useTaskTypesStore((state) => state.types);
   const checkins = useCheckinsStore((state) => state.byKey);
   const settings = useSettingsStore((state) => state.settings);
   const now = useDayNow();
 
   return useMemo(
-    () => buildGridData(tasks, checkins, settings, now),
-    [tasks, checkins, settings, now],
+    () => buildGridData(tasks, checkins, settings, now, types),
+    [tasks, types, checkins, settings, now],
   );
 }

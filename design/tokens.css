@@ -25,6 +25,16 @@
   --color-na: #EDEDED;          /* 不适用 */
   --color-warning: #C9871B;     /* [新增] 「今天到期」黄，§7.1 只给了 🟡 没给色值 */
 
+  /* ---- 任务类型调色板（自定义类型） ---- */
+  --type-color-green: #3D9A62;
+  --type-color-blue: #4C7FB8;
+  --type-color-purple: #7B61B5;
+  --type-color-orange: #C9871B;
+  --type-color-red: #D9534F;
+  --type-color-teal: #2E9B9B;
+  --type-color-pink: #C75B92;
+  --type-color-gray: #7A7A7A;
+
   /* ---- 交互态叠加 ---- */
   --state-hover: rgba(26, 26, 26, 0.04);
   --state-active: rgba(26, 26, 26, 0.08);
@@ -93,6 +103,15 @@
   --color-missed: #E06C68;
   --color-na: #333333;
   --color-warning: #D9A441;
+
+  --type-color-green: #4CAF7D;
+  --type-color-blue: #6FA3D9;
+  --type-color-purple: #9C86D4;
+  --type-color-orange: #D9A441;
+  --type-color-red: #E06C68;
+  --type-color-teal: #4FBDBD;
+  --type-color-pink: #DA7FAF;
+  --type-color-gray: #9A9A9A;
 
   --state-hover: rgba(255, 255, 255, 0.05);
   --state-active: rgba(255, 255, 255, 0.09);

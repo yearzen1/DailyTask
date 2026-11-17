@@ -8,6 +8,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 export const Events = {
   checkinsChanged: "checkins:changed",
   tasksChanged: "tasks:changed",
+  taskTypesChanged: "task-types:changed",
   todosChanged: "todos:changed",
   settingsChanged: "settings:changed",
   widgetExpand: "widget:expand",
@@ -21,6 +22,10 @@ export interface CheckinsChanged {
 }
 
 export interface TasksChanged {
+  source: EventSource;
+}
+
+export interface TaskTypesChanged {
   source: EventSource;
 }
 
@@ -50,6 +55,12 @@ export async function emitTasksChanged(payload: TasksChanged): Promise<void> {
   await emit(Events.tasksChanged, payload satisfies TasksChanged);
 }
 
+export async function emitTaskTypesChanged(
+  payload: TaskTypesChanged,
+): Promise<void> {
+  await emit(Events.taskTypesChanged, payload satisfies TaskTypesChanged);
+}
+
 export async function emitTodosChanged(payload: TodosChanged): Promise<void> {
   await emit(Events.todosChanged, payload satisfies TodosChanged);
 }
@@ -76,6 +87,14 @@ export function onTasksChanged(
   handler: (payload: TasksChanged) => void,
 ): Promise<UnlistenFn> {
   return listen<TasksChanged>(Events.tasksChanged, (event) => {
+    handler(event.payload);
+  });
+}
+
+export function onTaskTypesChanged(
+  handler: (payload: TaskTypesChanged) => void,
+): Promise<UnlistenFn> {
+  return listen<TaskTypesChanged>(Events.taskTypesChanged, (event) => {
     handler(event.payload);
   });
 }

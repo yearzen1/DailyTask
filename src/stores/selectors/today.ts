@@ -16,10 +16,19 @@ import {
   type CellState,
   type DayProgress,
 } from "../../domain/settle";
-import type { Checkin, Settings, Task, Todo } from "../../domain/types";
+import type { Checkin, Settings, Task, TaskType, Todo } from "../../domain/types";
+import {
+  DEFAULT_TASK_TYPES,
+  descendantTypeIds,
+  flattenTypeTree,
+  resolveTaskTypeId,
+  resolveTaskTypes,
+  sortedTasksByType,
+} from "../../domain/taskTypes";
 import { useCheckinsStore } from "../checkinsStore";
 import { useDayNow } from "../dayStore";
 import { useSettingsStore } from "../settingsStore";
+import { useTaskTypesStore } from "../taskTypesStore";
 import { useTasksStore } from "../tasksStore";
 import { useTodosStore } from "../todosStore";
 
@@ -39,6 +48,20 @@ export interface CategoryStat {
   total: number;
 }
 
+/** 今日页 / 挂件的类型树分组；rows 只含直属任务，stat 聚合整棵子树。 */
+export interface TodayTypeGroup {
+  type: TaskType;
+  depth: number;
+  path: TaskType[];
+  rows: TodayTask[];
+  stat: CategoryStat;
+}
+
+export interface TodayTypeStat {
+  type: TaskType;
+  stat: CategoryStat;
+}
+
 export interface DueTodoItem {
   todo: Todo;
   overdueDays: number;
@@ -47,8 +70,13 @@ export interface DueTodoItem {
 export interface TodayData {
   today: string;
   dateLabel: string;
+  /** 兼容旧视图：两个内置根类型下的全部任务。 */
   voluntary: TodayTask[];
   forced: TodayTask[];
+  /** 类型树展开顺序；父组折叠由 UI 处理。 */
+  groups: TodayTypeGroup[];
+  /** 顶层类型小计，用于今日页与挂件顶部。 */
+  typeStats: TodayTypeStat[];
   progress: DayProgress;
   voluntaryStat: CategoryStat;
   forcedStat: CategoryStat;
@@ -108,25 +136,70 @@ export function buildToday(
   settings: Settings,
   todos: Todo[],
   now: Date,
+  types: readonly TaskType[] = DEFAULT_TASK_TYPES,
 ): TodayData {
   const today = logicalToday(now, settings.dayStartHour);
-  const rows: TodayTask[] = applicableTasks(tasks, today)
-    .sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt))
-    .map((task) => {
-      const checkin = checkins.get(checkinKey(task.id, today));
-      const interval = currentInterval(task.intervals, today);
-      const deadline = interval?.end ?? null;
+  const tree = resolveTaskTypes(types);
+  const flat = flattenTypeTree(tree);
+  const known = new Set(flat.map((node) => node.type.id));
+  const rows: TodayTask[] = sortedTasksByType(
+    applicableTasks(tasks, today),
+    tree,
+  ).map((task) => {
+    const checkin = checkins.get(checkinKey(task.id, today));
+    const interval = currentInterval(task.intervals, today);
+    const deadline = interval?.end ?? null;
+    return {
+      task,
+      state: projectCell(task, today, checkin, settings, today),
+      value: checkin?.value ?? null,
+      deadline,
+      deadlineDays: deadline === null ? null : diffDays(deadline, today),
+    };
+  });
+
+  /** 旧数据只有 category 或类型被删时，回退到内置根类型。 */
+  const groupIdOf = (row: TodayTask): string => {
+    const id = resolveTaskTypeId(row.task);
+    return known.has(id) ? id : row.task.category;
+  };
+  const pathById = new Map(flat.map((node) => [node.type.id, node.path]));
+
+  const rootCategoryOf = (row: TodayTask): "voluntary" | "forced" => {
+    const root = pathById.get(groupIdOf(row))?.[0];
+    return root?.systemKey === "forced" ? "forced" : "voluntary";
+  };
+
+  const groups: TodayTypeGroup[] = [];
+  const included = new Set<string>();
+  for (const node of flat) {
+    const subtree = descendantTypeIds(tree, node.type.id);
+    const subtreeRows = rows.filter((row) => subtree.has(groupIdOf(row)));
+    if (subtreeRows.length === 0) {
+      continue;
+    }
+    included.add(node.type.id);
+    groups.push({
+      type: node.type,
+      depth: node.depth,
+      path: node.path,
+      rows: rows.filter((row) => groupIdOf(row) === node.type.id),
+      stat: statOf(subtreeRows),
+    });
+  }
+
+  const typeStats = flat
+    .filter((node) => node.depth === 0 && included.has(node.type.id))
+    .map((node) => {
+      const group = groups.find((item) => item.type.id === node.type.id);
       return {
-        task,
-        state: projectCell(task, today, checkin, settings, today),
-        value: checkin?.value ?? null,
-        deadline,
-        deadlineDays: deadline === null ? null : diffDays(deadline, today),
+        type: node.type,
+        stat: group?.stat ?? { done: 0, total: 0 },
       };
     });
 
-  const voluntary = rows.filter((row) => row.task.category === "voluntary");
-  const forced = rows.filter((row) => row.task.category === "forced");
+  const voluntary = rows.filter((row) => rootCategoryOf(row) === "voluntary");
+  const forced = rows.filter((row) => rootCategoryOf(row) === "forced");
 
   // 当天完成的待办保留在列表里（打勾不消失），次日自动移除。
   const dueTodos = dueTodosFor(todos, today, settings);
@@ -139,6 +212,8 @@ export function buildToday(
     }),
     voluntary,
     forced,
+    groups,
+    typeStats,
     progress: combineProgress(
       dayProgress(tasks, checkins, today, settings, today),
       todoStat,
@@ -154,13 +229,14 @@ export function buildToday(
 
 export function useTodayData(): TodayData {
   const tasks = useTasksStore((state) => state.tasks);
+  const types = useTaskTypesStore((state) => state.types);
   const checkins = useCheckinsStore((state) => state.byKey);
   const settings = useSettingsStore((state) => state.settings);
   const todos = useTodosStore((state) => state.todos);
   const now = useDayNow();
 
   return useMemo(
-    () => buildToday(tasks, checkins, settings, todos, now),
-    [tasks, checkins, settings, todos, now],
+    () => buildToday(tasks, checkins, settings, todos, now, types),
+    [tasks, types, checkins, settings, todos, now],
   );
 }

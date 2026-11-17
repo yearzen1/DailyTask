@@ -253,6 +253,12 @@ pub fn run() {
             sql: include_str!("../migrations/005_task_name_periods.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 6,
+            description: "task types",
+            sql: include_str!("../migrations/006_task_types.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

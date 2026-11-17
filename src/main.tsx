@@ -10,6 +10,7 @@ import { rotateDailyBackup } from "./db/backup";
 import { prepareWidgetStartup } from "./windows/widget/capsule";
 import { useCheckinsStore } from "./stores/checkinsStore";
 import { useSettingsStore } from "./stores/settingsStore";
+import { useTaskTypesStore } from "./stores/taskTypesStore";
 import { useTasksStore } from "./stores/tasksStore";
 import { setLocale, t } from "./shared/i18n";
 import { useTodosStore } from "./stores/todosStore";
@@ -21,6 +22,7 @@ import "./styles.css";
 function hydrate(data: AppData): void {
   useSettingsStore.getState().hydrate(data.settings);
   useTasksStore.getState().hydrate(data.tasks);
+  useTaskTypesStore.getState().hydrate(data.taskTypes);
   useCheckinsStore.getState().hydrate(data.checkins);
   useTodosStore.getState().hydrate(data.todos);
 }

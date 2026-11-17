@@ -13,12 +13,16 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 
-import type { GridRow } from "../../../domain/grid";
+import type { GridRow, GridTypeGroup } from "../../../domain/grid";
 import { monthTicks } from "../../../domain/grid";
 import { checkinKey } from "../../../domain/keys";
 import type { CellState } from "../../../domain/settle";
+import {
+  descendantTypeIds,
+  flattenTypeTree,
+  resolveTaskTypeId,
+} from "../../../domain/taskTypes";
 import type { Checkin, CheckinStatus } from "../../../domain/types";
-import type { MessageKey } from "../../../shared/i18n";
 import { dateLocale } from "../../../shared/i18n";
 import { useCheckinsStore } from "../../../stores/checkinsStore";
 import { useGridData } from "../../../stores/selectors/grid";
@@ -36,6 +40,7 @@ import {
   TASK_FONT_SIZE_DETAIL,
   TASK_FONT_SIZE_OVERVIEW,
 } from "../../../ui/gridColumnLayout";
+import { typeColorVar, typeDisplayName } from "../../../ui/taskType";
 import {
   RENDERED_CELL_BUDGET,
   useHorizontalWindowByOffsets,
@@ -55,22 +60,7 @@ const ZOOM_STEP = 2;
 const SKELETON_ROWS = 7;
 const SKELETON_COLUMNS = 12;
 
-type GroupKey = "voluntary" | "forced" | "disabled";
-
-const GROUP_META: Record<
-  GroupKey,
-  { labelKey: MessageKey; color: string }
-> = {
-  voluntary: {
-    labelKey: "grid.group.voluntary",
-    color: "var(--color-voluntary)",
-  },
-  forced: { labelKey: "grid.group.forced", color: "var(--color-forced)" },
-  disabled: {
-    labelKey: "grid.group.disabled",
-    color: "var(--color-border-strong)",
-  },
-};
+type GroupKey = string;
 
 /** 每格文案一类的常量，随语言变化重建一次。 */
 interface GridLabels {
@@ -99,11 +89,9 @@ export default function TaskGrid() {
   const setGridFilter = useUiStore((state) => state.setGridFilter);
   const ready = tasksLoaded && checkinsLoaded && settingsLoaded;
 
-  const [collapsed, setCollapsed] = useState<Record<GroupKey, boolean>>({
-    voluntary: false,
-    forced: false,
-    disabled: true,
-  });
+  const [collapsed, setCollapsed] = useState<Set<string>>(
+    () => new Set(["disabled"]),
+  );
   /** 历史名称段默认折叠；值是该任务展开过的 taskId 集合。 */
   const [expandedNames, setExpandedNames] = useState<Set<string>>(
     () => new Set(),
@@ -155,10 +143,20 @@ export default function TaskGrid() {
           ? 0
           : dates.length - 1;
   const filterActive =
-    filter.category !== "all" ||
+    filter.typeId !== null ||
     filter.taskId !== null ||
     filter.from !== null ||
     filter.to !== null;
+
+  // 类型被删除后，筛选项也要失效，避免停在空网格。
+  useEffect(() => {
+    const known = new Set(
+      flattenTypeTree(data.types).map((node) => node.type.id),
+    );
+    if (filter.typeId !== null && !known.has(filter.typeId)) {
+      setGridFilter({ typeId: null });
+    }
+  }, [data.types, filter.typeId, setGridFilter]);
 
   const taskFontSize = overview
     ? TASK_FONT_SIZE_OVERVIEW
@@ -167,14 +165,10 @@ export default function TaskGrid() {
   const taskColWidth = useMemo(
     () =>
       buildTaskColumnWidth(
-        [
-          ...data.groups.voluntary,
-          ...data.groups.forced,
-          ...data.groups.disabled,
-        ],
+        data.groups.typeGroups.flatMap((group) => group.rows),
         taskFontSize,
       ),
-    [data.groups, taskFontSize],
+    [data.groups.typeGroups, taskFontSize],
   );
   const columnWidths = useMemo(
     () =>
@@ -192,32 +186,80 @@ export default function TaskGrid() {
 
   /** 折叠状态 + 筛选后的分组；行数组要稳定，否则 memo 的分组每帧都白渲染。 */
   const groups = useMemo(() => {
-    const base: { key: GroupKey; rows: GridRow[] }[] = [
-      { key: "voluntary", rows: data.groups.voluntary },
-      { key: "forced", rows: data.groups.forced },
-      { key: "disabled", rows: data.groups.disabled },
-    ];
-    return base
+    const selected =
+      filter.typeId === null
+        ? null
+        : descendantTypeIds(data.types, filter.typeId);
+    const filterRows = (group: GridTypeGroup) =>
+      group.rows.filter(
+        (row) =>
+          (row.current || expandedNames.has(row.task.id)) &&
+          (selected === null ||
+            selected.has(resolveTaskTypeId(row.task))) &&
+          (filter.taskId === null || row.task.id === filter.taskId),
+      );
+
+    const withRows = data.groups.typeGroups.map((group) => ({
+      ...group,
+      rows: filterRows(group),
+    }));
+
+    // 计数跟着筛选走：父组只数过滤后子树里的任务；名称段行按任务去重。
+    const taskIdsByGroup = new Map<string, Set<string>>();
+    for (const group of withRows) {
+      const ids = new Set(group.rows.map((row) => row.task.id));
+      if (group.disabled) {
+        taskIdsByGroup.set(group.key, ids);
+        continue;
+      }
+      for (const node of group.path) {
+        const set = taskIdsByGroup.get(node.id) ?? new Set<string>();
+        ids.forEach((id) => set.add(id));
+        taskIdsByGroup.set(node.id, set);
+      }
+    }
+
+    const visible = new Set<string>();
+    for (const group of withRows) {
+      if (group.rows.length === 0) {
+        continue;
+      }
+      visible.add(group.key);
+      for (const node of group.path) {
+        visible.add(node.id);
+      }
+    }
+    return withRows
+      .filter((group) => visible.has(group.key))
       .map((group) => ({
         ...group,
-        rows: group.rows.filter(
-          (row) =>
-            (row.current || expandedNames.has(row.task.id)) &&
-            (filter.category === "all" ||
-              row.task.category === filter.category) &&
-            (filter.taskId === null || row.task.id === filter.taskId),
-        ),
-      }))
-      .filter((group) => group.rows.length > 0);
-  }, [data.groups, expandedNames, filter.category, filter.taskId]);
+        count: taskIdsByGroup.get(group.key)?.size ?? 0,
+      }));
+  }, [
+    data.groups.typeGroups,
+    data.types,
+    expandedNames,
+    filter.typeId,
+    filter.taskId,
+  ]);
 
   const allRows = useMemo(() => groups.flatMap((group) => group.rows), [groups]);
+  const visibleGroups = useMemo(
+    () =>
+      groups.filter(
+        (group) =>
+          !group.path
+            .slice(0, -1)
+            .some((ancestor) => collapsed.has(ancestor.id)),
+      ),
+    [groups, collapsed],
+  );
   const visibleRows = useMemo(
     () =>
-      groups
-        .filter((group) => !collapsed[group.key])
+      visibleGroups
+        .filter((group) => !collapsed.has(group.key))
         .flatMap((group) => group.rows),
-    [groups, collapsed],
+    [visibleGroups, collapsed],
   );
   const rowByKey = useMemo(
     () => new Map(allRows.map((row) => [row.key, row])),
@@ -225,19 +267,15 @@ export default function TaskGrid() {
   );
   const nameHistoryCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const group of [
-      data.groups.voluntary,
-      data.groups.forced,
-      data.groups.disabled,
-    ]) {
-      for (const row of group) {
+    for (const group of data.groups.typeGroups) {
+      for (const row of group.rows) {
         if (!row.current) {
           counts.set(row.task.id, (counts.get(row.task.id) ?? 0) + 1);
         }
       }
     }
     return counts;
-  }, [data.groups]);
+  }, [data.groups.typeGroups]);
   const labels = useMemo<GridLabels>(
     () => ({
       status: {
@@ -253,6 +291,15 @@ export default function TaskGrid() {
       drag: t("grid.drag"),
     }),
     [t, locale],
+  );
+  const typeFilterOptions = useMemo(
+    () =>
+      flattenTypeTree(data.types).map((node) => ({
+        id: node.type.id,
+        depth: node.depth,
+        name: typeDisplayName(node.type, t),
+      })),
+    [data.types, t, locale],
   );
 
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -583,7 +630,9 @@ export default function TaskGrid() {
 
   const handleReorder = useCallback(
     (groupKey: GroupKey, fromId: string, toId: string) => {
-      const group = groups.find((item) => item.key === groupKey);
+      const group = data.groups.typeGroups.find(
+        (item) => item.key === groupKey,
+      );
       if (!group) {
         return;
       }
@@ -596,15 +645,17 @@ export default function TaskGrid() {
       const [moved] = ids.splice(from, 1);
       ids.splice(to, 0, moved);
 
-      // 组内顺序改完后，按「自愿 → 被迫 → 已停用」的展示顺序展开成全局顺序。
-      const allIds = groups.flatMap((item) =>
-        item.key === groupKey
-          ? ids
-          : [...new Set(item.rows.map((row) => row.task.id))],
-      );
-      void reorder(allIds);
+      // 按类型树顺序展开成全局顺序，已停用任务排在最后。
+      const allIds = data.groups.typeGroups.flatMap((item) => {
+        const list =
+          item.key === groupKey
+            ? ids
+            : [...new Set(item.rows.map((row) => row.task.id))];
+        return list;
+      });
+      void reorder([...new Set(allIds)]);
     },
-    [groups, reorder],
+    [data.groups.typeGroups, reorder],
   );
 
   const defaultFocus = useMemo(
@@ -785,9 +836,17 @@ export default function TaskGrid() {
     const target = event.target as Element;
     const groupHeader = target.closest<HTMLElement>("[data-group-header]");
     if (groupHeader) {
-      const key = groupHeader.dataset.groupHeader as GroupKey | undefined;
+      const key = groupHeader.dataset.groupHeader;
       if (key) {
-        setCollapsed((current) => ({ ...current, [key]: !current[key] }));
+        setCollapsed((current) => {
+          const next = new Set(current);
+          if (next.has(key)) {
+            next.delete(key);
+          } else {
+            next.add(key);
+          }
+          return next;
+        });
       }
       return;
     }
@@ -982,35 +1041,22 @@ export default function TaskGrid() {
         className="flex flex-none flex-wrap items-center gap-2 text-[var(--text-2xs)] text-[var(--color-text-muted)]"
       >
         <span>{t("grid.filter.label")}</span>
-        <div
-          role="group"
-          aria-label={t("grid.filter.aria")}
-          className="flex gap-0.5 rounded-[var(--radius-pill)] border border-[var(--color-border)] bg-[var(--color-bg)] p-0.5"
+        <select
+          data-filter-type
+          aria-label={t("grid.filter.type")}
+          value={filter.typeId ?? ""}
+          onChange={(event) =>
+            setGridFilter({ typeId: event.target.value || null })
+          }
+          className="rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] px-1.5 py-0.5 text-[var(--text-2xs)] text-[var(--color-text)]"
         >
-          {(["all", "voluntary", "forced"] as const).map((category) => (
-            <button
-              key={category}
-              type="button"
-              data-filter-category={category}
-              aria-pressed={filter.category === category}
-              onClick={() => setGridFilter({ category })}
-              className={clsx(
-                "rounded-[var(--radius-pill)] px-2 py-0.5",
-                filter.category === category
-                  ? "bg-[var(--color-surface)] text-[var(--color-text)] shadow-[0_1px_2px_rgba(0,0,0,.06)]"
-                  : "hover:bg-[var(--state-hover)]",
-              )}
-            >
-              {t(
-                category === "all"
-                  ? "grid.filter.all"
-                  : category === "voluntary"
-                    ? "grid.filter.voluntary"
-                    : "grid.filter.forced",
-              )}
-            </button>
+          <option value="">{t("grid.filter.allTypes")}</option>
+          {typeFilterOptions.map((option) => (
+            <option key={option.id} value={option.id}>
+              {`${"\u3000".repeat(option.depth)}${option.name}`}
+            </option>
           ))}
-        </div>
+        </select>
 
         <select
           data-filter-task
@@ -1058,7 +1104,7 @@ export default function TaskGrid() {
             data-filter-clear
             onClick={() =>
               setGridFilter({
-                category: "all",
+                typeId: null,
                 taskId: null,
                 from: null,
                 to: null,
@@ -1171,12 +1217,22 @@ export default function TaskGrid() {
                 <div style={{ width: viewportWindow.rightPad }} />
               </div>
 
-              {groups.map((group) => (
+              {visibleGroups.map((group) => (
                 <GridGroup
                   key={group.key}
                   groupKey={group.key}
-                  rows={group.rows}
-                  open={!collapsed[group.key]}
+                  group={group}
+                  label={
+                    group.type
+                      ? typeDisplayName(group.type, t)
+                      : t("grid.group.disabled")
+                  }
+                  color={
+                    group.type
+                      ? typeColorVar(group.type)
+                      : "var(--color-border-strong)"
+                  }
+                  open={!collapsed.has(group.key)}
                   dates={visibleDates}
                   dateLabels={dateLabels}
                   widths={visibleWidths}
@@ -1359,7 +1415,9 @@ function GridSkeleton() {
 
 function GridGroupInner({
   groupKey,
-  rows,
+  group,
+  label,
+  color,
   open,
   dates,
   dateLabels,
@@ -1383,7 +1441,9 @@ function GridGroupInner({
   expandedNames,
 }: {
   groupKey: GroupKey;
-  rows: GridRow[];
+  group: GridTypeGroup;
+  label: string;
+  color: string;
   open: boolean;
   dates: string[];
   dateLabels: Map<string, string>;
@@ -1407,14 +1467,11 @@ function GridGroupInner({
   expandedNames: Set<string>;
 }) {
   const t = useT();
-  const meta = GROUP_META[groupKey];
-  const label = t(meta.labelKey);
+  const rows = group.rows;
+  const groupDepth = group.depth;
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
-  const taskCount = useMemo(
-    () => new Set(rows.map((row) => row.task.id)).size,
-    [rows],
-  );
+  const taskCount = group.count;
 
   return (
     <>
@@ -1427,17 +1484,20 @@ function GridGroupInner({
             group: label,
           })}
           style={{ width: taskColWidth, height: groupHeight }}
-          className="sticky left-0 z-10 flex shrink-0 items-center gap-1.5 border-b border-r border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-[var(--text-2xs)] font-semibold text-[var(--color-text-muted)] hover:bg-[var(--state-hover)]"
+          className="sticky left-0 z-10 flex shrink-0 items-center gap-1.5 border-b border-r border-[var(--color-border)] bg-[var(--color-surface)] pr-2 text-[var(--text-2xs)] font-semibold text-[var(--color-text-muted)] hover:bg-[var(--state-hover)]"
         >
-          <span className="w-2 text-[9px]">{open ? "▾" : "▸"}</span>
-          <i
-            className="h-[11px] w-[3px] rounded-[2px]"
-            style={{ background: meta.color }}
-          />
-          {label}
-          <span className="ml-auto pr-1 font-normal tabular-nums">
-            {taskCount}
+          <span
+            className="flex min-w-0 flex-1 items-center gap-1.5"
+            style={{ paddingLeft: 8 + groupDepth * 16 }}
+          >
+            <span className="w-2 text-[9px]">{open ? "▾" : "▸"}</span>
+            <i
+              className="h-[11px] w-[3px] shrink-0 rounded-[2px]"
+              style={{ background: color }}
+            />
+            <span className="truncate">{label}</span>
           </span>
+          <span className="shrink-0 font-normal tabular-nums">{taskCount}</span>
         </button>
         <div
           className="flex-1 border-b border-[var(--color-border)] bg-[var(--color-surface)]"
@@ -1532,9 +1592,13 @@ function GridGroupInner({
                   }
                   title={dragEnabled ? labels.drag : undefined}
                   data-task-name={row.key}
-                  style={{ width: taskColWidth, minHeight: rowHeight }}
+                  style={{
+                    width: taskColWidth,
+                    minHeight: rowHeight,
+                    paddingLeft: 8 + groupDepth * 16,
+                  }}
                   className={clsx(
-                    "sticky left-0 z-10 flex shrink-0 cursor-grab items-center gap-1.5 border-b border-r border-[var(--color-border)] bg-[var(--color-surface)] px-2 active:cursor-grabbing",
+                    "sticky left-0 z-10 flex shrink-0 cursor-grab items-center gap-1.5 border-b border-r border-[var(--color-border)] bg-[var(--color-surface)] pr-2 active:cursor-grabbing",
                     overview ? "text-[var(--text-2xs)]" : "text-xs",
                     (row.disabled || !row.current) &&
                       "text-[var(--color-text-muted)]",
@@ -1543,10 +1607,9 @@ function GridGroupInner({
                   <i
                     className="size-[5px] shrink-0 rounded-full"
                     style={{
-                      background:
-                        groupKey === "disabled"
-                          ? "var(--color-border-strong)"
-                          : meta.color,
+                      background: group.type
+                        ? typeColorVar(group.type)
+                        : "var(--color-border-strong)",
                       opacity: row.disabled || !row.current ? 0.35 : 1,
                     }}
                   />

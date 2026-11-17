@@ -1,9 +1,16 @@
 import { useMemo } from "react";
 
 import { logicalToday } from "../../domain/date";
-import type { Task } from "../../domain/types";
+import {
+  DEFAULT_TASK_TYPES,
+  flattenTypeTree,
+  resolveTaskTypeId,
+  resolveTaskTypes,
+} from "../../domain/taskTypes";
+import type { Task, TaskType } from "../../domain/types";
 import { useDayNow } from "../dayStore";
 import { useSettingsStore } from "../settingsStore";
+import { useTaskTypesStore } from "../taskTypesStore";
 import { useTasksStore } from "../tasksStore";
 
 export type ManageStatus =
@@ -16,6 +23,10 @@ export type ManageStatus =
 export interface ManageRow {
   task: Task;
   status: ManageStatus;
+  /** 叶子类型；旧数据回退到内置类型。 */
+  type: TaskType;
+  /** 从根到叶的完整路径，用于悬停显示与筛选。 */
+  typePath: TaskType[];
   /** 最新一段区间的起止日期。 */
   start: string;
   end: string | null;
@@ -30,10 +41,25 @@ export interface ManageRow {
  * 任务管理表（Requirements §4.5）：一行一个任务，显示最新区间的起止；
  * 多段区间只展示最后一段，用「N 段」提示历史段仍保留。
  */
-export function buildManageRows(tasks: Task[], today: string): ManageRow[] {
+export function buildManageRows(
+  tasks: Task[],
+  today: string,
+  types: readonly TaskType[] = DEFAULT_TASK_TYPES,
+): ManageRow[] {
+  const tree = resolveTaskTypes(types);
+  const pathById = new Map(
+    flattenTypeTree(tree).map((node) => [node.type.id, node.path]),
+  );
+  const fallback = new Map(tree.map((type) => [type.id, type]));
+
   return [...tasks]
     .sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt))
     .map((task) => {
+      const typeId = resolveTaskTypeId(task);
+      const path =
+        pathById.get(typeId) ??
+        pathById.get(task.category) ?? [fallback.get(task.category) as TaskType];
+      const type = path[path.length - 1];
       const sorted = [...task.intervals].sort((a, b) =>
         a.start.localeCompare(b.start),
       );
@@ -64,6 +90,8 @@ export function buildManageRows(tasks: Task[], today: string): ManageRow[] {
       return {
         task,
         status,
+        type,
+        typePath: path,
         start: latest?.start ?? "",
         end,
         everyDays: latest?.everyDays ?? 1,
@@ -75,14 +103,15 @@ export function buildManageRows(tasks: Task[], today: string): ManageRow[] {
 
 export function useManageRows(): { today: string; rows: ManageRow[] } {
   const tasks = useTasksStore((state) => state.tasks);
+  const types = useTaskTypesStore((state) => state.types);
   const settings = useSettingsStore((state) => state.settings);
   const now = useDayNow();
 
   return useMemo(
     () => {
       const today = logicalToday(now, settings.dayStartHour);
-      return { today, rows: buildManageRows(tasks, today) };
+      return { today, rows: buildManageRows(tasks, today, types) };
     },
-    [tasks, settings.dayStartHour, now],
+    [tasks, types, settings.dayStartHour, now],
   );
 }

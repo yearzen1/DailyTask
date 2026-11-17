@@ -4,29 +4,42 @@ import type {
   NamePeriod,
   Settings,
   Task,
+  TaskCategory,
+  TaskType,
+  TaskTypeColor,
   Todo,
 } from "../domain/types";
 import { normalizeEveryDays } from "../domain/intervals";
 import { namePeriodsOf } from "../domain/names";
+import {
+  DEFAULT_TASK_TYPES,
+  resolveTaskTypeId,
+  resolveTaskTypes,
+} from "../domain/taskTypes";
 import type { SqlDatabase } from "./client";
 import { listCheckins } from "./checkins";
 import { getSettings, sanitizeSettings, setSettings } from "./settings";
 import { listTasks } from "./tasks";
+import { listTaskTypes } from "./taskTypes";
 import { listTodos } from "./todos";
 
-/** JSON v2：任务、名称段与区间分开放，导入时可以按 id upsert。v1 仍可导入。 */
+/** JSON v3：任务、类型、名称段与区间分开放，导入时可以按 id upsert。v1/v2 仍可导入。 */
 export interface ExportTask {
   id: string;
   name: string;
-  category: Task["category"];
+  /** v3 起使用；v1/v2 只有 category。 */
+  typeId?: string;
+  /** 旧版本的根类型；v3 导出不再写。 */
+  category?: TaskCategory;
   order: number;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface ExportBundle {
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   exportedAt: string;
+  taskTypes: TaskType[];
   tasks: ExportTask[];
   namePeriods: NamePeriod[];
   intervals: Interval[];
@@ -41,14 +54,16 @@ export function buildExportBundle(
   todos: Todo[],
   settings: Settings,
   now: Date,
+  taskTypes: TaskType[] = [...DEFAULT_TASK_TYPES],
 ): ExportBundle {
   return {
-    version: 2,
+    version: 3,
     exportedAt: now.toISOString(),
+    taskTypes: [...taskTypes],
     tasks: tasks.map((task) => ({
       id: task.id,
       name: task.name,
-      category: task.category,
+      typeId: resolveTaskTypeId(task),
       order: task.order,
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
@@ -76,14 +91,15 @@ export async function exportData(
   db: SqlDatabase,
   now = new Date(),
 ): Promise<ExportBundle> {
-  const [tasks, checkins, todos, settings] = await Promise.all([
+  const [tasks, taskTypes, checkins, todos, settings] = await Promise.all([
     listTasks(db),
+    listTaskTypes(db),
     listCheckins(db),
     listTodos(db),
     getSettings(db),
   ]);
 
-  return buildExportBundle(tasks, checkins, todos, settings, now);
+  return buildExportBundle(tasks, checkins, todos, settings, now, taskTypes);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -106,13 +122,45 @@ type ImportCheckin = Omit<Checkin, "status"> & {
   status: Checkin["status"] | "recorded";
 };
 
+const TASK_CATEGORIES = ["voluntary", "forced"] as const;
+const TYPE_COLORS = [
+  "green",
+  "blue",
+  "purple",
+  "orange",
+  "red",
+  "teal",
+  "pink",
+  "gray",
+] as const;
+
+function isTaskCategory(value: unknown): value is TaskCategory {
+  return TASK_CATEGORIES.includes(value as TaskCategory);
+}
+
 function isExportTask(value: unknown): value is ExportTask {
   return (
     isRecord(value) &&
     isString(value.id) &&
     isString(value.name) &&
-    (value.category === "voluntary" || value.category === "forced") &&
+    (value.typeId === undefined || isString(value.typeId)) &&
+    (value.category === undefined || isTaskCategory(value.category)) &&
     typeof value.order === "number" &&
+    isString(value.createdAt) &&
+    isString(value.updatedAt)
+  );
+}
+
+function isTaskType(value: unknown): value is TaskType {
+  return (
+    isRecord(value) &&
+    isString(value.id) &&
+    (value.name === null || isString(value.name)) &&
+    isNullableString(value.parentId) &&
+    typeof value.order === "number" &&
+    (value.systemKey === null || isTaskCategory(value.systemKey)) &&
+    (value.color === null ||
+      TYPE_COLORS.includes(value.color as TaskTypeColor)) &&
     isString(value.createdAt) &&
     isString(value.updatedAt)
   );
@@ -215,12 +263,28 @@ export function parseImportBundle(text: string): ExportBundle {
   if (!isRecord(raw)) {
     throw new Error("invalid-structure");
   }
-  if (raw.version !== 1 && raw.version !== 2) {
+  if (raw.version !== 1 && raw.version !== 2 && raw.version !== 3) {
     throw new Error("unsupported-version");
   }
 
   const version = raw.version;
-  const tasks = arrayOf(raw.tasks, isExportTask);
+  const rawTasks = arrayOf(raw.tasks, isExportTask);
+  const taskTypes = resolveTaskTypes(
+    version === 3 ? arrayOf(raw.taskTypes, isTaskType) : DEFAULT_TASK_TYPES,
+  );
+  const typeIds = new Set(taskTypes.map((type) => type.id));
+  const tasks: ExportTask[] = rawTasks.map((task) => {
+    const typeId = version === 3 ? task.typeId : task.category;
+    if (!isString(typeId) || !typeIds.has(typeId)) {
+      throw new Error("invalid-structure");
+    }
+    return { ...task, typeId };
+  });
+  for (const type of taskTypes) {
+    if (type.parentId !== null && !typeIds.has(type.parentId)) {
+      throw new Error("invalid-structure");
+    }
+  }
   const intervals = arrayOf(raw.intervals, isInterval).map((interval) => ({
     ...interval,
     everyDays: normalizeEveryDays(interval.everyDays),
@@ -229,6 +293,7 @@ export function parseImportBundle(text: string): ExportBundle {
   return {
     version,
     exportedAt: isString(raw.exportedAt) ? raw.exportedAt : new Date().toISOString(),
+    taskTypes,
     tasks,
     namePeriods:
       version === 2
@@ -252,6 +317,20 @@ export interface ImportCounts {
   todos: number;
 }
 
+function rootCategoryFromTypes(
+  types: TaskType[],
+  typeId: string,
+): TaskCategory {
+  const byId = new Map(types.map((type) => [type.id, type]));
+  const visited = new Set<string>();
+  let current = byId.get(typeId);
+  while (current && current.parentId !== null && !visited.has(current.id)) {
+    visited.add(current.id);
+    current = byId.get(current.parentId);
+  }
+  return current?.systemKey === "forced" ? "forced" : "voluntary";
+}
+
 /**
  * 导入冲突策略：按主键 upsert，本地多出来的行一律保留；
  * 打卡以 (task_id, date) 为语义键，保留本地 id。
@@ -264,17 +343,49 @@ export async function importData(
   const namePeriods =
     bundle.namePeriods ??
     synthesizeNamePeriods(bundle.tasks, bundle.intervals);
+  const taskTypes = resolveTaskTypes(bundle.taskTypes ?? DEFAULT_TASK_TYPES);
+
+  for (const type of taskTypes) {
+    // v1/v2 不携带类型名：只补内置类型，避免把用户改过的默认名冲回翻译。
+    const conflict =
+      bundle.version === 3
+        ? "ON CONFLICT(id) DO UPDATE SET " +
+          "name = excluded.name, parent_id = excluded.parent_id, " +
+          "sort_order = excluded.sort_order, system_key = excluded.system_key, " +
+          "color = excluded.color, created_at = excluded.created_at, " +
+          "updated_at = excluded.updated_at"
+        : "ON CONFLICT(id) DO NOTHING";
+    await db.execute(
+      "INSERT INTO task_types " +
+        "(id, name, parent_id, sort_order, system_key, color, created_at, updated_at) " +
+        `VALUES (?, ?, ?, ?, ?, ?, ?, ?) ${conflict}`,
+      [
+        type.id,
+        type.name,
+        type.parentId,
+        type.order,
+        type.systemKey,
+        type.color,
+        type.createdAt,
+        type.updatedAt,
+      ],
+    );
+  }
 
   for (const task of bundle.tasks) {
+    const typeId = task.typeId ?? task.category ?? "voluntary";
+    const category = task.category ?? rootCategoryFromTypes(taskTypes, typeId);
     await db.execute(
-      "INSERT INTO tasks (id, name, category, sort_order, created_at, updated_at) " +
-        "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET " +
+      "INSERT INTO tasks (id, name, category, type_id, sort_order, created_at, updated_at) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET " +
         "name = excluded.name, category = excluded.category, " +
-        "sort_order = excluded.sort_order, updated_at = excluded.updated_at",
+        "type_id = excluded.type_id, sort_order = excluded.sort_order, " +
+        "updated_at = excluded.updated_at",
       [
         task.id,
         task.name,
-        task.category,
+        category,
+        typeId,
         task.order,
         task.createdAt,
         task.updatedAt,

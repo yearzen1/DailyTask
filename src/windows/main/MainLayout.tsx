@@ -25,6 +25,7 @@ import Stats from "./views/Stats";
 import TaskGrid from "./views/TaskGrid";
 import Today from "./views/Today";
 import Todos from "./views/Todos";
+import Types from "./views/Types";
 
 const NAV_BY_VIEW: Record<
   ViewName,
@@ -34,6 +35,7 @@ const NAV_BY_VIEW: Record<
   grid: { labelKey: "nav.grid", icon: "grid" },
   todos: { labelKey: "nav.todos", icon: "todo" },
   manage: { labelKey: "nav.manage", icon: "manage" },
+  types: { labelKey: "nav.types", icon: "types" },
   stats: { labelKey: "nav.stats", icon: "stats" },
   settings: { labelKey: "nav.settings", icon: "settings" },
 };
@@ -51,6 +53,8 @@ function renderView(view: ViewName) {
       return <Todos />;
     case "manage":
       return <Manage />;
+    case "types":
+      return <Types />;
     case "stats":
       return <Stats />;
     case "settings":

@@ -6,6 +6,34 @@
 import { DEFAULT_MANAGE_COLUMN_WIDTHS } from "./manageColumns";
 
 export type TaskCategory = "voluntary" | "forced";
+
+/** 类型调色板 key；内置类型缺省用绿 / 蓝灰。 */
+export type TaskTypeColor =
+  | "green"
+  | "blue"
+  | "purple"
+  | "orange"
+  | "red"
+  | "teal"
+  | "pink"
+  | "gray";
+
+/**
+ * 任务类型：可嵌套的树。内置「自愿 / 被迫」id 固定为 voluntary / forced，
+ * name 为 null 时显示跟随界面语言。
+ */
+export interface TaskType {
+  id: string;
+  name: string | null;
+  parentId: string | null;
+  /** 同级排序，只在同一 parent 下比较。 */
+  order: number;
+  systemKey: TaskCategory | null;
+  color: TaskTypeColor | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /**
  * 打卡状态只有三种判定；值（value）是独立附加字段。
  * 没有判定时写值会自动记为 done。
@@ -39,6 +67,9 @@ export interface Task {
   id: string;
   /** 当前名字；有 namePeriods 时以最新名称段为准。 */
   name: string;
+  /** 所属类型 id；缺省（旧测试数据）时回退 category。 */
+  typeId?: string;
+  /** 类型根节点缓存：voluntary / forced。只用于兼容旧数据。 */
   category: TaskCategory;
   intervals: Interval[];
   /**

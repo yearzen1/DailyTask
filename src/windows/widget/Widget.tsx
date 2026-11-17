@@ -18,6 +18,7 @@ import {
   type CategoryStat,
   type DueTodoItem,
   type TodayTask,
+  type TodayTypeGroup,
 } from "../../stores/selectors/today";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useTodosStore } from "../../stores/todosStore";
@@ -26,6 +27,7 @@ import {
   MenuItem,
   MenuSurface,
 } from "../../ui/MenuSurface";
+import { typeColorVar, typeDisplayName } from "../../ui/taskType";
 import { applyTheme } from "../../ui/theme";
 import { useT } from "../../ui/useT";
 import {
@@ -40,14 +42,7 @@ import {
 
 const RING_RADIUS = 17;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
-
-const EXPANDED_GROUPS = {
-  voluntary: false,
-  forced: false,
-  dueTodos: false,
-} as const;
-
-type GroupKey = keyof typeof EXPANDED_GROUPS;
+const TODOS_GROUP_KEY = "__todos";
 
 /**
  * 展开态与「今日」页内容一致：日期、完成率、自愿/被迫分项、全部任务、全部到期待办。
@@ -64,9 +59,9 @@ export function Widget() {
   const updateSettings = useSettingsStore((state) => state.update);
   const [collapsed, setCollapsed] = useState(readCollapsedPreference);
   const [side, setSide] = useState<WidgetSide>(readSidePreference);
-  const [collapsedGroups, setCollapsedGroups] = useState<
-    Record<GroupKey, boolean>
-  >({ ...EXPANDED_GROUPS });
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [menu, setMenu] = useState<{
     row: TodayTask;
     x: number;
@@ -97,16 +92,24 @@ export function Widget() {
     }
   }, []);
 
-  const toggleGroup = (key: GroupKey) => {
+  const toggleGroup = (key: string) => {
     setMenu(null);
-    setCollapsedGroups((current) => ({ ...current, [key]: !current[key] }));
+    setCollapsedGroups((current) => {
+      const next = new Set(current);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
   };
 
   const setCapsule = (next: boolean) => {
     writeCollapsedPreference(next);
     setCollapsed(next);
     // 不记住分组折叠：每次从胶囊展开都回到全展开。
-    setCollapsedGroups({ ...EXPANDED_GROUPS });
+    setCollapsedGroups(new Set());
     void applyWidgetLayout(next, next ? undefined : side)
       .then((used) => {
         if (used) {
@@ -141,7 +144,10 @@ export function Widget() {
     );
   };
 
-  const rows = [...data.voluntary, ...data.forced];
+  const rowCount = data.groups.reduce(
+    (total, group) => total + group.rows.length,
+    0,
+  );
   const completed = data.progress.done;
   const total = data.progress.applicable - data.progress.skipped;
   const percent = Math.round(data.progress.ratio * 100);
@@ -322,16 +328,14 @@ export function Widget() {
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-[var(--color-text-muted)]">
-                <CategoryCount
-                  label={t("today.category.voluntary")}
-                  color="var(--color-voluntary)"
-                  stat={data.voluntaryStat}
-                />
-                <CategoryCount
-                  label={t("today.category.forced")}
-                  color="var(--color-forced)"
-                  stat={data.forcedStat}
-                />
+                {data.typeStats.map((item) => (
+                  <CategoryCount
+                    key={item.type.id}
+                    label={typeDisplayName(item.type, t)}
+                    color={typeColorVar(item.type)}
+                    stat={item.stat}
+                  />
+                ))}
                 {data.todoStat.total > 0 ? (
                   <CategoryCount
                     label={t("today.category.todos")}
@@ -347,49 +351,41 @@ export function Widget() {
             data-widget-scroll
             className="widget-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-0.5"
           >
-            {rows.length === 0 ? (
+            {rowCount === 0 ? (
               <p className="m-0 py-2 text-center text-[11px] text-[var(--color-text-muted)]">
                 {t("today.empty")}
               </p>
             ) : (
-              <>
+              data.groups.map((group) => (
                 <WidgetTaskGroup
-                  title={t("today.group.voluntary")}
-                  color="var(--color-voluntary)"
-                  rows={data.voluntary}
-                  stat={data.voluntaryStat}
-                  open={!collapsedGroups.voluntary}
-                  onToggle={() => toggleGroup("voluntary")}
+                  key={group.type.id}
+                  group={group}
+                  title={typeDisplayName(group.type, t)}
+                  color={typeColorVar(group.type)}
+                  open={!collapsedGroups.has(group.type.id)}
+                  hidden={group.path
+                    .slice(0, -1)
+                    .some((ancestor) => collapsedGroups.has(ancestor.id))}
+                  onToggle={() => toggleGroup(group.type.id)}
                   onCycle={cycle}
                   onValue={saveValue}
                   onMenu={openMenu}
                 />
-                <WidgetTaskGroup
-                  title={t("today.group.forced")}
-                  color="var(--color-forced)"
-                  rows={data.forced}
-                  stat={data.forcedStat}
-                  open={!collapsedGroups.forced}
-                  onToggle={() => toggleGroup("forced")}
-                  onCycle={cycle}
-                  onValue={saveValue}
-                  onMenu={openMenu}
-                />
-              </>
+              ))
             )}
 
             {dueTodos.length > 0 ? (
-              <div className={rows.length > 0 ? "mt-1" : ""}>
+              <div className={rowCount > 0 ? "mt-1" : ""}>
                 <button
                   type="button"
-                  aria-expanded={!collapsedGroups.dueTodos}
+                  aria-expanded={!collapsedGroups.has(TODOS_GROUP_KEY)}
                   aria-label={t(
-                    collapsedGroups.dueTodos
+                    collapsedGroups.has(TODOS_GROUP_KEY)
                       ? "common.expandSection"
                       : "common.collapseSection",
                     { section: t("today.dueTodos") },
                   )}
-                  onClick={() => toggleGroup("dueTodos")}
+                  onClick={() => toggleGroup(TODOS_GROUP_KEY)}
                   className="flex h-5 w-full items-center gap-1.5 rounded-[4px] px-1 text-left text-[10.5px] font-semibold text-[var(--color-text-muted)] hover:bg-[var(--state-hover)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
                 >
                   <i
@@ -400,13 +396,13 @@ export function Widget() {
                   />
                   <span className="truncate">{t("today.dueTodos")}</span>
                   <span aria-hidden="true" className="shrink-0 text-[11px] leading-none">
-                    {collapsedGroups.dueTodos ? "▸" : "▾"}
+                    {collapsedGroups.has(TODOS_GROUP_KEY) ? "▸" : "▾"}
                   </span>
                   <span className="ml-auto shrink-0 font-normal tabular-nums">
                     {data.todoStat.done} / {data.todoStat.total}
                   </span>
                 </button>
-                {collapsedGroups.dueTodos
+                {collapsedGroups.has(TODOS_GROUP_KEY)
                   ? null
                   : dueTodos.map((item) => (
                       <WidgetTodoRow
@@ -691,28 +687,29 @@ function CategoryCount({
 }
 
 function WidgetTaskGroup({
+  group,
   title,
   color,
-  rows,
-  stat,
   open,
+  hidden,
   onToggle,
   onCycle,
   onValue,
   onMenu,
 }: {
+  group: TodayTypeGroup;
   title: string;
   color: string;
-  rows: TodayTask[];
-  stat: CategoryStat;
   open: boolean;
+  hidden: boolean;
   onToggle: () => void;
   onCycle: (row: TodayTask) => void;
   onValue: (row: TodayTask, value: string) => void;
   onMenu: (row: TodayTask, event: ReactMouseEvent) => void;
 }) {
   const t = useT();
-  if (rows.length === 0) {
+  const { rows, stat, depth } = group;
+  if (hidden) {
     return null;
   }
 
@@ -726,7 +723,8 @@ function WidgetTaskGroup({
           { section: title },
         )}
         onClick={onToggle}
-        className="flex h-5 w-full items-center gap-1.5 rounded-[4px] px-1 text-left text-[10.5px] font-semibold text-[var(--color-text-muted)] hover:bg-[var(--state-hover)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
+        style={{ paddingLeft: 4 + depth * 10 }}
+        className="flex h-5 w-full items-center gap-1.5 rounded-[4px] pr-1 text-left text-[10.5px] font-semibold text-[var(--color-text-muted)] hover:bg-[var(--state-hover)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
       >
         <i
           aria-hidden="true"
@@ -743,13 +741,14 @@ function WidgetTaskGroup({
       </button>
       {open
         ? rows.map((row) => (
-            <WidgetTaskRow
-              key={row.task.id}
-              row={row}
-              onCycle={() => onCycle(row)}
-              onValue={(value) => onValue(row, value)}
-              onMenu={(event) => onMenu(row, event)}
-            />
+            <div key={row.task.id} style={{ paddingLeft: depth * 10 }}>
+              <WidgetTaskRow
+                row={row}
+                onCycle={() => onCycle(row)}
+                onValue={(value) => onValue(row, value)}
+                onMenu={(event) => onMenu(row, event)}
+              />
+            </div>
           ))
         : null}
     </div>

@@ -1,9 +1,17 @@
 import { create } from "zustand";
 
-export type ViewName = "today" | "grid" | "todos" | "manage" | "stats" | "settings";
+export type ViewName =
+  | "today"
+  | "grid"
+  | "todos"
+  | "manage"
+  | "types"
+  | "stats"
+  | "settings";
 
 export interface GridFilter {
-  category: "all" | "voluntary" | "forced";
+  /** 选中的类型 id；null = 全部类型。父类型包含全部后代。 */
+  typeId: string | null;
   taskId: string | null;
   from: string | null;
   to: string | null;
@@ -33,7 +41,7 @@ export interface UiState {
 
 export const useUiStore = create<UiState>()((set, get) => ({
   view: "today",
-  gridFilter: { category: "all", taskId: null, from: null, to: null },
+  gridFilter: { typeId: null, taskId: null, from: null, to: null },
   selectedCell: null,
   widgetExpanded: false,
   todoDraft: EMPTY_TODO_DRAFT,

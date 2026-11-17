@@ -8,6 +8,7 @@ export const DEFAULT_NAV_ORDER: ViewName[] = [
   "grid",
   "todos",
   "manage",
+  "types",
   "stats",
   "settings",
 ];

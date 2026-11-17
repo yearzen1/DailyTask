@@ -8,11 +8,13 @@ import {
   type CategoryStat,
   type DueTodoItem,
   type TodayTask,
+  type TodayTypeGroup,
 } from "../../../stores/selectors/today";
 import { useTodosStore } from "../../../stores/todosStore";
 import { CheckCell } from "../../../ui/CheckCell";
 import { Chip } from "../../../ui/Chip";
 import { ProgressRing } from "../../../ui/ProgressRing";
+import { typeColorVar, typeDisplayName } from "../../../ui/taskType";
 import { useT } from "../../../ui/useT";
 
 const CARD =
@@ -24,14 +26,19 @@ export default function Today() {
   const setStatus = useCheckinsStore((state) => state.setStatus);
   const setValue = useCheckinsStore((state) => state.setValue);
   const setTodoDone = useTodosStore((state) => state.setDone);
-  const [collapsed, setCollapsed] = useState({
-    voluntary: false,
-    forced: false,
-    dueTodos: false,
-  });
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  const dueTodosCollapsed = collapsed.has("__todos");
 
-  const toggleSection = (key: keyof typeof collapsed) => {
-    setCollapsed((current) => ({ ...current, [key]: !current[key] }));
+  const toggleSection = (key: string) => {
+    setCollapsed((current) => {
+      const next = new Set(current);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
   };
 
   const toggleTodo = (item: DueTodoItem) => {
@@ -88,17 +95,15 @@ export default function Today() {
             })}
           </div>
         </div>
-        <div className="ml-auto flex gap-6">
-          <SplitStat
-            label={t("today.category.voluntary")}
-            color="var(--color-voluntary)"
-            stat={data.voluntaryStat}
-          />
-          <SplitStat
-            label={t("today.category.forced")}
-            color="var(--color-forced)"
-            stat={data.forcedStat}
-          />
+        <div className="ml-auto flex flex-wrap items-center gap-6">
+          {data.typeStats.map((item) => (
+            <SplitStat
+              key={item.type.id}
+              label={typeDisplayName(item.type, t)}
+              color={typeColorVar(item.type)}
+              stat={item.stat}
+            />
+          ))}
           {data.todoStat.total > 0 ? (
             <SplitStat
               label={t("today.category.todos")}
@@ -110,35 +115,27 @@ export default function Today() {
       </section>
 
       <section className={`${CARD} p-2`}>
-        {data.voluntary.length === 0 && data.forced.length === 0 ? (
+        {data.groups.length === 0 ? (
           <p className="py-10 text-center text-sm text-[var(--color-text-muted)]">
             {t("today.empty")}
           </p>
         ) : (
-          <>
+          data.groups.map((group) => (
             <TaskGroup
-              title={t("today.group.voluntary")}
-              color="var(--color-voluntary)"
-              rows={data.voluntary}
-              stat={data.voluntaryStat}
-              open={!collapsed.voluntary}
-              onToggle={() => toggleSection("voluntary")}
+              key={group.type.id}
+              group={group}
+              title={typeDisplayName(group.type, t)}
+              color={typeColorVar(group.type)}
+              open={!collapsed.has(group.type.id)}
+              hidden={group.path
+                .slice(0, -1)
+                .some((ancestor) => collapsed.has(ancestor.id))}
+              onToggle={() => toggleSection(group.type.id)}
               onToggleRow={toggle}
               onSkip={toggleSkip}
               onValue={saveValue}
             />
-            <TaskGroup
-              title={t("today.group.forced")}
-              color="var(--color-forced)"
-              rows={data.forced}
-              stat={data.forcedStat}
-              open={!collapsed.forced}
-              onToggle={() => toggleSection("forced")}
-              onToggleRow={toggle}
-              onSkip={toggleSkip}
-              onValue={saveValue}
-            />
-          </>
+          ))
         )}
       </section>
 
@@ -146,14 +143,14 @@ export default function Today() {
         <section className={`${CARD} p-2`}>
           <button
             type="button"
-            aria-expanded={!collapsed.dueTodos}
+            aria-expanded={!dueTodosCollapsed}
             aria-label={t(
-              collapsed.dueTodos
+              dueTodosCollapsed
                 ? "common.expandSection"
                 : "common.collapseSection",
               { section: t("today.dueTodos") },
             )}
-            onClick={() => toggleSection("dueTodos")}
+            onClick={() => toggleSection("__todos")}
             className="flex h-[34px] w-full items-center gap-2 rounded-[var(--radius-control)] px-2 text-left text-xs font-semibold text-[var(--color-text-muted)] hover:bg-[var(--state-hover)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
           >
             <i
@@ -164,13 +161,13 @@ export default function Today() {
             />
             <span className="truncate">{t("today.dueTodos")}</span>
             <span aria-hidden="true" className="shrink-0 text-xs leading-none">
-              {collapsed.dueTodos ? "▸" : "▾"}
+              {dueTodosCollapsed ? "▸" : "▾"}
             </span>
             <span className="ml-auto font-normal tabular-nums">
               {data.todoStat.done} / {data.todoStat.total}
             </span>
           </button>
-          {collapsed.dueTodos ? null : (
+          {dueTodosCollapsed ? null : (
             <>
               {data.overdueTodos.map((item) => (
                 <DueTodoRow
@@ -283,21 +280,21 @@ function SplitStat({
 }
 
 function TaskGroup({
+  group,
   title,
   color,
-  rows,
-  stat,
   open,
+  hidden,
   onToggle,
   onToggleRow,
   onSkip,
   onValue,
 }: {
+  group: TodayTypeGroup;
   title: string;
   color: string;
-  rows: TodayTask[];
-  stat: CategoryStat;
   open: boolean;
+  hidden: boolean;
   onToggle: () => void;
   onToggleRow: (row: TodayTask) => void;
   onSkip: (row: TodayTask) => void;
@@ -305,6 +302,7 @@ function TaskGroup({
 }) {
   const t = useT();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const { rows, stat, depth } = group;
 
   useEffect(() => {
     if (!open) {
@@ -312,7 +310,7 @@ function TaskGroup({
     }
   }, [open]);
 
-  if (rows.length === 0) {
+  if (hidden) {
     return null;
   }
 
@@ -326,7 +324,8 @@ function TaskGroup({
           { section: title },
         )}
         onClick={onToggle}
-        className="flex h-[34px] w-full items-center gap-2 rounded-[var(--radius-control)] px-2 text-left text-xs font-semibold text-[var(--color-text-muted)] hover:bg-[var(--state-hover)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
+        style={{ paddingLeft: 8 + depth * 16 }}
+        className="flex h-[34px] w-full items-center gap-2 rounded-[var(--radius-control)] pr-2 text-left text-xs font-semibold text-[var(--color-text-muted)] hover:bg-[var(--state-hover)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
       >
         <i
           aria-hidden="true"
@@ -356,7 +355,8 @@ function TaskGroup({
                   onToggleRow(row);
                 }
               }}
-              className="group flex h-[34px] cursor-pointer items-center gap-3 rounded-[var(--radius-control)] px-2 hover:bg-[var(--state-hover)] active:bg-[var(--state-active)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
+              style={{ paddingLeft: 20 + depth * 16 }}
+              className="group flex h-[34px] cursor-pointer items-center gap-3 rounded-[var(--radius-control)] pr-2 hover:bg-[var(--state-hover)] active:bg-[var(--state-active)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
             >
               <CheckCell
                 state={row.state}

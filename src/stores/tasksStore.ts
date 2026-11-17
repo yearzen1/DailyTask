@@ -19,7 +19,9 @@ export interface TasksState {
   reload: () => Promise<void>;
   create: (input: {
     name: string;
-    category: TaskCategory;
+    /** 所属类型；缺省兼容旧调用。 */
+    typeId?: string;
+    category?: TaskCategory;
     startDate: string;
     /** 截止日期；null / 缺省表示一直有效。 */
     endDate?: string | null;
@@ -27,7 +29,7 @@ export interface TasksState {
   }) => Promise<Task>;
   update: (
     id: string,
-    patch: { category?: TaskCategory; order?: number },
+    patch: { typeId?: string; category?: TaskCategory; order?: number },
   ) => Promise<void>;
   /** 改名；默认从 today 起生效，rewrite-current 用于修正错别字。 */
   rename: (

@@ -5,6 +5,7 @@ export type IconName =
   | "grid"
   | "todo"
   | "manage"
+  | "types"
   | "stats"
   | "settings";
 
@@ -35,6 +36,14 @@ const PATHS: Record<IconName, ReactNode> = {
       <circle cx="7" cy="5" r="1.6" fill="var(--color-surface)" />
       <circle cx="13" cy="10" r="1.6" fill="var(--color-surface)" />
       <circle cx="6" cy="15" r="1.6" fill="var(--color-surface)" />
+    </>
+  ),
+  types: (
+    <>
+      <rect x="3" y="3" width="5" height="4" rx="1" />
+      <rect x="12" y="9" width="5" height="4" rx="1" />
+      <rect x="12" y="15" width="5" height="4" rx="1" />
+      <path d="M5.5 7v5.5H12M5.5 12.5V17H12M5.5 12.5H14.5M5.5 17H14.5" />
     </>
   ),
   stats: (

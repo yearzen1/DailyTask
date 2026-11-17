@@ -22,18 +22,21 @@ import {
 } from "../../../domain/manageColumns";
 import { namePeriodsOf } from "../../../domain/names";
 import type { MessageKey } from "../../../shared/i18n";
-import type { Task, TaskCategory } from "../../../domain/types";
+import type { Task } from "../../../domain/types";
 import {
   useManageRows,
   type ManageRow,
   type ManageStatus,
 } from "../../../stores/selectors/manage";
 import { useSettingsStore } from "../../../stores/settingsStore";
+import { useTaskTypesStore } from "../../../stores/taskTypesStore";
 import { useTasksStore } from "../../../stores/tasksStore";
 import { Chip, type ChipVariant } from "../../../ui/Chip";
 import { ConfirmDeleteButton } from "../../../ui/ConfirmDeleteButton";
 import { DateField } from "../../../ui/DateField";
+import { typeColorVar, typeDisplayName } from "../../../ui/taskType";
 import { useT } from "../../../ui/useT";
+import { TaskTypePicker } from "./TaskTypePicker";
 import { useColumnResize } from "./useColumnResize";
 
 const CARD =
@@ -170,17 +173,21 @@ export default function Manage() {
   );
 }
 
-function CreateTaskDialog({
+export function CreateTaskDialog({
   today,
+  defaultTypeId,
   onClose,
 }: {
   today: string;
+  /** 从类型页「＋任务」进入时预选类型。 */
+  defaultTypeId?: string;
   onClose: () => void;
 }) {
   const t = useT();
   const create = useTasksStore((state) => state.create);
+  const types = useTaskTypesStore((state) => state.types);
   const [name, setName] = useState("");
-  const [category, setCategory] = useState<TaskCategory>("voluntary");
+  const [typeId, setTypeId] = useState(defaultTypeId ?? "voluntary");
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState("");
   const [everyDays, setEveryDays] = useState("1");
@@ -195,7 +202,7 @@ function CreateTaskDialog({
     }
     void create({
       name: name.trim(),
-      category,
+      typeId,
       startDate,
       endDate: endDate || null,
       everyDays: normalizeEveryDays(Number(everyDays)),
@@ -240,11 +247,15 @@ function CreateTaskDialog({
           />
         </label>
 
-        <CategoryPicker
-          value={category}
-          onChange={setCategory}
-          variant="new"
-        />
+        <label className="flex flex-col gap-1 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+          {t("manage.field.category")}
+          <TaskTypePicker
+            value={typeId}
+            onChange={setTypeId}
+            types={types}
+            dataAttribute="new"
+          />
+        </label>
 
         <label className="flex flex-col gap-1 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
           {t("manage.field.start")}
@@ -309,54 +320,6 @@ function CreateTaskDialog({
   );
 }
 
-/** 类型二选一，新建与编辑共用。 */
-function CategoryPicker({
-  value,
-  onChange,
-  variant,
-}: {
-  value: TaskCategory;
-  onChange: (value: TaskCategory) => void;
-  variant: "new" | "edit";
-}) {
-  const t = useT();
-
-  return (
-    <fieldset className="m-0 border-0 p-0">
-      <legend className="mb-1 p-0 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
-        {t("manage.field.category")}
-      </legend>
-      <div className="flex gap-2">
-        {(["voluntary", "forced"] as const).map((option) => (
-          <label
-            key={option}
-            className={`flex-1 cursor-pointer rounded-[var(--radius-control)] border px-2 py-1 text-center text-xs ${
-              value === option
-                ? "border-[var(--color-voluntary)] bg-[color-mix(in_srgb,var(--color-voluntary)_10%,transparent)] font-semibold"
-                : "border-[var(--color-border)]"
-            }`}
-          >
-            <input
-              type="radio"
-              name={`${variant}-category`}
-              value={option}
-              data-category-option={option}
-              checked={value === option}
-              onChange={() => onChange(option)}
-              className="sr-only"
-            />
-            {t(
-              option === "voluntary"
-                ? "manage.category.voluntary"
-                : "manage.category.forced",
-            )}
-          </label>
-        ))}
-      </div>
-    </fieldset>
-  );
-}
-
 /** 间隔天数：1 = 每天；N = 以启用日为第 1 天，每 N 天一次。 */
 function EveryDaysField({
   value,
@@ -406,6 +369,7 @@ function EditTaskDialog({
 }) {
   const t = useT();
   const update = useTasksStore((state) => state.update);
+  const types = useTaskTypesStore((state) => state.types);
   const rename = useTasksStore((state) => state.rename);
   const updateInterval = useTasksStore((state) => state.updateInterval);
   const sorted = [...task.intervals].sort((a, b) =>
@@ -416,7 +380,7 @@ function EditTaskDialog({
   const periods = namePeriodsOf(task);
 
   const [name, setName] = useState(task.name);
-  const [category, setCategory] = useState(task.category);
+  const [typeId, setTypeId] = useState(task.typeId ?? task.category);
   const [typoOnly, setTypoOnly] = useState(true);
   const [start, setStart] = useState(latest?.start ?? "");
   const [end, setEnd] = useState(latest?.end ?? "");
@@ -446,8 +410,8 @@ function EditTaskDialog({
         typoOnly ? "rewrite-current" : "from-today",
       );
     }
-    if (category !== task.category) {
-      void update(task.id, { category });
+    if (typeId !== (task.typeId ?? task.category)) {
+      void update(task.id, { typeId });
     }
     if (latest) {
       void updateInterval(latest.id, {
@@ -527,7 +491,15 @@ function EditTaskDialog({
           </ul>
         </div>
 
-        <CategoryPicker value={category} onChange={setCategory} variant="edit" />
+        <label className="flex flex-col gap-1 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+          {t("manage.field.category")}
+          <TaskTypePicker
+            value={typeId}
+            onChange={setTypeId}
+            types={types}
+            dataAttribute="edit"
+          />
+        </label>
 
         {sorted.length > 1 ? (
           <div className="text-[var(--text-2xs)] text-[var(--color-text-muted)]">
@@ -849,10 +821,7 @@ function ManageTableRow({ row, today }: { row: ManageRow; today: string }) {
             aria-hidden="true"
             className="size-[5px] shrink-0 rounded-full"
             style={{
-              background:
-                row.task.category === "voluntary"
-                  ? "var(--color-voluntary)"
-                  : "var(--color-forced)",
+              background: typeColorVar(row.type),
               opacity: retired ? 0.35 : 1,
             }}
           />
@@ -882,11 +851,13 @@ function ManageTableRow({ row, today }: { row: ManageRow; today: string }) {
         </div>
       </td>
       <td className="px-3 text-[var(--color-text-muted)]">
-        {t(
-          row.task.category === "voluntary"
-            ? "manage.category.voluntary"
-            : "manage.category.forced",
-        )}
+        <span
+          title={row.typePath
+            .map((type) => typeDisplayName(type, t))
+            .join(" / ")}
+        >
+          {typeDisplayName(row.type, t)}
+        </span>
       </td>
       <td className="px-3 tabular-nums text-[var(--color-text-muted)]">
         {row.start ? format(parseISO(row.start), "MM/dd") : t("manage.never")}

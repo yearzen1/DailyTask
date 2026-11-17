@@ -1,7 +1,15 @@
 import { isApplicable } from "./applicability";
 import { addDays, diffDays, range } from "./date";
 import { namePeriodsOf } from "./names";
-import type { NamePeriod, Task } from "./types";
+import {
+  DEFAULT_TASK_TYPES,
+  descendantTypeIds,
+  flattenTypeTree,
+  resolveTaskTypeId,
+  resolveTaskTypes,
+  sortedTasksByType,
+} from "./taskTypes";
+import type { NamePeriod, Task, TaskType } from "./types";
 
 /** 保底一年历史 + 未来 30 天，覆盖「整年概览」与临时补打卡。 */
 export const GRID_PAST_DAYS = 365;
@@ -63,9 +71,25 @@ export interface GridRow {
 }
 
 export interface GridGroups {
+  /** 兼容旧视图 / 旧测试：两个内置根类型下的全部行。 */
   voluntary: GridRow[];
   forced: GridRow[];
   disabled: GridRow[];
+  /** 类型树展开顺序；父组折叠由 UI 处理。 */
+  typeGroups: GridTypeGroup[];
+}
+
+export interface GridTypeGroup {
+  /** 类型 id；已停用组固定为 `disabled`。 */
+  key: string;
+  type: TaskType | null;
+  depth: number;
+  path: TaskType[];
+  /** 直属任务行；子类型行在后续 group 里。 */
+  rows: GridRow[];
+  /** 整棵子树的任务数（已停用组为停用任务数）。 */
+  count: number;
+  disabled: boolean;
 }
 
 /**
@@ -82,19 +106,26 @@ export function isRetired(task: Task, today: string): boolean {
   );
 }
 
-export function groupTasks(tasks: Task[], today: string): GridGroups {
-  const sorted = [...tasks].sort(
-    (a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt),
-  );
-  const groups: GridGroups = { voluntary: [], forced: [], disabled: [] };
+export function groupTasks(
+  tasks: Task[],
+  today: string,
+  types: readonly TaskType[] = DEFAULT_TASK_TYPES,
+): GridGroups {
+  const tree = resolveTaskTypes(types);
+  const flat = flattenTypeTree(tree);
+  const known = new Set(flat.map((node) => node.type.id));
+  const sorted = sortedTasksByType(tasks, tree);
+  const directRows = new Map<string, GridRow[]>();
+  const activeGroup = new Map<string, string>();
+  const disabled: GridRow[] = [];
 
   for (const task of sorted) {
     const retired = isRetired(task, today);
-    const group = retired
-      ? groups.disabled
-      : task.category === "voluntary"
-        ? groups.voluntary
-        : groups.forced;
+    const rawId = resolveTaskTypeId(task);
+    const groupId = known.has(rawId) ? rawId : task.category;
+    if (!retired) {
+      activeGroup.set(task.id, groupId);
+    }
 
     // 当前名称段在最上面，历史段按时间倒序紧随其后。
     const periods = namePeriodsOf(task);
@@ -102,20 +133,74 @@ export function groupTasks(tasks: Task[], today: string): GridGroups {
       periods[periods.length - 1],
       ...periods.slice(0, -1).reverse(),
     ];
-    ordered.forEach((period, index) => {
+    const rows = ordered.map((period, index) => {
       const current = index === 0;
-      group.push({
+      return {
         key: current ? task.id : `${task.id}~${period.id}`,
         task,
         namePeriod: period,
         name: period.name,
         current,
         disabled: retired,
-      });
+      };
+    });
+
+    if (retired) {
+      disabled.push(...rows);
+      continue;
+    }
+    const list = directRows.get(groupId);
+    if (list) {
+      list.push(...rows);
+    } else {
+      directRows.set(groupId, rows);
+    }
+  }
+
+  const typeGroups: GridTypeGroup[] = [];
+  for (const node of flat) {
+    const subtree = descendantTypeIds(tree, node.type.id);
+    let count = 0;
+    for (const groupId of activeGroup.values()) {
+      if (subtree.has(groupId)) {
+        count += 1;
+      }
+    }
+    if (count === 0) {
+      continue;
+    }
+    typeGroups.push({
+      key: node.type.id,
+      type: node.type,
+      depth: node.depth,
+      path: node.path,
+      rows: directRows.get(node.type.id) ?? [],
+      count,
+      disabled: false,
     });
   }
 
-  return groups;
+  const voluntary: GridRow[] = [];
+  const forced: GridRow[] = [];
+  for (const group of typeGroups) {
+    if (group.path[0]?.systemKey === "forced") {
+      forced.push(...group.rows);
+    } else {
+      voluntary.push(...group.rows);
+    }
+  }
+
+  typeGroups.push({
+    key: "disabled",
+    type: null,
+    depth: 0,
+    path: [],
+    rows: disabled,
+    count: new Set(disabled.map((row) => row.task.id)).size,
+    disabled: true,
+  });
+
+  return { voluntary, forced, disabled, typeGroups };
 }
 
 /** 月份带的分隔刻度：每个自然月的第一天。 */

@@ -7,11 +7,13 @@ import type {
 import { addDays, formatDate } from "../domain/date";
 import { normalizeEveryDays } from "../domain/intervals";
 import type { SqlDatabase } from "./client";
+import { rootCategoryForTaskType } from "./taskTypes";
 
 export interface TaskRow {
   id: string;
   name: string;
   category: TaskCategory;
+  type_id: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -64,6 +66,7 @@ export function taskFromRows(
   return {
     id: row.id,
     name: sorted.length > 0 ? sorted[sorted.length - 1].name : row.name,
+    typeId: row.type_id ?? row.category,
     category: row.category,
     intervals,
     namePeriods: sorted,
@@ -102,7 +105,7 @@ function groupNamePeriods(rows: NamePeriodRow[]): Map<string, NamePeriod[]> {
 export async function listTasks(db: SqlDatabase): Promise<Task[]> {
   const [taskRows, intervalRows, namePeriodRows] = await Promise.all([
     db.select<TaskRow[]>(
-      "SELECT id, name, category, sort_order, created_at, updated_at " +
+      "SELECT id, name, category, type_id, sort_order, created_at, updated_at " +
         "FROM tasks ORDER BY sort_order ASC, created_at ASC",
     ),
     db.select<IntervalRow[]>(
@@ -128,7 +131,9 @@ export async function listTasks(db: SqlDatabase): Promise<Task[]> {
 
 export interface CreateTaskInput {
   name: string;
-  category: TaskCategory;
+  /** 所属类型；缺省时用 category（旧调用）或自愿。 */
+  typeId?: string;
+  category?: TaskCategory;
   startDate: string;
   /** 截止日期；null / 缺省表示一直有效。 */
   endDate?: string | null;
@@ -142,6 +147,11 @@ export async function createTask(
 ): Promise<Task> {
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
+  const typeId = input.typeId ?? input.category ?? "voluntary";
+  const category: TaskCategory =
+    input.typeId !== undefined
+      ? await rootCategoryForTaskType(db, input.typeId)
+      : (input.category ?? "voluntary");
   const order =
     input.order ??
     (await db.select<{ next: number }[]>(
@@ -149,9 +159,9 @@ export async function createTask(
     ))[0].next;
 
   await db.execute(
-    "INSERT INTO tasks (id, name, category, sort_order, created_at, updated_at) " +
-      "VALUES (?, ?, ?, ?, ?, ?)",
-    [id, input.name, input.category, order, now, now],
+    "INSERT INTO tasks (id, name, category, type_id, sort_order, created_at, updated_at) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [id, input.name, category, typeId, order, now, now],
   );
 
   const interval: Interval = {
@@ -195,7 +205,8 @@ export async function createTask(
   return {
     id,
     name: input.name,
-    category: input.category,
+    typeId,
+    category,
     intervals: [interval],
     namePeriods: [namePeriod],
     order,
@@ -206,6 +217,7 @@ export async function createTask(
 
 export interface TaskPatch {
   category?: TaskCategory;
+  typeId?: string;
   order?: number;
 }
 
@@ -217,9 +229,14 @@ export async function updateTask(
   const columns: string[] = [];
   const values: unknown[] = [];
 
-  if (patch.category !== undefined) {
-    columns.push("category = ?");
-    values.push(patch.category);
+  if (patch.typeId !== undefined) {
+    const category = await rootCategoryForTaskType(db, patch.typeId);
+    columns.push("type_id = ?", "category = ?");
+    values.push(patch.typeId, category);
+  } else if (patch.category !== undefined) {
+    // 旧调用只给 category 时，同时把权威 type_id 拉回内置类型，避免两列分叉。
+    columns.push("category = ?", "type_id = ?");
+    values.push(patch.category, patch.category);
   }
   if (patch.order !== undefined) {
     columns.push("sort_order = ?");
