@@ -259,6 +259,19 @@
 
 ---
 
+## 17. v0.1.22 完成记录（2026-11-17）
+
+校验：`npm run typecheck`、`npm run lint`（改动文件）、`npm run docs:check`、`npm run build`、`tauri build`（签名 + NSIS）通过；本轮未跑 `npm run test`，合并前已在 `feat` 分支验证。已发布 v0.1.22：<https://github.com/yearzen1/DailyTask/releases/tag/v0.1.22>。
+
+- 合并 `feat` 分支：任务表与设置页视觉重做。任务表今天列改实心绿 pill + 6% 绿底，状态格用 20px 圆角标记 + 符号，工具栏右侧常驻状态图例，任务行 36px、日期头 40px。
+- 任务表筛选收进工具栏按钮：类型 / 任务 / 时间段在弹层内即时生效，生效后显示可单独移除的条件 chip，清除按钮重置全部条件。合并时把 feat 的「自愿 / 被迫」二选一筛选接到 main 的类型树筛选（`filter.typeId`，父类型含全部后代）。
+- 设置页改为两列卡片（左 外观 / 窗口，右 行为 / 数据 / 更新），主题改三张缩略图卡片，语言改分段控件，顶部标注「改动即时保存」，发现新版本时显示 banner 与「安装并重启」。
+- 视觉 token 补 `--color-surface-2`、`--color-divider`、`--color-green-solid` / `--color-on-green` 与 11 / 12 / 13 / 14 / 20 字号阶梯，全站字号改走 token。
+- 冲突处理：`Icon.tsx` 与两份 i18n 取双方并集（`grid.filter.type` 撞名，选择框 aria-label 改用新增 `grid.filter.typeAria`）；`Manage.tsx` 以 main 为底删掉已废弃的 `CategoryPicker`；`TaskGrid.tsx` 取 feat 视觉骨架 + main 的 `typeGroups` 数据源、祖先折叠与类型筛选；`TaskGrid.test.tsx` 的 chip 用例改按 `[data-filter-type]` 选类型。
+- 本版未改动数据模型，无需迁移。
+
+---
+
 ## 16. v0.1.21 完成记录（2026-11-17）
 
 全量校验：`npm run test` **454 passed**、`npm run lint`、`npm run typecheck`、`cargo check`、`npm run docs:check`、`npm run build`、`tauri build` 全绿。已发布 v0.1.21：<https://github.com/yearzen1/DailyTask/releases/tag/v0.1.21>。
