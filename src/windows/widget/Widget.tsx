@@ -311,7 +311,7 @@ export function Widget() {
             </div>
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <div className="flex items-baseline gap-1.5">
-                <b className="text-[13px] tabular-nums">
+                <b className="text-sm tabular-nums">
                   {completed} / {total}
                 </b>
                 <span className="text-[10px] tabular-nums text-[var(--color-text-muted)]">
@@ -806,7 +806,7 @@ function WidgetTaskRow({
   };
 
   const base =
-    "flex h-[26px] w-full items-center gap-[6px] rounded-[5px] px-1 pr-6 text-left text-[12px]";
+    "flex h-[26px] w-full items-center gap-[6px] rounded-[5px] px-1 pr-6 text-left text-xs";
 
   return (
     <div className="group relative" data-state={row.state}>

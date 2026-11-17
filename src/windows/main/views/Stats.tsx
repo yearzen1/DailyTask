@@ -41,7 +41,7 @@ export default function Stats() {
   return (
     <>
       <header className="flex items-baseline gap-3">
-        <h1 className="m-0 text-[var(--text-lg)] font-semibold tracking-[.2px]">
+        <h1 className="m-0 text-lg font-semibold tracking-[.2px]">
           {t("stats.title")}
         </h1>
         <span className="text-sm text-[var(--color-text-muted)]">
@@ -89,7 +89,7 @@ export default function Stats() {
             </tbody>
           </table>
 
-          <p className="m-0 border-t border-[var(--color-border)] px-4 py-2 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+          <p className="m-0 border-t border-[var(--color-border)] px-4 py-2 text-[11px] text-[var(--color-text-muted)]">
             {t("stats.note")}
           </p>
         </section>
@@ -141,7 +141,7 @@ function StatsRow({
           />
           <span className="min-w-0 truncate">{row.name}</span>
           {row.current ? null : (
-            <span className="shrink-0 text-[var(--text-2xs)] tabular-nums">
+            <span className="shrink-0 text-[11px] tabular-nums">
               {range}
             </span>
           )}
@@ -151,7 +151,7 @@ function StatsRow({
               data-name-history-toggle={row.task.id}
               aria-expanded={expanded}
               onClick={onToggle}
-              className="shrink-0 whitespace-nowrap rounded-[var(--radius-pill)] border border-[var(--color-border)] px-1.5 py-px text-[var(--text-2xs)] hover:bg-[var(--state-hover)]"
+              className="shrink-0 whitespace-nowrap rounded-[var(--radius-pill)] border border-[var(--color-border)] px-1.5 py-px text-[11px] hover:bg-[var(--state-hover)]"
             >
               {t(
                 expanded ? "stats.nameHistory.hide" : "stats.nameHistory",
@@ -159,7 +159,7 @@ function StatsRow({
               )}
             </button>
           ) : null}
-          <span className="shrink-0 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+          <span className="shrink-0 text-[11px] text-[var(--color-text-muted)]">
             {t(
               row.task.category === "voluntary"
                 ? "manage.category.voluntary"
@@ -170,7 +170,7 @@ function StatsRow({
       </td>
       <td className="px-4 tabular-nums">
         {row.streak > 0 ? (
-          <span className="rounded-[var(--radius-pill)] bg-[color-mix(in_srgb,var(--color-voluntary)_12%,transparent)] px-[7px] py-px text-[var(--text-2xs)] font-semibold text-[var(--color-voluntary)]">
+          <span className="rounded-[var(--radius-pill)] bg-[color-mix(in_srgb,var(--color-voluntary)_12%,transparent)] px-[7px] py-px text-[11px] font-semibold text-[var(--color-voluntary)]">
             {t("stats.streakDays", { count: row.streak })}
           </span>
         ) : (

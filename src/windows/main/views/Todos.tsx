@@ -98,7 +98,7 @@ export default function Todos() {
   return (
     <>
       <header className="flex items-baseline gap-3">
-        <h1 className="m-0 text-[var(--text-lg)] font-semibold tracking-[.2px]">
+        <h1 className="m-0 text-lg font-semibold tracking-[.2px]">
           {t("todos.title")}
         </h1>
         <span className="text-sm text-[var(--color-text-muted)]">
@@ -183,7 +183,7 @@ export default function Todos() {
             className="fixed w-[216px]"
           >
             <MenuHeading>{menu.todo.title}</MenuHeading>
-            <label className="flex items-center gap-1.5 px-1 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+            <label className="flex items-center gap-1.5 px-1 text-[11px] text-[var(--color-text-muted)]">
               {t("todos.menu.date")}
               <DateField
                 data-menu-date
@@ -192,7 +192,7 @@ export default function Todos() {
                 onChange={(next) => setDueDraft(next ?? "")}
                 aria-label={t("todos.menu.date")}
                 align="right"
-                className="min-w-0 flex-1 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-bg)] px-1 py-0.5 text-[var(--text-2xs)] text-[var(--color-text)]"
+                className="min-w-0 flex-1 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-bg)] px-1 py-0.5 text-[11px] text-[var(--color-text)]"
               />
             </label>
             <div className="mt-1.5 flex justify-end gap-1">
@@ -200,7 +200,7 @@ export default function Todos() {
                 type="button"
                 data-menu-clear
                 onClick={() => saveDueDate(null)}
-                className="rounded-[var(--radius-control)] px-2 py-1 text-[var(--text-2xs)] text-[var(--color-text-muted)] hover:bg-[var(--state-hover)]"
+                className="rounded-[var(--radius-control)] px-2 py-1 text-[11px] text-[var(--color-text-muted)] hover:bg-[var(--state-hover)]"
               >
                 {t("todos.menu.clear")}
               </button>
@@ -208,7 +208,7 @@ export default function Todos() {
                 type="button"
                 data-menu-save
                 onClick={() => saveDueDate(dueDraft || null)}
-                className="rounded-[var(--radius-control)] bg-[var(--color-voluntary)] px-2 py-1 text-[var(--text-2xs)] font-semibold text-white"
+                className="rounded-[var(--radius-control)] bg-[var(--color-voluntary)] px-2 py-1 text-[11px] font-semibold text-white"
               >
                 {t("todos.menu.save")}
               </button>
@@ -223,7 +223,7 @@ export default function Todos() {
                 await remove(menu.todo.id, confirmation);
                 setMenu(null);
               }}
-              className="mt-1 w-full rounded-[var(--radius-control)] px-2 py-1 text-left text-[var(--text-2xs)] text-[var(--color-missed)] hover:bg-[var(--state-hover)]"
+              className="mt-1 w-full rounded-[var(--radius-control)] px-2 py-1 text-left text-[11px] text-[var(--color-missed)] hover:bg-[var(--state-hover)]"
             >
               {t("todos.menu.delete")}
             </ConfirmDeleteButton>
@@ -288,13 +288,13 @@ function TodoForm() {
         onChange={(next) => setTodoDraft({ dueDate: next ?? "" })}
         aria-label={t("todos.dueLabel")}
         allowClear
-        className="w-[132px] rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-bg)] px-1.5 py-0.5 text-[var(--text-2xs)] text-[var(--color-text)]"
+        className="w-[132px] rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-bg)] px-1.5 py-0.5 text-[11px] text-[var(--color-text)]"
       />
       <button
         type="submit"
         data-todo-add
         disabled={!canSubmit}
-        className="rounded-[var(--radius-control)] bg-[var(--color-voluntary)] px-2.5 py-1 text-[var(--text-2xs)] font-semibold text-white disabled:opacity-40"
+        className="rounded-[var(--radius-control)] bg-[var(--color-voluntary)] px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-40"
       >
         {t("todos.add")}
       </button>

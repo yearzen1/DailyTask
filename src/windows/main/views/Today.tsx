@@ -65,7 +65,7 @@ export default function Today() {
   return (
     <>
       <header className="flex items-baseline gap-3">
-        <h1 className="m-0 text-[var(--text-lg)] font-semibold tracking-[.2px]">
+        <h1 className="m-0 text-lg font-semibold tracking-[.2px]">
           {t("today.title")}
         </h1>
         <span className="text-sm text-[var(--color-text-muted)]">

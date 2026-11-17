@@ -56,7 +56,7 @@ export function ProgressRing({
         <span style={{ fontSize: size >= 80 ? "var(--text-lg)" : "var(--text-sm)" }}>
           {done}
         </span>
-        <small className="relative top-[3px] text-[var(--text-xs)] font-normal text-[var(--color-text-muted)]">
+        <small className="relative top-[3px] text-xs font-normal text-[var(--color-text-muted)]">
           / {total}
         </small>
       </div>
