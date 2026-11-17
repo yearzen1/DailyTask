@@ -9,16 +9,12 @@ export interface TypeMovePlan {
   index: number;
 }
 
-/** 内置类型只能作为父级，整行都算「放入内部」；自定义类型按上下三分之一分区。 */
+/** 按行的上 / 中 / 下三分之一判断插入位置。 */
 export function typeDropZone(
   clientY: number,
   top: number,
   height: number,
-  targetIsBuiltin: boolean,
 ): Exclude<TypeDropPosition, "invalid"> {
-  if (targetIsBuiltin) {
-    return "inside";
-  }
   const ratio = height > 0 ? (clientY - top) / height : 0.5;
   if (ratio < 0.3) {
     return "before";
@@ -31,7 +27,7 @@ export function typeDropZone(
 
 /**
  * 计算拖放后的新父级与同级下标；非法拖放返回 null。
- * 与仓库层一致：同级顺序按「内置优先 → order → 创建时间 → id」。
+ * 与仓库层一致：同级顺序按「order → 创建时间 → id」。
  */
 export function planTypeMove(
   types: readonly TaskType[],
@@ -44,19 +40,11 @@ export function planTypeMove(
   }
   const source = types.find((type) => type.id === sourceId);
   const target = types.find((type) => type.id === targetId);
-  if (!source || !target) {
-    return null;
-  }
-  // 内置类型固定为顶层，不能移动。
-  if (source.systemKey !== null || source.id === target.id) {
+  if (!source || !target || source.id === target.id) {
     return null;
   }
   // 不能把类型挂到自己的子孙下。
   if (isTypeDescendant(types, source.id, target.id)) {
-    return null;
-  }
-  // 内置类型不能被前插 / 后插，只能作为父级。
-  if (position !== "inside" && target.systemKey !== null) {
     return null;
   }
 

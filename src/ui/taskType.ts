@@ -23,15 +23,18 @@ const COLOR_VARS: Record<TaskTypeColor, string> = {
   gray: "var(--type-color-gray)",
 };
 
-/** 内置类型固定用现有语义色，自定义类型用调色板。 */
+/** 自定义颜色优先；未设色时内置类型用语义色，其余用调色板默认色。 */
 export function typeColorVar(type: TaskType | null): string {
+  if (type?.color) {
+    return typeColorVarForKey(type.color);
+  }
   if (type?.systemKey === "voluntary") {
     return "var(--color-voluntary)";
   }
   if (type?.systemKey === "forced") {
     return "var(--color-forced)";
   }
-  return typeColorVarForKey(type?.color ?? null);
+  return typeColorVarForKey(null);
 }
 
 export function typeColorVarForKey(color: TaskTypeColor | null): string {

@@ -25,19 +25,13 @@ export const DEFAULT_TASK_TYPES: readonly TaskType[] = Object.freeze([
   builtinType(FORCED_TYPE_ID, 1),
 ]);
 
-/** 始终补齐两个内置类型，避免旧数据或局部查询把自愿/被迫弄丢。 */
+/** 空列表才回退到两个默认类型；非空列表原样使用。 */
 export function resolveTaskTypes(types?: readonly TaskType[] | null): TaskType[] {
-  const provided = types ?? [];
-  const byId = new Map(provided.map((type) => [type.id, type]));
-  const merged: TaskType[] = DEFAULT_TASK_TYPES.map(
-    (builtin) => byId.get(builtin.id) ?? { ...builtin },
-  );
-  for (const type of provided) {
-    if (type.id !== VOLUNTARY_TYPE_ID && type.id !== FORCED_TYPE_ID) {
-      merged.push(type);
-    }
+  // 空列表才回退默认值；非空列表原样使用，内置类型删除后不会被自动补回。
+  if (!types || types.length === 0) {
+    return DEFAULT_TASK_TYPES.map((type) => ({ ...type }));
   }
-  return merged;
+  return [...types];
 }
 
 /** 旧数据的任务只有 category；新数据以 typeId 为准。 */
@@ -55,19 +49,8 @@ export interface TypeNode {
   children: TypeNode[];
 }
 
-function builtinRank(type: TaskType): number {
-  if (type.id === VOLUNTARY_TYPE_ID) {
-    return 0;
-  }
-  if (type.id === FORCED_TYPE_ID) {
-    return 1;
-  }
-  return 2;
-}
-
 export function compareTaskTypes(a: TaskType, b: TaskType): number {
   return (
-    builtinRank(a) - builtinRank(b) ||
     a.order - b.order ||
     a.createdAt.localeCompare(b.createdAt) ||
     a.id.localeCompare(b.id)

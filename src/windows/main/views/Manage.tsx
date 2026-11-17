@@ -21,6 +21,10 @@ import {
   type ManageColumnKey,
 } from "../../../domain/manageColumns";
 import { namePeriodsOf } from "../../../domain/names";
+import {
+  flattenTypeTree,
+  resolveTaskTypes,
+} from "../../../domain/taskTypes";
 import type { MessageKey } from "../../../shared/i18n";
 import type { Task } from "../../../domain/types";
 import {
@@ -184,13 +188,18 @@ function CreateTaskDialog({
   const create = useTasksStore((state) => state.create);
   const types = useTaskTypesStore((state) => state.types);
   const [name, setName] = useState("");
-  const [typeId, setTypeId] = useState("voluntary");
+  const [typeId, setTypeId] = useState(
+    () => flattenTypeTree(resolveTaskTypes(types))[0]?.type.id ?? "",
+  );
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState("");
   const [everyDays, setEveryDays] = useState("1");
   const error = validateInterval(startDate, endDate || null, null);
   const canSubmit =
-    name.trim().length > 0 && startDate.length > 0 && error === null;
+    name.trim().length > 0 &&
+    typeId.length > 0 &&
+    startDate.length > 0 &&
+    error === null;
 
   const submit = (event: FormEvent) => {
     event.preventDefault();

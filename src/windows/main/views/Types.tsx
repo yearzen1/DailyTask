@@ -43,7 +43,7 @@ const ERROR_KEYS: Record<string, MessageKey> = {
   cycle: "types.error.cycle",
   "has-tasks": "types.error.hasTasks",
   "has-children": "types.error.hasChildren",
-  "system-type": "types.error.systemType",
+  "last-type": "types.error.lastType",
   "not-found": "types.error.notFound",
 };
 
@@ -117,9 +117,7 @@ export default function Types() {
     if (selectedId && flat.some((node) => node.type.id === selectedId)) {
       return;
     }
-    const next =
-      flat.find((node) => node.type.systemKey === null) ?? flat[0] ?? null;
-    setSelectedId(next?.type.id ?? null);
+    setSelectedId(flat[0]?.type.id ?? null);
   }, [flat, selectedId]);
 
   const toggleCollapse = (typeId: string) => {
@@ -193,7 +191,7 @@ export default function Types() {
               <li key={type.id} data-type-row={type.id}>
                 <div
                   onClick={() => setSelectedId(type.id)}
-                  draggable={type.systemKey === null}
+                  draggable
                   onDragStart={(event) => {
                     event.dataTransfer.setData("text/plain", type.id);
                     event.dataTransfer.effectAllowed = "move";
@@ -212,7 +210,6 @@ export default function Types() {
                       event.clientY,
                       rect.top,
                       rect.height,
-                      type.systemKey !== null,
                     );
                     const valid =
                       planTypeMove(tree, draggingId, type.id, raw) !== null;
@@ -248,7 +245,6 @@ export default function Types() {
                         event.clientY,
                         rect.top,
                         rect.height,
-                        type.systemKey !== null,
                       );
                       dropOn(draggingId, type, position);
                     }
@@ -298,13 +294,10 @@ export default function Types() {
 
                   <span
                     aria-hidden="true"
-                    title={type.systemKey === null ? t("grid.drag") : undefined}
+                    title={t("grid.drag")}
                     className={clsx(
-                      "shrink-0 text-[9px] leading-none text-[var(--color-border-strong)] opacity-0 transition-opacity group-hover:opacity-100",
+                      "shrink-0 cursor-grab text-[9px] leading-none text-[var(--color-border-strong)] opacity-0 transition-opacity group-hover:opacity-100",
                       isSelected && "opacity-100",
-                      type.systemKey === null
-                        ? "cursor-grab"
-                        : "invisible",
                     )}
                   >
                     ⋮⋮
@@ -350,11 +343,6 @@ export default function Types() {
                       {t("types.dropInvalid")}
                     </span>
                   ) : null}
-                  {type.systemKey !== null ? (
-                    <span className="shrink-0 rounded-[var(--radius-pill)] bg-[var(--state-hover)] px-1.5 py-px text-[10px] text-[var(--color-text-muted)]">
-                      {t("types.builtin")}
-                    </span>
-                  ) : null}
                   <span className="shrink-0 text-[var(--text-2xs)] tabular-nums text-[var(--color-text-muted)]">
                     {count}
                   </span>
@@ -363,11 +351,6 @@ export default function Types() {
             );
           })}
           </ul>
-          {tree.every((type) => type.systemKey !== null) ? (
-            <p className="m-0 px-2 py-3 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
-              {t("types.empty")}
-            </p>
-          ) : null}
         </div>
 
         {selected && selectedNode ? (
@@ -376,6 +359,7 @@ export default function Types() {
             path={selectedNode.path}
             count={subtreeCount(selected.id)}
             directTasks={tasksByType.get(selected.id) ?? []}
+            canDelete={tree.length > 1}
             onAddTask={() => setAssignTarget(selected)}
             onEdit={() => setDialog({ mode: "edit", type: selected })}
             onAddChild={() =>
@@ -412,6 +396,7 @@ function TypeDetailDock({
   path,
   count,
   directTasks,
+  canDelete,
   onAddTask,
   onEdit,
   onAddChild,
@@ -420,6 +405,7 @@ function TypeDetailDock({
   path: TaskType[];
   count: number;
   directTasks: Task[];
+  canDelete: boolean;
   onAddTask: () => void;
   onEdit: () => void;
   onAddChild: () => void;
@@ -480,7 +466,8 @@ function TypeDetailDock({
             name={name}
             description={t("types.deleteHint")}
             errorMessage={t("types.deleteFailed")}
-            disabled={type.systemKey !== null}
+            disabled={!canDelete}
+            title={!canDelete ? t("types.error.lastType") : undefined}
             onConfirm={async (confirmation) => {
               await useTaskTypesStore.getState().remove(type.id, confirmation);
             }}
@@ -743,8 +730,8 @@ function TypeDialog({
   const [parent, setParent] = useState(
     type?.parentId ?? parentId ?? "",
   );
-  const [color, setColor] = useState<TaskTypeColor>(
-    type?.color ?? nextTypeColor(types.length),
+  const [color, setColor] = useState<TaskTypeColor | null>(
+    type ? (type.color ?? null) : nextTypeColor(types.length),
   );
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -760,7 +747,7 @@ function TypeDialog({
     );
   });
 
-  const canSubmit = type?.systemKey != null || name.trim().length > 0;
+  const canSubmit = type?.name === null || name.trim().length > 0;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -779,7 +766,7 @@ function TypeDialog({
       } else if (type) {
         const trimmed = name.trim();
         await update(type.id, {
-          name: trimmed === "" && type.systemKey !== null ? null : trimmed,
+          name: trimmed === "" && type.name === null ? null : trimmed,
           parentId: parent === "" ? null : parent,
           color,
         });
@@ -831,23 +818,13 @@ function TypeDialog({
             data-type-name
             value={name}
             placeholder={
-              type?.systemKey
+              type && type.name === null
                 ? typeDisplayName(type, t)
                 : t("types.namePlaceholder")
             }
             onChange={(event) => setName(event.target.value)}
             className="rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1 text-sm text-[var(--color-text)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
           />
-          {type?.systemKey ? (
-            <button
-              type="button"
-              data-type-restore-name
-              onClick={() => setName("")}
-              className="self-start text-[var(--text-2xs)] text-[var(--color-voluntary)] hover:underline"
-            >
-              {t("types.restoreName")}
-            </button>
-          ) : null}
         </label>
 
         <label className="flex flex-col gap-1 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
@@ -855,9 +832,8 @@ function TypeDialog({
           <select
             data-type-parent
             value={parent}
-            disabled={type?.systemKey != null}
             onChange={(event) => setParent(event.target.value)}
-            className="rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1 text-sm text-[var(--color-text)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:opacity-50"
+            className="rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1 text-sm text-[var(--color-text)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
           >
             <option value="">{t("types.parentNone")}</option>
             {parentOptions.map((node) => (

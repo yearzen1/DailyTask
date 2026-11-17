@@ -23,7 +23,7 @@ export type TaskTypeErrorCode =
   | "cycle"
   | "has-tasks"
   | "has-children"
-  | "system-type";
+  | "last-type";
 
 export class TaskTypeError extends Error {
   readonly code: TaskTypeErrorCode;
@@ -195,9 +195,6 @@ export async function updateTaskType(
 
   if ("parentId" in patch) {
     const parentId = patch.parentId ?? null;
-    if (target.systemKey !== null && parentId !== null) {
-      throw new TaskTypeError("system-type");
-    }
     if (parentId !== null) {
       if (!types.some((type) => type.id === parentId)) {
         throw new TaskTypeError("not-found");
@@ -280,9 +277,6 @@ export async function moveTaskType(
   if (!target) {
     throw new TaskTypeError("not-found");
   }
-  if (target.systemKey !== null) {
-    throw new TaskTypeError("system-type");
-  }
   if (parentId !== null) {
     if (!types.some((type) => type.id === parentId)) {
       throw new TaskTypeError("not-found");
@@ -333,16 +327,19 @@ export async function deleteTaskType(
   db: SqlDatabase,
   id: string,
 ): Promise<void> {
-  const rows = await db.select<{ system_key: TaskCategory | null }[]>(
-    "SELECT system_key FROM task_types WHERE id = ?",
+  const rows = await db.select<{ id: string }[]>(
+    "SELECT id FROM task_types WHERE id = ?",
     [id],
   );
-  const target = rows[0];
-  if (!target) {
+  if (!rows[0]) {
     throw new TaskTypeError("not-found");
   }
-  if (target.system_key !== null) {
-    throw new TaskTypeError("system-type");
+
+  const totalRows = await db.select<{ count: number }[]>(
+    "SELECT COUNT(*) AS count FROM task_types",
+  );
+  if ((totalRows[0]?.count ?? 0) <= 1) {
+    throw new TaskTypeError("last-type");
   }
 
   const taskCount = await db.select<{ count: number }[]>(
