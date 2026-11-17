@@ -34,16 +34,10 @@ const types: TaskType[] = [
 ];
 
 describe("typeDropZone", () => {
-  it("splits a custom row into before, inside and after", () => {
-    expect(typeDropZone(10, 0, 100, false)).toBe("before");
-    expect(typeDropZone(50, 0, 100, false)).toBe("inside");
-    expect(typeDropZone(90, 0, 100, false)).toBe("after");
-  });
-
-  it("only allows dropping inside a built-in row", () => {
-    expect(typeDropZone(10, 0, 100, true)).toBe("inside");
-    expect(typeDropZone(50, 0, 100, true)).toBe("inside");
-    expect(typeDropZone(90, 0, 100, true)).toBe("inside");
+  it("splits a row into before, inside and after", () => {
+    expect(typeDropZone(10, 0, 100)).toBe("before");
+    expect(typeDropZone(50, 0, 100)).toBe("inside");
+    expect(typeDropZone(90, 0, 100)).toBe("after");
   });
 });
 
@@ -81,13 +75,25 @@ describe("planTypeMove", () => {
     });
   });
 
-  it("rejects self, descendants and built-in edge drops", () => {
+  it("rejects self and descendants", () => {
     expect(planTypeMove(types, "health", "health", "inside")).toBeNull();
     expect(planTypeMove(types, "health", "deep", "inside")).toBeNull();
     expect(planTypeMove(types, "health", "deep", "after")).toBeNull();
-    expect(planTypeMove(types, "health", "voluntary", "before")).toBeNull();
-    expect(planTypeMove(types, "health", "voluntary", "after")).toBeNull();
-    expect(planTypeMove(types, "voluntary", "work", "inside")).toBeNull();
+  });
+
+  it("allows built-in types to move and be edge targets", () => {
+    expect(planTypeMove(types, "health", "voluntary", "before")).toEqual({
+      parentId: null,
+      index: 0,
+    });
+    expect(planTypeMove(types, "health", "voluntary", "after")).toEqual({
+      parentId: null,
+      index: 1,
+    });
+    expect(planTypeMove(types, "voluntary", "work", "inside")).toEqual({
+      parentId: "work",
+      index: 0,
+    });
   });
 
   it("allows dropping inside a built-in type", () => {

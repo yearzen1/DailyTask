@@ -11,6 +11,7 @@ const NOW = new Date(2026, 10, 4, 9, 0, 0);
 
 const originalCreate = useTaskTypesStore.getState().create;
 const originalMove = useTaskTypesStore.getState().move;
+const originalRemove = useTaskTypesStore.getState().remove;
 const originalAssignType = useTasksStore.getState().assignType;
 
 function type(
@@ -57,13 +58,16 @@ describe("Types", () => {
     });
     useTaskTypesStore.setState({
       types: [
-        type("health", "健康", "voluntary", 0),
+        type("voluntary", "自愿", null, 0, "voluntary"),
+        type("forced", "被迫", null, 1, "forced"),
+        type("health", "健康", "voluntary", 2),
         type("run", "跑步", "health", 0),
-        type("work", "工作", "forced", 1),
+        type("work", "工作", "forced", 3),
       ],
       loaded: true,
       create: originalCreate,
       move: originalMove,
+      remove: originalRemove,
     });
     useTasksStore.setState({
       tasks: [
@@ -78,7 +82,11 @@ describe("Types", () => {
 
   afterEach(() => {
     vi.useRealTimers();
-    useTaskTypesStore.setState({ create: originalCreate, move: originalMove });
+    useTaskTypesStore.setState({
+      create: originalCreate,
+      move: originalMove,
+      remove: originalRemove,
+    });
     useTasksStore.setState({ assignType: originalAssignType });
   });
 
@@ -182,12 +190,47 @@ describe("Types", () => {
     );
   });
 
-  it("does not allow deleting built-in types", () => {
+  it("treats built-in types like custom types", () => {
     const { container } = render(<Types />);
+    const row = container.querySelector(
+      '[data-type-row="voluntary"] > div',
+    ) as HTMLElement;
 
+    expect(row).toHaveAttribute("draggable", "true");
+    fireEvent.click(row);
+    expect(container.querySelector("[data-type-dock]")).toHaveTextContent(
+      "自愿",
+    );
+  });
+
+  it("deletes an empty built-in type", async () => {
+    const remove = vi.fn(async () => undefined);
+    useTaskTypesStore.setState({ remove });
+
+    const { container } = render(<Types />);
     fireEvent.click(
       container.querySelector('[data-type-row="voluntary"] > div') as Element,
     );
+    fireEvent.click(
+      container.querySelector('[data-dock-action="delete"]') as Element,
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "删除「自愿」" });
+    await act(async () => {
+      fireEvent.click(
+        within(dialog).getByRole("button", { name: "确认删除" }),
+      );
+    });
+
+    expect(remove).toHaveBeenCalledWith("voluntary", expect.anything());
+  });
+
+  it("disables deleting the last remaining type", () => {
+    useTaskTypesStore.setState({
+      types: [type("voluntary", "自愿", null, 0, "voluntary")],
+    });
+
+    const { container } = render(<Types />);
 
     expect(
       container.querySelector('[data-dock-action="delete"]'),

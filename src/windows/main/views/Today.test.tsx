@@ -196,6 +196,26 @@ describe("Today due todos", () => {  beforeEach(() => {
   it("collapses a parent type and hides its child type and tasks", () => {
     const types: TaskType[] = [
       {
+        id: "voluntary",
+        name: "自愿",
+        parentId: null,
+        order: 0,
+        systemKey: "voluntary",
+        color: null,
+        createdAt: "2026-11-01T00:00:00.000Z",
+        updatedAt: "2026-11-01T00:00:00.000Z",
+      },
+      {
+        id: "forced",
+        name: "被迫",
+        parentId: null,
+        order: 1,
+        systemKey: "forced",
+        color: null,
+        createdAt: "2026-11-01T00:00:00.000Z",
+        updatedAt: "2026-11-01T00:00:00.000Z",
+      },
+      {
         id: "health",
         name: "健康",
         parentId: "voluntary",

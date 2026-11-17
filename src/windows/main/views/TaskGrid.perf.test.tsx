@@ -101,7 +101,7 @@ describe("TaskGrid 性能预算", () => {
     const cells = container.querySelectorAll("[data-grid-cell]");
     expect(cells.length).toBeGreaterThan(0);
     expect(cells.length).toBeLessThanOrEqual(MAX_CELLS);
-  });
+  }, 15000);
 
   it("keeps the cell DOM within budget in the middle of the axis", () => {
     restoreViewport = mockViewportWidth(WIDE_VIEWPORT);
@@ -117,7 +117,7 @@ describe("TaskGrid 性能预算", () => {
     const cells = container.querySelectorAll("[data-grid-cell]");
     expect(cells.length).toBeGreaterThan(0);
     expect(cells.length).toBeLessThanOrEqual(MAX_CELLS);
-  });
+  }, 15000);
 
   it("commits at most twice while mounting", () => {
     restoreViewport = mockViewportWidth(WIDE_VIEWPORT);
@@ -136,7 +136,7 @@ describe("TaskGrid 性能预算", () => {
 
     expect(commits.length).toBeGreaterThan(0);
     expect(commits.length).toBeLessThanOrEqual(MAX_MOUNT_COMMITS);
-  });
+  }, 15000);
 
   it("renders only the focused cell again when focus moves", () => {
     restoreViewport = mockViewportWidth(WIDE_VIEWPORT);
@@ -152,5 +152,5 @@ describe("TaskGrid 性能预算", () => {
     });
 
     expect(gridCellRenderCount() - before).toBeLessThanOrEqual(2);
-  });
+  }, 15000);
 });

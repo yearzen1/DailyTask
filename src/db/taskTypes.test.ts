@@ -150,10 +150,14 @@ describe("task type repository", () => {
     ).rejects.toThrow("cycle");
   });
 
-  it("keeps built-in types at the top level", async () => {
-    await expect(
-      updateTaskType(db, "forced", { parentId: "voluntary" }),
-    ).rejects.toThrow("system-type");
+  it("allows nesting built-in types", async () => {
+    const health = await createTaskType(db, { name: "健康" });
+
+    await updateTaskType(db, "forced", { parentId: health.id });
+
+    expect(
+      (await listTaskTypes(db)).find((type) => type.id === "forced")?.parentId,
+    ).toBe(health.id);
   });
 
   it("reorders only the given siblings", async () => {
@@ -207,15 +211,34 @@ describe("task type repository", () => {
     );
   });
 
-  it("rejects moving built-in types", async () => {
-    await expect(moveTaskType(db, "voluntary", null, 0)).rejects.toThrow(
-      "system-type",
-    );
+  it("moves built-in types like any other type", async () => {
+    const health = await createTaskType(db, { name: "健康" });
+
+    await moveTaskType(db, "voluntary", health.id, 0);
+
+    expect(
+      (await listTaskTypes(db)).find((type) => type.id === "voluntary")
+        ?.parentId,
+    ).toBe(health.id);
   });
 
-  it("refuses to delete built-in, non-empty, or parent types", async () => {
-    await expect(deleteTaskType(db, "voluntary")).rejects.toThrow("system-type");
+  it("deletes empty built-in and custom types", async () => {
+    await deleteTaskType(db, "voluntary");
+    const health = await createTaskType(db, { name: "健康" });
+    await deleteTaskType(db, health.id);
 
+    const ids = (await listTaskTypes(db)).map((type) => type.id);
+    expect(ids).not.toContain("voluntary");
+    expect(ids).not.toContain(health.id);
+  });
+
+  it("refuses to delete the last type", async () => {
+    await deleteTaskType(db, "voluntary");
+
+    await expect(deleteTaskType(db, "forced")).rejects.toThrow("last-type");
+  });
+
+  it("refuses to delete non-empty or parent types", async () => {
     const health = await createTaskType(db, { name: "健康" });
     await createTaskType(db, { name: "运动", parentId: health.id });
     await expect(deleteTaskType(db, health.id)).rejects.toThrow("has-children");

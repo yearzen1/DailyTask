@@ -226,7 +226,6 @@ describe("parseImportBundle", () => {
     expect(bundle.version).toBe(3);
     expect(bundle.taskTypes.map((type) => type.id)).toEqual([
       "voluntary",
-      "forced",
       "health",
     ]);
     expect(bundle.tasks[0].typeId).toBe("health");

@@ -55,14 +55,14 @@ describe("task types", () => {
     ).toBe("healthy");
   });
 
-  it("always includes the two built-in types", () => {
+  it("falls back to the two default types only for an empty list", () => {
     const types = resolveTaskTypes([type("healthy", 0)]);
-    expect(types.map((item) => item.id)).toEqual([
+    expect(types.map((item) => item.id)).toEqual(["healthy"]);
+    expect(resolveTaskTypes(undefined).map((item) => item.id)).toEqual([
       "voluntary",
       "forced",
-      "healthy",
     ]);
-    expect(resolveTaskTypes(undefined)).toHaveLength(2);
+    expect(resolveTaskTypes([])).toHaveLength(2);
   });
 
   it("builds a nested tree ordered by sibling sort_order", () => {
@@ -75,17 +75,12 @@ describe("task types", () => {
     ]);
 
     const tree = buildTypeTree(types);
-    expect(tree.map((node) => node.type.id)).toEqual([
-      "voluntary",
-      "forced",
-      "health",
-      "work",
-    ]);
-    expect(tree[2].children.map((node) => node.type.id)).toEqual([
+    expect(tree.map((node) => node.type.id)).toEqual(["health", "work"]);
+    expect(tree[0].children.map((node) => node.type.id)).toEqual([
       "sleep",
       "run",
     ]);
-    expect(tree[3].children.map((node) => node.type.id)).toEqual(["meeting"]);
+    expect(tree[1].children.map((node) => node.type.id)).toEqual(["meeting"]);
   });
 
   it("flattens the tree with depth and full path", () => {
@@ -151,11 +146,11 @@ describe("task types", () => {
     );
 
     expect(sorted.map((item) => item.id)).toEqual([
-      "legacy",
-      "forced-a",
       "health",
       "run-a",
       "run-b",
+      "forced-a",
+      "legacy",
     ]);
   });
 });
