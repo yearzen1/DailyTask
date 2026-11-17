@@ -105,6 +105,47 @@ describe("Types", () => {
     expect(container.querySelector('[data-type-row="run"]')).not.toBeInTheDocument();
   });
 
+  it("shows a top-level type name once in the dock", () => {
+    const { container } = render(<Types />);
+    const dock = container.querySelector("[data-type-dock]") as HTMLElement;
+
+    expect(dock).toHaveTextContent("自愿");
+    expect(dock.textContent?.match(/自愿/g)).toHaveLength(1);
+  });
+
+  it("shows ancestors in the breadcrumb and the type name once", () => {
+    const { container } = render(<Types />);
+    fireEvent.click(
+      container.querySelector('[data-type-row="run"] > div') as Element,
+    );
+
+    const dock = container.querySelector("[data-type-dock]") as HTMLElement;
+    expect(dock).toHaveTextContent("自愿 / 健康");
+    expect(dock.querySelector("h2")).toHaveTextContent("跑步");
+    expect(dock.textContent?.match(/跑步/g)).toHaveLength(1);
+  });
+
+  it("renders dock tasks as read-only rows with an icon", () => {
+    const { container } = render(<Types />);
+    const list = container.querySelector(
+      "[data-type-task-list]",
+    ) as HTMLElement;
+
+    expect(list).toHaveClass("overflow-y-auto");
+    expect(list.querySelector('input[type="checkbox"]')).toBeNull();
+    for (const row of Array.from(list.querySelectorAll("li"))) {
+      expect(row.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    }
+  });
+
+  it("caps the dock height so the tree stays visible", () => {
+    const { container } = render(<Types />);
+
+    expect(container.querySelector("[data-type-dock]")).toHaveClass(
+      "max-h-[45%]",
+    );
+  });
+
   it("adds multiple existing tasks and excludes the current subtree", async () => {
     const assignType = vi.fn(async () => undefined);
     useTasksStore.setState({ assignType });
