@@ -199,8 +199,8 @@ CASE WHEN status = 'recorded' THEN 'done' ELSE status END
 | 文件 | 职责 |
 |---|---|
 | `src/db/client.ts` | `Database.load` + 迁移入口 |
-| `src/db/tasks.ts` | 任务/区间/名称段 CRUD、改名、级联删除 |
-| `src/db/taskTypes.ts` | 类型树 CRUD、排序、改父级、删除保护 |
+| `src/db/tasks.ts` | 任务/区间/名称段 CRUD、改名、批量改类型、级联删除 |
+| `src/db/taskTypes.ts` | 类型树 CRUD、排序、拖拽移动、改父级、删除保护 |
 | `src/db/checkins.ts` | 状态、值、备注、删除 |
 | `src/db/todos.ts` | 待办 CRUD |
 | `src/db/settings.ts` | kv JSON 读写与 sanitize |

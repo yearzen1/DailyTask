@@ -67,7 +67,12 @@ flattenTypeTree(types: TaskType[]): FlatType[] // 带 depth / path
 descendantTypeIds(types: TaskType[], id: string): Set<string>
 isTypeDescendant(types, ancestorId, id): boolean
 sortedTasksByType(tasks: Task[], types: TaskType[]): Task[]
+typeDropZone(clientY, top, height, isBuiltin): "before" | "inside" | "after"
+planTypeMove(types, sourceId, targetId, position): { parentId, index } | null
 ```
+
+- `typeDropZone`：自行上三分之一 → 前插，下三分之一 → 后插，中间 → 作为子类型；内置类型整行都算「作为子类型」
+- `planTypeMove`：拒绝移动自身、内置类型、拖到自身子孙下、内置类型的前后插入
 
 - 内置类型 id 为 `voluntary` / `forced`，可被改名，但节点始终存在
 - 树顺序：先父后子；同级按 `sort_order`，相同再按 `created_at`
