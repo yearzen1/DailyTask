@@ -8,7 +8,14 @@ export type IconName =
   | "types"
   | "stats"
   | "settings"
-  | "task";
+  | "task"
+  | "filter"
+  | "sun"
+  | "sliders"
+  | "window"
+  | "database"
+  | "refresh"
+  | "check";
 
 const PATHS: Record<IconName, ReactNode> = {
   today: (
@@ -64,6 +71,39 @@ const PATHS: Record<IconName, ReactNode> = {
       <path d="M7 8h6M7 11.5h4.5" />
     </>
   ),
+  filter: <path d="M3 5h14l-5.4 6.2v4.6L8.4 17v-5.8L3 5z" />,
+  sun: (
+    <>
+      <circle cx="10" cy="10" r="3.2" />
+      <path d="M10 2.5v2M10 15.5v2M17.5 10h-2M4.5 10h-2M15.3 4.7l-1.4 1.4M6.1 13.9l-1.4 1.4M15.3 15.3l-1.4-1.4M6.1 6.1L4.7 4.7" />
+    </>
+  ),
+  sliders: (
+    <>
+      <path d="M3 6h14M3 14h14" />
+      <circle cx="7.5" cy="6" r="2" fill="var(--color-surface)" />
+      <circle cx="13" cy="14" r="2" fill="var(--color-surface)" />
+    </>
+  ),
+  window: (
+    <>
+      <rect x="3" y="4" width="14" height="12" rx="1.6" />
+      <path d="M3 7.5h14M5.5 5.8h.01" />
+    </>
+  ),
+  database: (
+    <>
+      <ellipse cx="10" cy="5" rx="6" ry="2.4" />
+      <path d="M4 5v10c0 1.3 2.7 2.4 6 2.4s6-1.1 6-2.4V5M4 10c0 1.3 2.7 2.4 6 2.4s6-1.1 6-2.4" />
+    </>
+  ),
+  refresh: (
+    <>
+      <path d="M16 10a6 6 0 1 1-1.9-4.4" />
+      <path d="M16.2 3.2v3.8h-3.8" />
+    </>
+  ),
+  check: <path d="M4.5 10.5l3.5 3.5 7.5-8.5" />,
 };
 
 export function Icon({

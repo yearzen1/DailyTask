@@ -104,7 +104,7 @@ export default function Manage() {
   return (
     <>
       <header className="flex items-baseline gap-3">
-        <h1 className="m-0 text-[var(--text-lg)] font-semibold tracking-[.2px]">
+        <h1 className="m-0 text-lg font-semibold tracking-[.2px]">
           {t("manage.title")}
         </h1>
         <span className="text-sm text-[var(--color-text-muted)]">
@@ -114,7 +114,7 @@ export default function Manage() {
           type="button"
           data-manage-new
           onClick={() => setCreating(true)}
-          className="ml-auto rounded-[var(--radius-pill)] bg-[var(--color-voluntary)] px-3 py-1 text-[var(--text-2xs)] font-semibold text-white"
+          className="ml-auto rounded-[var(--radius-pill)] bg-[var(--color-voluntary)] px-3 py-1 text-[11px] font-semibold text-white"
         >
           ＋ {t("manage.new")}
         </button>
@@ -241,7 +241,7 @@ function CreateTaskDialog({
       >
         <h2 className="m-0 text-sm font-semibold">{t("manage.newTitle")}</h2>
 
-        <label className="flex flex-col gap-1 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+        <label className="flex flex-col gap-1 text-[11px] text-[var(--color-text-muted)]">
           {t("manage.field.name")}
           <input
             autoFocus
@@ -263,7 +263,7 @@ function CreateTaskDialog({
           />
         </label>
 
-        <label className="flex flex-col gap-1 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+        <label className="flex flex-col gap-1 text-[11px] text-[var(--color-text-muted)]">
           {t("manage.field.start")}
           <DateField
             data-new-start
@@ -274,7 +274,7 @@ function CreateTaskDialog({
           />
         </label>
 
-        <label className="flex flex-col gap-1 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+        <label className="flex flex-col gap-1 text-[11px] text-[var(--color-text-muted)]">
           {t("manage.field.end")}
           <DateField
             data-new-end
@@ -291,7 +291,7 @@ function CreateTaskDialog({
         {error ? (
           <p
             data-new-error
-            className="m-0 text-[var(--text-2xs)] text-[var(--color-missed)]"
+            className="m-0 text-[11px] text-[var(--color-missed)]"
           >
             {t(INTERVAL_ERROR_KEY[error])}
           </p>
@@ -308,7 +308,7 @@ function CreateTaskDialog({
             type="button"
             data-new-cancel
             onClick={onClose}
-            className="rounded-[var(--radius-control)] px-2.5 py-1 text-[var(--text-2xs)] text-[var(--color-text-muted)] hover:bg-[var(--state-hover)]"
+            className="rounded-[var(--radius-control)] px-2.5 py-1 text-[11px] text-[var(--color-text-muted)] hover:bg-[var(--state-hover)]"
           >
             {t("manage.cancel")}
           </button>
@@ -316,7 +316,7 @@ function CreateTaskDialog({
             type="submit"
             data-new-submit
             disabled={!canSubmit}
-            className="rounded-[var(--radius-control)] bg-[var(--color-voluntary)] px-2.5 py-1 text-[var(--text-2xs)] font-semibold text-white disabled:opacity-40"
+            className="rounded-[var(--radius-control)] bg-[var(--color-voluntary)] px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-40"
           >
             {t("manage.submit")}
           </button>
@@ -339,7 +339,7 @@ function EveryDaysField({
   const t = useT();
 
   return (
-    <label className="flex min-w-0 flex-col gap-1 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+    <label className="flex min-w-0 flex-col gap-1 text-[11px] text-[var(--color-text-muted)]">
       {t("manage.field.everyDays")}
       <input
         type="number"
@@ -456,7 +456,7 @@ function EditTaskDialog({
           {t("manage.editTitle", { name: task.name })}
         </h2>
 
-        <label className="flex flex-col gap-1 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+        <label className="flex flex-col gap-1 text-[11px] text-[var(--color-text-muted)]">
           {t("manage.field.name")}
           <input
             autoFocus
@@ -470,7 +470,7 @@ function EditTaskDialog({
           </span>
         </label>
 
-        <label className="flex items-center gap-1.5 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+        <label className="flex items-center gap-1.5 text-[11px] text-[var(--color-text-muted)]">
           <input
             type="checkbox"
             data-edit-name-typo
@@ -480,7 +480,7 @@ function EditTaskDialog({
           {t("manage.nameHistory.typo")}
         </label>
 
-        <div className="text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+        <div className="text-[11px] text-[var(--color-text-muted)]">
           <p className="m-0 mb-1">{t("manage.nameHistory")}</p>
           <ul className="m-0 flex list-none flex-col gap-0.5 p-0 tabular-nums">
             {periods.map((period) => (
@@ -508,7 +508,7 @@ function EditTaskDialog({
         </label>
 
         {sorted.length > 1 ? (
-          <div className="text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+          <div className="text-[11px] text-[var(--color-text-muted)]">
             <p className="m-0 mb-1">{t("manage.history")}</p>
             <ul className="m-0 flex list-none flex-col gap-0.5 p-0 tabular-nums">
               {sorted.slice(0, -1).map((interval) => (
@@ -524,7 +524,7 @@ function EditTaskDialog({
         ) : null}
 
         <div className="grid grid-cols-2 gap-2">
-          <label className="flex min-w-0 flex-col gap-1 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+          <label className="flex min-w-0 flex-col gap-1 text-[11px] text-[var(--color-text-muted)]">
             {t("manage.field.start")}
             <DateField
               data-edit-start
@@ -534,7 +534,7 @@ function EditTaskDialog({
               className="rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1 text-sm text-[var(--color-text)]"
             />
           </label>
-          <label className="flex min-w-0 flex-col gap-1 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+          <label className="flex min-w-0 flex-col gap-1 text-[11px] text-[var(--color-text-muted)]">
             {t("manage.field.end")}
             <DateField
               data-edit-end
@@ -555,7 +555,7 @@ function EditTaskDialog({
           dataAttribute="edit"
         />
 
-        <label className="flex items-center gap-1.5 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+        <label className="flex items-center gap-1.5 text-[11px] text-[var(--color-text-muted)]">
           <input
             type="checkbox"
             data-edit-open
@@ -574,7 +574,7 @@ function EditTaskDialog({
         {error ? (
           <p
             data-edit-error
-            className="m-0 text-[var(--text-2xs)] text-[var(--color-missed)]"
+            className="m-0 text-[11px] text-[var(--color-missed)]"
           >
             {t(INTERVAL_ERROR_KEY[error])}
           </p>
@@ -585,7 +585,7 @@ function EditTaskDialog({
             type="button"
             data-edit-cancel
             onClick={onClose}
-            className="rounded-[var(--radius-control)] px-2.5 py-1 text-[var(--text-2xs)] text-[var(--color-text-muted)] hover:bg-[var(--state-hover)]"
+            className="rounded-[var(--radius-control)] px-2.5 py-1 text-[11px] text-[var(--color-text-muted)] hover:bg-[var(--state-hover)]"
           >
             {t("manage.cancel")}
           </button>
@@ -593,7 +593,7 @@ function EditTaskDialog({
             type="submit"
             data-edit-submit
             disabled={!canSubmit}
-            className="rounded-[var(--radius-control)] bg-[var(--color-voluntary)] px-2.5 py-1 text-[var(--text-2xs)] font-semibold text-white disabled:opacity-40"
+            className="rounded-[var(--radius-control)] bg-[var(--color-voluntary)] px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-40"
           >
             {t("manage.save")}
           </button>
@@ -694,7 +694,7 @@ function IntervalDialog({
           })}
         </h2>
 
-        <label className="flex flex-col gap-1 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+        <label className="flex flex-col gap-1 text-[11px] text-[var(--color-text-muted)]">
           {t("manage.effectiveDate")}
           <DateField
             data-interval-date
@@ -714,13 +714,13 @@ function IntervalDialog({
           />
         ) : null}
 
-        <p className="m-0 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+        <p className="m-0 text-[11px] text-[var(--color-text-muted)]">
           {t(mode === "stop" ? "manage.stopHint" : "manage.resumeHint")}
         </p>
         {!valid || error ? (
           <p
             data-interval-error
-            className="m-0 text-[var(--text-2xs)] text-[var(--color-missed)]"
+            className="m-0 text-[11px] text-[var(--color-missed)]"
           >
             {error ?? t("manage.dateInvalid")}
           </p>
@@ -731,7 +731,7 @@ function IntervalDialog({
             type="button"
             data-interval-cancel
             onClick={onClose}
-            className="rounded-[var(--radius-control)] px-2.5 py-1 text-[var(--text-2xs)] text-[var(--color-text-muted)] hover:bg-[var(--state-hover)]"
+            className="rounded-[var(--radius-control)] px-2.5 py-1 text-[11px] text-[var(--color-text-muted)] hover:bg-[var(--state-hover)]"
           >
             {t("manage.cancel")}
           </button>
@@ -739,7 +739,7 @@ function IntervalDialog({
             type="submit"
             data-interval-submit
             disabled={!valid}
-            className="rounded-[var(--radius-control)] bg-[var(--color-voluntary)] px-2.5 py-1 text-[var(--text-2xs)] font-semibold text-white disabled:opacity-40"
+            className="rounded-[var(--radius-control)] bg-[var(--color-voluntary)] px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-40"
           >
             {t(
               mode === "stop" ? "manage.confirmStop" : "manage.confirmResume",
@@ -882,7 +882,7 @@ function ManageTableRow({ row, today }: { row: ManageRow; today: string }) {
             type="button"
             data-manage-action={row.hasOpen ? "stop" : "resume"}
             onClick={() => setDialog(row.hasOpen ? "stop" : "resume")}
-            className="rounded-[var(--radius-control)] px-1.5 py-0.5 text-[var(--text-2xs)] text-[var(--color-text-muted)] hover:bg-[var(--state-active)]"
+            className="rounded-[var(--radius-control)] px-1.5 py-0.5 text-[11px] text-[var(--color-text-muted)] hover:bg-[var(--state-active)]"
           >
             {t(row.hasOpen ? "manage.stop" : "manage.resume")}
           </button>
@@ -890,7 +890,7 @@ function ManageTableRow({ row, today }: { row: ManageRow; today: string }) {
             type="button"
             data-manage-action="edit"
             onClick={() => setDialog("edit")}
-            className="rounded-[var(--radius-control)] px-1.5 py-0.5 text-[var(--text-2xs)] text-[var(--color-text-muted)] hover:bg-[var(--state-active)]"
+            className="rounded-[var(--radius-control)] px-1.5 py-0.5 text-[11px] text-[var(--color-text-muted)] hover:bg-[var(--state-active)]"
           >
             {t("manage.edit")}
           </button>
@@ -900,7 +900,7 @@ function ManageTableRow({ row, today }: { row: ManageRow; today: string }) {
             description={t("manage.deleteHint")}
             errorMessage={t("manage.deleteFailed")}
             onConfirm={(confirmation) => remove(row.task.id, confirmation)}
-            className="rounded-[var(--radius-control)] px-1.5 py-0.5 text-[var(--text-2xs)] text-[var(--color-text-muted)] hover:bg-[var(--state-hover)] hover:text-[var(--color-missed)]"
+            className="rounded-[var(--radius-control)] px-1.5 py-0.5 text-[11px] text-[var(--color-text-muted)] hover:bg-[var(--state-hover)] hover:text-[var(--color-missed)]"
           >
             {t("manage.delete")}
           </ConfirmDeleteButton>

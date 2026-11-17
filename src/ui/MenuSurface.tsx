@@ -44,7 +44,7 @@ export function MenuHeading({
   return (
     <p
       className={clsx(
-        "m-0 truncate px-1 pb-1 text-[var(--text-2xs)] text-[var(--color-text-muted)]",
+        "m-0 truncate px-1 pb-1 text-[11px] text-[var(--color-text-muted)]",
         className,
       )}
     >

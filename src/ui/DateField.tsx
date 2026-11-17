@@ -375,7 +375,7 @@ export function DateField({
               setDraft("");
               setOpen(false);
             }}
-            className="rounded-[var(--radius-control)] px-2 py-1 text-[var(--text-2xs)] text-[var(--color-text-muted)] hover:bg-[var(--state-hover)]"
+            className="rounded-[var(--radius-control)] px-2 py-1 text-[11px] text-[var(--color-text-muted)] hover:bg-[var(--state-hover)]"
           >
             {t("date.clear")}
           </button>
@@ -383,7 +383,7 @@ export function DateField({
         <button
           type="button"
           onClick={() => pick(today)}
-          className="rounded-[var(--radius-control)] px-2 py-1 text-[var(--text-2xs)] font-semibold text-[var(--color-voluntary)] hover:bg-[var(--state-hover)]"
+          className="rounded-[var(--radius-control)] px-2 py-1 text-[11px] font-semibold text-[var(--color-voluntary)] hover:bg-[var(--state-hover)]"
         >
           {t("date.today")}
         </button>

@@ -43,7 +43,7 @@ export function Chip({
       className={clsx(
         "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-[var(--radius-pill)] font-semibold leading-none",
         size === "md"
-          ? "h-[18px] px-[7px] text-[var(--text-2xs)]"
+          ? "h-[18px] px-[7px] text-[11px]"
           : "h-4 px-[6px] text-[10px]",
         VARIANT_CLASS[variant],
         className,

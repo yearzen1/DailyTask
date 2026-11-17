@@ -119,13 +119,13 @@ export function ConfirmDeleteButton({
                 <h2 className="m-0 text-sm font-semibold">
                   {t("common.deleteTitle", { name })}
                 </h2>
-                <p className="m-0 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+                <p className="m-0 text-[11px] text-[var(--color-text-muted)]">
                   {description ?? t("common.deleteHint")}
                 </p>
                 {error ? (
                   <p
                     data-confirm-delete-error
-                    className="m-0 text-[var(--text-2xs)] text-[var(--color-missed)]"
+                    className="m-0 text-[11px] text-[var(--color-missed)]"
                   >
                     {error}
                   </p>
@@ -137,7 +137,7 @@ export function ConfirmDeleteButton({
                     data-confirm-delete-cancel
                     disabled={pending}
                     onClick={close}
-                    className="rounded-[var(--radius-control)] px-2.5 py-1 text-[var(--text-2xs)] text-[var(--color-text-muted)] hover:bg-[var(--state-hover)] disabled:opacity-40"
+                    className="rounded-[var(--radius-control)] px-2.5 py-1 text-[11px] text-[var(--color-text-muted)] hover:bg-[var(--state-hover)] disabled:opacity-40"
                   >
                     {cancelText}
                   </button>
@@ -146,7 +146,7 @@ export function ConfirmDeleteButton({
                     data-confirm-delete-submit
                     disabled={pending}
                     onClick={() => void confirm()}
-                    className="rounded-[var(--radius-control)] bg-[var(--color-missed)] px-2.5 py-1 text-[var(--text-2xs)] font-semibold text-white disabled:opacity-40"
+                    className="rounded-[var(--radius-control)] bg-[var(--color-missed)] px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-40"
                   >
                     {pending ? t("common.deleting") : confirmText}
                   </button>
