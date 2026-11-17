@@ -76,6 +76,16 @@ migration 1 was previously applied but has been modified
 3. Console 搜 `[sync]`
 4. 两窗口是否连同一个 DB
 
+### 6.1 拖拽不生效
+
+Windows 上 Tauri 默认接管 WebView2 的拖放，HTML5 `dragstart / dragover / drop` 会被吞掉。主窗口必须保留：
+
+```json
+"dragDropEnabled": false
+```
+
+改完 `tauri.conf.json` 要重启应用，Vite HMR 不会重新创建窗口。
+
 ## 7. 更新
 
 | 现象 | 处理 |

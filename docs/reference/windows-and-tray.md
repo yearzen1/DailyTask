@@ -14,6 +14,7 @@
 | 默认尺寸 | 1080×720 |
 | 最小尺寸 | 900×640 |
 | 装饰 | 原生标题栏 |
+| 拖放 | `dragDropEnabled: false`；Windows 上必须关闭 Tauri 原生拖放，HTML5 拖拽才能收到 `dragstart / dragover / drop` |
 | 关闭行为 | 销毁主 WebView，保留或重建挂件；再次打开时按需重建主窗 |
 | 入口 | 启动时显示；托盘或单实例唤回 |
 

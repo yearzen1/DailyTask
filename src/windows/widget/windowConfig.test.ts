@@ -16,6 +16,7 @@ interface WindowConfig {
   transparent?: boolean;
   alwaysOnTop?: boolean;
   skipTaskbar?: boolean;
+  dragDropEnabled?: boolean;
   url?: string;
 }
 
@@ -36,6 +37,14 @@ describe("widget window config", () => {
       minWidth: 900,
       minHeight: 640,
     });
+  });
+
+  it("disables Tauri's native drag drop so HTML5 drag works on Windows", () => {
+    const main = readJson("src-tauri/tauri.conf.json").app.windows.find(
+      (window) => window.label === "main",
+    );
+
+    expect(main?.dragDropEnabled).toBe(false);
   });
 
   it("creates the widget on demand instead of keeping a second WebView alive", () => {
