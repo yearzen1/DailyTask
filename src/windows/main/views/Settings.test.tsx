@@ -102,6 +102,17 @@ describe("Settings", () => {
     );
   });
 
+  it("renders a preview for each theme option", () => {
+    const { container } = render(<Settings />);
+
+    expect(
+      container.querySelectorAll("[data-theme-preview]"),
+    ).toHaveLength(3);
+    expect(
+      container.querySelector('[data-theme-option="system"]'),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("applies and persists a theme switch", () => {
     const { container } = render(<Settings />);
 
