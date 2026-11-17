@@ -5,11 +5,13 @@ import {
   DEFAULT_SETTINGS,
   type Checkin,
   type Task,
+  type TaskType,
   type Todo,
 } from "../../../domain/types";
 import { checkinKey } from "../../../domain/keys";
 import { useCheckinsStore } from "../../../stores/checkinsStore";
 import { useSettingsStore } from "../../../stores/settingsStore";
+import { useTaskTypesStore } from "../../../stores/taskTypesStore";
 import { useTasksStore } from "../../../stores/tasksStore";
 import { useTodosStore } from "../../../stores/todosStore";
 import Today from "./Today";
@@ -36,6 +38,7 @@ describe("Today due todos", () => {  beforeEach(() => {
 
     useSettingsStore.setState({ settings: DEFAULT_SETTINGS });
     useTasksStore.setState({ tasks: [] });
+    useTaskTypesStore.setState({ types: [] });
     useCheckinsStore.setState({ byKey: new Map() });
     useTodosStore.setState({
       todos: [
@@ -173,7 +176,7 @@ describe("Today due todos", () => {  beforeEach(() => {
     expect(container.querySelector("[data-todo-bar]")).not.toBeNull();
 
     const voluntaryHeader = screen.getByRole("button", {
-      name: "折叠自愿任务",
+      name: "折叠自愿",
     });
     fireEvent.click(voluntaryHeader);
     expect(voluntaryHeader).toHaveAttribute("aria-expanded", "false");
@@ -188,6 +191,49 @@ describe("Today due todos", () => {  beforeEach(() => {
     expect(todoHeader).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("交房租")).not.toBeInTheDocument();
     expect(within(todoHeader).getByText("1 / 3")).toBeInTheDocument();
+  });
+
+  it("collapses a parent type and hides its child type and tasks", () => {
+    const types: TaskType[] = [
+      {
+        id: "health",
+        name: "健康",
+        parentId: "voluntary",
+        order: 0,
+        systemKey: null,
+        color: null,
+        createdAt: "2026-11-01T00:00:00.000Z",
+        updatedAt: "2026-11-01T00:00:00.000Z",
+      },
+      {
+        id: "run",
+        name: "跑步",
+        parentId: "health",
+        order: 0,
+        systemKey: null,
+        color: null,
+        createdAt: "2026-11-01T00:00:00.000Z",
+        updatedAt: "2026-11-01T00:00:00.000Z",
+      },
+    ];
+    useTaskTypesStore.setState({ types });
+    useTasksStore.setState({
+      tasks: [
+        { ...task(), id: "p1", name: "体检", typeId: "health", order: 0 },
+        { ...task(), id: "c1", name: "晨跑", typeId: "run", order: 1 },
+      ],
+    });
+
+    render(<Today />);
+    expect(screen.getByText("体检")).toBeInTheDocument();
+    expect(screen.getByText("晨跑")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "折叠健康" }));
+
+    expect(screen.queryByText("体检")).not.toBeInTheDocument();
+    expect(screen.queryByText("跑步")).not.toBeInTheDocument();
+    expect(screen.queryByText("晨跑")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "折叠自愿" })).toBeInTheDocument();
   });
 });
 
@@ -222,6 +268,7 @@ describe("Today values", () => {
 
     useSettingsStore.setState({ settings: DEFAULT_SETTINGS });
     useTasksStore.setState({ tasks: [task()] });
+    useTaskTypesStore.setState({ types: [] });
     useCheckinsStore.setState({
       byKey: new Map([[checkinKey("t1", TODAY), valueCell("3min")]]),
     });

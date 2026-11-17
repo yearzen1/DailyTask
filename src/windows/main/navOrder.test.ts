@@ -13,7 +13,15 @@ describe("sanitizeNavOrder", () => {
   it("drops unknown and duplicate views", () => {
     expect(
       sanitizeNavOrder(["todos", "nope", "todos", 42, "today"]),
-    ).toEqual(["todos", "today", "grid", "manage", "stats", "settings"]);
+    ).toEqual([
+      "todos",
+      "today",
+      "grid",
+      "manage",
+      "types",
+      "stats",
+      "settings",
+    ]);
   });
 
   it("appends missing views in the default order", () => {
@@ -23,6 +31,7 @@ describe("sanitizeNavOrder", () => {
       "grid",
       "todos",
       "manage",
+      "types",
       "stats",
     ]);
   });
@@ -63,7 +72,7 @@ describe("nav order storage", () => {
 describe("moveNavItem", () => {
   it("moves an item down and up", () => {
     expect(moveNavItem(DEFAULT_NAV_ORDER, 0, 2)[2]).toBe("today");
-    expect(moveNavItem(DEFAULT_NAV_ORDER, 5, 1)[1]).toBe("settings");
+    expect(moveNavItem(DEFAULT_NAV_ORDER, 6, 1)[1]).toBe("settings");
   });
 
   it("returns the same array when the position does not change", () => {
@@ -71,6 +80,6 @@ describe("moveNavItem", () => {
   });
 
   it("clamps out-of-range targets", () => {
-    expect(moveNavItem(DEFAULT_NAV_ORDER, 4, 99).at(-1)).toBe("stats");
+    expect(moveNavItem(DEFAULT_NAV_ORDER, 5, 99).at(-1)).toBe("stats");
   });
 });

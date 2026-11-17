@@ -6,6 +6,7 @@ import {
   currentSource,
   emitCheckinsChanged,
   emitSettingsChanged,
+  emitTaskTypesChanged,
   emitTasksChanged,
   emitTodosChanged,
   emitWidgetExpand,
@@ -13,6 +14,7 @@ import {
   onCheckinsChanged,
   type CheckinsChanged,
   type SettingsChanged,
+  type TaskTypesChanged,
   type TasksChanged,
   type TodosChanged,
   type WidgetExpand,
@@ -71,6 +73,7 @@ describe("events", () => {
     expect(names).toEqual([
       "checkins:changed",
       "tasks:changed",
+      "task-types:changed",
       "todos:changed",
       "settings:changed",
       "widget:expand",
@@ -79,6 +82,7 @@ describe("events", () => {
 
   it("emits every event with a source-only invalidation payload", async () => {
     await emitTasksChanged({ source: "main" });
+    await emitTaskTypesChanged({ source: "widget" });
     await emitTodosChanged({ source: "widget" });
     await emitSettingsChanged({ source: "main" });
     await emitWidgetExpand({ source: "main" });
@@ -86,13 +90,16 @@ describe("events", () => {
     expect(emit).toHaveBeenNthCalledWith(1, Events.tasksChanged, {
       source: "main",
     });
-    expect(emit).toHaveBeenNthCalledWith(2, Events.todosChanged, {
+    expect(emit).toHaveBeenNthCalledWith(2, Events.taskTypesChanged, {
       source: "widget",
     });
-    expect(emit).toHaveBeenNthCalledWith(3, Events.settingsChanged, {
+    expect(emit).toHaveBeenNthCalledWith(3, Events.todosChanged, {
+      source: "widget",
+    });
+    expect(emit).toHaveBeenNthCalledWith(4, Events.settingsChanged, {
       source: "main",
     });
-    expect(emit).toHaveBeenNthCalledWith(4, Events.widgetExpand, {
+    expect(emit).toHaveBeenNthCalledWith(5, Events.widgetExpand, {
       source: "main",
     });
   });
@@ -103,6 +110,9 @@ describe("events", () => {
       source: "main" | "widget";
     }>();
     expectTypeOf<TasksChanged>().toEqualTypeOf<{
+      source: "main" | "widget";
+    }>();
+    expectTypeOf<TaskTypesChanged>().toEqualTypeOf<{
       source: "main" | "widget";
     }>();
     expectTypeOf<TodosChanged>().toEqualTypeOf<{

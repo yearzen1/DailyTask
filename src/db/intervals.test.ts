@@ -40,6 +40,11 @@ const MIGRATION_005 = readFileSync(
   "utf8",
 );
 
+const MIGRATION_006 = readFileSync(
+  resolve(process.cwd(), "src-tauri/migrations/006_task_types.sql"),
+  "utf8",
+);
+
 /** 真实 SQLite：验证停用/重新启用只追加区间，历史区间与打卡行都不动。 */
 function createDb(): SqlDatabase {
   const sqlite = new DatabaseSync(":memory:");
@@ -48,6 +53,7 @@ function createDb(): SqlDatabase {
   sqlite.exec(MIGRATION_003);
   sqlite.exec(MIGRATION_004);
   sqlite.exec(MIGRATION_005);
+  sqlite.exec(MIGRATION_006);
   sqlite.exec(
     "INSERT INTO tasks (id, name, category, sort_order, created_at, updated_at) " +
       "VALUES ('t1', '跑步', 'voluntary', 0, '2026-10-01', '2026-10-01')",

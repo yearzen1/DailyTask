@@ -18,6 +18,11 @@ const MIGRATION_005 = readFileSync(
   "utf8",
 );
 
+const MIGRATION_006 = readFileSync(
+  resolve(process.cwd(), "src-tauri/migrations/006_task_types.sql"),
+  "utf8",
+);
+
 function legacyDb(): DatabaseSync {
   const sqlite = new DatabaseSync(":memory:");
   for (const sql of MIGRATIONS) {
@@ -72,5 +77,53 @@ describe("005_task_name_periods", () => {
         )
         .get(),
     ).toEqual({ name: "阅读", start_date: "2026-09-20", end_date: null });
+  });
+});
+
+describe("006_task_types", () => {
+  it("inserts the two built-in types", () => {
+    const sqlite = legacyDb();
+    sqlite.exec(MIGRATION_006);
+
+    expect(
+      sqlite
+        .prepare(
+          "SELECT id, name, parent_id, sort_order, system_key FROM task_types ORDER BY sort_order",
+        )
+        .all(),
+    ).toEqual([
+      {
+        id: "voluntary",
+        name: null,
+        parent_id: null,
+        sort_order: 0,
+        system_key: "voluntary",
+      },
+      {
+        id: "forced",
+        name: null,
+        parent_id: null,
+        sort_order: 1,
+        system_key: "forced",
+      },
+    ]);
+  });
+
+  it("backfills tasks.type_id from category", () => {
+    const sqlite = legacyDb();
+    sqlite.exec(
+      "INSERT INTO tasks (id, name, category, sort_order, created_at, updated_at) " +
+        "VALUES ('t1', '跑步', 'voluntary', 0, '2026-10-01', '2026-10-01'), " +
+        "('t2', '开会', 'forced', 1, '2026-10-01', '2026-10-01')",
+    );
+
+    sqlite.exec(MIGRATION_006);
+
+    expect(
+      sqlite.prepare("SELECT id, type_id FROM tasks ORDER BY id").all(),
+    ).toEqual([
+      { id: "t1", type_id: "voluntary" },
+      { id: "t2", type_id: "forced" },
+    ]);
   });
 });

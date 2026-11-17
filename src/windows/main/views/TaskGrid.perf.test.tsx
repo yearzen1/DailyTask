@@ -65,7 +65,7 @@ describe("TaskGrid 性能预算", () => {
       update: vi.fn(async () => undefined),
     });
     useUiStore.setState({
-      gridFilter: { category: "all", taskId: null, from: null, to: null },
+      gridFilter: { typeId: null, taskId: null, from: null, to: null },
     });
     useTasksStore.setState({
       tasks: Array.from({ length: 21 }, (_, index) => task(index)),

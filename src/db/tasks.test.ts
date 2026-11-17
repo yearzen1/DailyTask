@@ -19,6 +19,7 @@ const taskRow: TaskRow = {
   id: "t1",
   name: "跑步",
   category: "voluntary",
+  type_id: "voluntary",
   sort_order: 2,
   created_at: "2026-11-01T00:00:00.000Z",
   updated_at: "2026-11-02T00:00:00.000Z",
@@ -93,6 +94,7 @@ describe("taskFromRows", () => {
     expect(task.createdAt).toBe("2026-11-01T00:00:00.000Z");
     expect(task.intervals).toHaveLength(2);
     expect(task.intervals[0].end).toBe("2026-10-31");
+    expect(task.typeId).toBe("voluntary");
   });
 
   it("uses the latest name period as the current name", () => {
@@ -151,6 +153,38 @@ describe("createTask", () => {
 
     expect(task.intervals[0].end).toBeNull();
     expect(calls[1][3]).toBeNull();
+  });
+
+  it("stores a custom type id and syncs the legacy category root", async () => {
+    const calls: unknown[][] = [];
+    const db: SqlDatabase = {
+      select: async <T>(query: string) =>
+        (query.includes("WITH RECURSIVE")
+          ? [{ system_key: "forced" }]
+          : [{ next: 0 }]) as T,
+      execute: async (_query, values = []) => {
+        calls.push(values);
+        return { rowsAffected: 1 };
+      },
+    };
+
+    const task = await createTask(db, {
+      name: "开会",
+      typeId: "work",
+      startDate: "2026-11-01",
+    });
+
+    expect(task.typeId).toBe("work");
+    expect(task.category).toBe("forced");
+    expect(calls[0]).toEqual([
+      task.id,
+      "开会",
+      "forced",
+      "work",
+      0,
+      expect.any(String),
+      expect.any(String),
+    ]);
   });
 });
 

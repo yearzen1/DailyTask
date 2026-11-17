@@ -2,7 +2,13 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { checkinKey } from "../../domain/keys";
-import type { Checkin, CheckinStatus, Task, Todo } from "../../domain/types";
+import type {
+  Checkin,
+  CheckinStatus,
+  Task,
+  TaskType,
+  Todo,
+} from "../../domain/types";
 import { DEFAULT_SETTINGS } from "../../domain/types";
 import { useCheckinsStore } from "../checkinsStore";
 import { useDayStore } from "../dayStore";
@@ -154,6 +160,62 @@ describe("buildToday", () => {
       applicable: 6,
       ratio: 0.4,
     });
+  });
+
+  it("groups tasks by a nested type tree and aggregates parent stats", () => {
+    const types: TaskType[] = [
+      {
+        id: "health",
+        name: "健康",
+        parentId: "voluntary",
+        order: 0,
+        systemKey: null,
+        color: "green",
+        createdAt: "2026-11-01T00:00:00.000Z",
+        updatedAt: "2026-11-01T00:00:00.000Z",
+      },
+      {
+        id: "run",
+        name: "跑步",
+        parentId: "health",
+        order: 0,
+        systemKey: null,
+        color: null,
+        createdAt: "2026-11-01T00:00:00.000Z",
+        updatedAt: "2026-11-01T00:00:00.000Z",
+      },
+    ];
+    const nestedTasks: Task[] = [
+      { ...task("parent", "体检", "voluntary", 0), typeId: "health" },
+      { ...task("child", "晨跑", "voluntary", 1), typeId: "run" },
+      task("f1", "开会", "forced", 2),
+    ];
+
+    const data = buildToday(
+      nestedTasks,
+      new Map(),
+      DEFAULT_SETTINGS,
+      [],
+      NOW,
+      types,
+    );
+
+    expect(data.groups.map((group) => group.type.id)).toEqual([
+      "voluntary",
+      "health",
+      "run",
+      "forced",
+    ]);
+    expect(data.groups.map((group) => group.depth)).toEqual([0, 1, 2, 0]);
+    expect(data.groups[0].rows).toHaveLength(0);
+    expect(data.groups[0].stat).toEqual({ done: 0, total: 2 });
+    expect(data.groups[1].rows.map((row) => row.task.id)).toEqual(["parent"]);
+    expect(data.groups[2].rows.map((row) => row.task.id)).toEqual(["child"]);
+    expect(data.typeStats.map((item) => item.type.id)).toEqual([
+      "voluntary",
+      "forced",
+    ]);
+    expect(data.typeStats[0].stat).toEqual({ done: 0, total: 2 });
   });
 });
 

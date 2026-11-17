@@ -6,9 +6,11 @@ import {
   DEFAULT_SETTINGS,
   type Checkin,
   type Task,
+  type TaskType,
 } from "../../../domain/types";
 import { useCheckinsStore } from "../../../stores/checkinsStore";
 import { useSettingsStore } from "../../../stores/settingsStore";
+import { useTaskTypesStore } from "../../../stores/taskTypesStore";
 import { useTasksStore } from "../../../stores/tasksStore";
 import { useUiStore } from "../../../stores/uiStore";
 import TaskGrid from "./TaskGrid";
@@ -84,8 +86,9 @@ describe("TaskGrid", () => {
       update: updateSettings,
     });
     useUiStore.setState({
-      gridFilter: { category: "all", taskId: null, from: null, to: null },
+      gridFilter: { typeId: null, taskId: null, from: null, to: null },
     });
+    useTaskTypesStore.setState({ types: [], loaded: true });
     useTasksStore.setState({
       tasks: [
         task("t1", "引体向上", "voluntary", "2026-10-28", null, 0),
@@ -125,6 +128,79 @@ describe("TaskGrid", () => {
     expect(
       container.querySelector('[data-grid-row="t3"]'),
     ).not.toBeInTheDocument();
+  });
+
+  it("nests type groups, collapses descendants, and filters a parent subtree", () => {
+    const types: TaskType[] = [
+      {
+        id: "health",
+        name: "健康",
+        parentId: "voluntary",
+        order: 0,
+        systemKey: null,
+        color: "green",
+        createdAt: "2026-11-01T00:00:00.000Z",
+        updatedAt: "2026-11-01T00:00:00.000Z",
+      },
+      {
+        id: "run",
+        name: "跑步",
+        parentId: "health",
+        order: 0,
+        systemKey: null,
+        color: null,
+        createdAt: "2026-11-01T00:00:00.000Z",
+        updatedAt: "2026-11-01T00:00:00.000Z",
+      },
+    ];
+    useTaskTypesStore.setState({ types });
+    useTasksStore.setState({
+      tasks: [
+        {
+          ...task("p1", "体检", "voluntary", "2026-11-01", null, 0),
+          typeId: "health",
+        },
+        {
+          ...task("c1", "晨跑", "voluntary", "2026-11-01", null, 1),
+          typeId: "run",
+        },
+      ],
+      loaded: true,
+      reorder,
+    });
+
+    const { container } = render(<TaskGrid />);
+
+    const headers = Array.from(
+      container.querySelectorAll("[data-group-header]"),
+    ).map((element) => element.getAttribute("data-group-header"));
+    expect(headers).toEqual(["voluntary", "health", "run"]);
+
+    fireEvent.click(
+      container.querySelector('[data-group-header="health"]') as Element,
+    );
+    expect(
+      container.querySelector('[data-group-header="run"]'),
+    ).not.toBeInTheDocument();
+    expect(
+      container.querySelector('[data-grid-row="p1"]'),
+    ).not.toBeInTheDocument();
+    expect(
+      container.querySelector('[data-grid-row="c1"]'),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(
+      container.querySelector('[data-group-header="health"]') as Element,
+    );
+    expect(container.querySelector('[data-grid-row="p1"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-grid-row="c1"]')).toBeInTheDocument();
+
+    fireEvent.change(container.querySelector("[data-filter-type]") as Element, {
+      target: { value: "health" },
+    });
+
+    expect(container.querySelector('[data-grid-row="p1"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-grid-row="c1"]')).toBeInTheDocument();
   });
 
   it("expands the retired group on demand", () => {
@@ -576,12 +652,12 @@ describe("TaskGrid", () => {
     expect(updateSettings).not.toHaveBeenCalled();
   });
 
-  it("filters rows by category and by task", () => {
+  it("filters rows by type and by task", () => {
     const { container } = render(<TaskGrid />);
 
-    fireEvent.click(
-      container.querySelector('[data-filter-category="forced"]') as Element,
-    );
+    fireEvent.change(container.querySelector("[data-filter-type]") as Element, {
+      target: { value: "forced" },
+    });
     expect(
       container.querySelector('[data-grid-row="t2"]'),
     ).toBeInTheDocument();
@@ -592,9 +668,9 @@ describe("TaskGrid", () => {
       container.querySelector('[data-group-header="voluntary"]'),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(
-      container.querySelector('[data-filter-category="all"]') as Element,
-    );
+    fireEvent.change(container.querySelector("[data-filter-type]") as Element, {
+      target: { value: "" },
+    });
     fireEvent.change(container.querySelector("[data-filter-task]") as Element, {
       target: { value: "t2" },
     });
@@ -642,9 +718,9 @@ describe("TaskGrid", () => {
     fireEvent.change(container.querySelector("[data-filter-task]") as Element, {
       target: { value: "t2" },
     });
-    fireEvent.click(
-      container.querySelector('[data-filter-category="voluntary"]') as Element,
-    );
+    fireEvent.change(container.querySelector("[data-filter-type]") as Element, {
+      target: { value: "voluntary" },
+    });
 
     expect(screen.getByText("没有符合筛选的任务")).toBeInTheDocument();
     expect(

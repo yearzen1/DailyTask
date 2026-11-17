@@ -8,9 +8,14 @@ describe("loadAppData", () => {
     const firstSeen: string[] = [];
     const db: SqlDatabase = {
       select: async <T>(query: string) => {
-        const table = ["settings", "tasks", "task_intervals", "checkins", "todos"].find(
-          (name) => query.includes(`FROM ${name}`),
-        );
+        const table = [
+          "settings",
+          "tasks",
+          "task_types",
+          "task_intervals",
+          "checkins",
+          "todos",
+        ].find((name) => query.includes(`FROM ${name}`));
         if (table && !firstSeen.includes(table)) {
           firstSeen.push(table);
         }
@@ -22,11 +27,17 @@ describe("loadAppData", () => {
     const data = await loadAppData(db);
 
     expect(firstSeen[0]).toBe("settings");
-    expect(firstSeen.indexOf("tasks")).toBeLessThan(firstSeen.indexOf("checkins"));
+    expect(firstSeen.indexOf("tasks")).toBeLessThan(
+      firstSeen.indexOf("task_types"),
+    );
+    expect(firstSeen.indexOf("task_types")).toBeLessThan(
+      firstSeen.indexOf("checkins"),
+    );
     expect(firstSeen.indexOf("checkins")).toBeLessThan(firstSeen.indexOf("todos"));
     expect(data).toEqual({
       settings: expect.objectContaining({ dayStartHour: 4 }),
       tasks: [],
+      taskTypes: [],
       checkins: [],
       todos: [],
     });

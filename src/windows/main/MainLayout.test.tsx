@@ -105,7 +105,15 @@ describe("MainLayout", () => {
     fireEvent(settings, pointer("pointermove", 10));
     fireEvent(settings, pointer("pointerup", 10));
 
-    const expected = ["settings", "today", "grid", "todos", "manage", "stats"];
+    const expected = [
+      "settings",
+      "today",
+      "grid",
+      "todos",
+      "manage",
+      "types",
+      "stats",
+    ];
     expect(navOrder(container)).toEqual(expected);
     expect(JSON.parse(localStorage.getItem(NAV_ORDER_KEY) ?? "[]")).toEqual(
       expected,
@@ -118,7 +126,15 @@ describe("MainLayout", () => {
       NAV_ORDER_KEY,
       JSON.stringify(["todos", "today", "grid", "manage", "stats", "settings"]),
     );
-    const stored = ["stats", "today", "grid", "todos", "manage", "settings"];
+    const stored = [
+      "stats",
+      "today",
+      "grid",
+      "todos",
+      "manage",
+      "settings",
+      "types",
+    ];
     useSettingsStore.setState({
       settings: { ...DEFAULT_SETTINGS, navOrder: stored },
       loaded: true,
@@ -133,7 +149,15 @@ describe("MainLayout", () => {
   });
 
   it("migrates a custom localStorage order into settings on first mount", () => {
-    const stored = ["settings", "today", "grid", "todos", "manage", "stats"];
+    const stored = [
+      "settings",
+      "today",
+      "grid",
+      "todos",
+      "manage",
+      "stats",
+      "types",
+    ];
     localStorage.setItem(NAV_ORDER_KEY, JSON.stringify(stored));
 
     render(<MainLayout />);

@@ -10,7 +10,7 @@ import {
   monthTicks,
 } from "./grid";
 import { addDays } from "./date";
-import type { Interval, NamePeriod, Task } from "./types";
+import type { Interval, NamePeriod, Task, TaskType } from "./types";
 
 const TODAY = "2026-11-02";
 
@@ -99,6 +99,68 @@ describe("groupTasks", () => {
     expect(isRetired(taskSoon, TODAY)).toBe(false);
     expect(groupTasks([taskSoon], TODAY).voluntary).toHaveLength(1);
     expect(groupTasks([taskSoon], TODAY).disabled).toHaveLength(0);
+  });
+
+  it("builds nested type groups with aggregated counts and leaf rows", () => {
+    const types: TaskType[] = [
+      {
+        id: "health",
+        name: "健康",
+        parentId: "voluntary",
+        order: 0,
+        systemKey: null,
+        color: "green",
+        createdAt: "2026-11-01T00:00:00.000Z",
+        updatedAt: "2026-11-01T00:00:00.000Z",
+      },
+      {
+        id: "run",
+        name: "跑步",
+        parentId: "health",
+        order: 0,
+        systemKey: null,
+        color: null,
+        createdAt: "2026-11-01T00:00:00.000Z",
+        updatedAt: "2026-11-01T00:00:00.000Z",
+      },
+    ];
+    const tasks: Task[] = [
+      {
+        ...task("parent", [interval("2026-11-01", null)]),
+        typeId: "health",
+      },
+      {
+        ...task("child", [interval("2026-11-01", null)]),
+        typeId: "run",
+        order: 1,
+      },
+      task("retired", [interval("2026-09-01", "2026-10-01")], "voluntary", 2),
+    ];
+
+    const groups = groupTasks(tasks, TODAY, types);
+
+    expect(groups.typeGroups.map((group) => group.key)).toEqual([
+      "voluntary",
+      "health",
+      "run",
+      "disabled",
+    ]);
+    expect(groups.typeGroups.map((group) => group.depth)).toEqual([0, 1, 2, 0]);
+    expect(groups.typeGroups[0].rows).toHaveLength(0);
+    expect(groups.typeGroups[0].count).toBe(2);
+    expect(groups.typeGroups[1].rows.map((row) => row.task.id)).toEqual([
+      "parent",
+    ]);
+    expect(groups.typeGroups[2].rows.map((row) => row.task.id)).toEqual([
+      "child",
+    ]);
+    expect(groups.typeGroups[3].rows.map((row) => row.task.id)).toEqual([
+      "retired",
+    ]);
+    expect(groups.voluntary.map((row) => row.task.id)).toEqual([
+      "parent",
+      "child",
+    ]);
   });
 
   it("treats a task without intervals as retired", () => {

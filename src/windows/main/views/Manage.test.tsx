@@ -128,7 +128,8 @@ const remove = vi.fn(async (taskId: string) => {
 const create = vi.fn(
   async (input: {
     name: string;
-    category: Task["category"];
+    typeId?: string;
+    category?: Task["category"];
     startDate: string;
     endDate?: string | null;
     everyDays?: number;
@@ -136,7 +137,8 @@ const create = vi.fn(
     const created: Task = {
       id: "created",
       name: input.name,
-      category: input.category,
+      typeId: input.typeId ?? input.category ?? "voluntary",
+      category: input.category ?? "voluntary",
       intervals: [
         {
           id: "created-i",
@@ -272,14 +274,15 @@ describe("Manage", () => {
     fireEvent.change(container.querySelector("[data-new-name]") as Element, {
       target: { value: "阅读" },
     });
-    fireEvent.click(
-      container.querySelector('[data-category-option="forced"]') as Element,
+    fireEvent.change(
+      container.querySelector('[data-type-picker="new"]') as Element,
+      { target: { value: "forced" } },
     );
     fireEvent.click(container.querySelector("[data-new-submit]") as Element);
 
     expect(create).toHaveBeenCalledWith({
       name: "阅读",
-      category: "forced",
+      typeId: "forced",
       startDate: "2026-11-04",
       endDate: null,
       everyDays: 1,
@@ -304,7 +307,7 @@ describe("Manage", () => {
 
     expect(create).toHaveBeenCalledWith({
       name: "阅读",
-      category: "voluntary",
+      typeId: "voluntary",
       startDate: "2026-11-04",
       endDate: "2026-11-30",
       everyDays: 1,
@@ -341,7 +344,7 @@ describe("Manage", () => {
 
     expect(create).toHaveBeenCalledWith({
       name: "健身",
-      category: "voluntary",
+      typeId: "voluntary",
       startDate: "2026-11-04",
       endDate: null,
       everyDays: 3,
@@ -527,6 +530,22 @@ describe("Manage", () => {
     expect(
       container.querySelector('[data-manage-row="t1"]'),
     ).toHaveTextContent("晨跑");
+  });
+
+  it("moves a task to another type from the edit dialog", () => {
+    const { container } = render(<Manage />);
+
+    fireEvent.click(
+      container.querySelector(
+        '[data-manage-row="t2"] [data-manage-action="edit"]',
+      ) as Element,
+    );
+    fireEvent.change(container.querySelector('[data-type-picker="edit"]') as Element, {
+      target: { value: "voluntary" },
+    });
+    fireEvent.click(container.querySelector("[data-edit-submit]") as Element);
+
+    expect(update).toHaveBeenCalledWith("t2", { typeId: "voluntary" });
   });
 
   it("defaults to typo mode and rewrites the current name", () => {

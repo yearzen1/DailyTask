@@ -14,6 +14,7 @@ import type { SqlDatabase } from "./client";
 import { listCheckins, upsertCheckin } from "./checkins";
 import { getSettings } from "./settings";
 import { listTasks } from "./tasks";
+import { listTaskTypes, updateTaskType } from "./taskTypes";
 import { listTodos } from "./todos";
 import {
   buildExportBundle,
@@ -64,7 +65,7 @@ function todo(id: string, createdAt: string): Todo {
 }
 
 describe("buildExportBundle", () => {
-  it("uses JSON v2 with tasks, name periods and intervals split apart", () => {
+  it("uses JSON v3 with task types and tasks split apart", () => {
     const bundle = buildExportBundle(
       [task("t1", 0)],
       [checkin("t1", "2026-11-02")],
@@ -73,19 +74,23 @@ describe("buildExportBundle", () => {
       NOW,
     );
 
-    expect(bundle.version).toBe(2);
+    expect(bundle.version).toBe(3);
     expect(bundle.exportedAt).toBe(NOW.toISOString());
     expect(bundle.tasks).toEqual([
       {
         id: "t1",
         name: "任务t1",
-        category: "voluntary",
+        typeId: "voluntary",
         order: 0,
         createdAt: "2026-10-01T00:00:00.000Z",
         updatedAt: "2026-11-01T00:00:00.000Z",
       },
     ]);
     expect(bundle.tasks[0]).not.toHaveProperty("intervals");
+    expect(bundle.taskTypes.map((type) => type.id)).toEqual([
+      "voluntary",
+      "forced",
+    ]);
     expect(bundle.namePeriods).toEqual([
       {
         id: "t1",
@@ -178,11 +183,82 @@ describe("parseImportBundle", () => {
     ]);
   });
 
+  it("accepts a v3 bundle with an explicit type tree", () => {
+    const bundle = parseImportBundle(
+      JSON.stringify({
+        ...valid,
+        version: 3,
+        taskTypes: [
+          {
+            id: "voluntary",
+            name: null,
+            parentId: null,
+            order: 0,
+            systemKey: "voluntary",
+            color: null,
+            createdAt: "2026-10-01T00:00:00.000Z",
+            updatedAt: "2026-10-01T00:00:00.000Z",
+          },
+          {
+            id: "health",
+            name: "健康",
+            parentId: "voluntary",
+            order: 0,
+            systemKey: null,
+            color: "green",
+            createdAt: "2026-10-01T00:00:00.000Z",
+            updatedAt: "2026-10-01T00:00:00.000Z",
+          },
+        ],
+        tasks: [
+          {
+            id: "t1",
+            name: "跑步",
+            typeId: "health",
+            order: 0,
+            createdAt: "2026-10-01T00:00:00.000Z",
+            updatedAt: "2026-10-01T00:00:00.000Z",
+          },
+        ],
+      }),
+    );
+
+    expect(bundle.version).toBe(3);
+    expect(bundle.taskTypes.map((type) => type.id)).toEqual([
+      "voluntary",
+      "forced",
+      "health",
+    ]);
+    expect(bundle.tasks[0].typeId).toBe("health");
+  });
+
   it("rejects malformed JSON and unsupported versions", () => {
     expect(() => parseImportBundle("{")).toThrow("invalid-json");
     expect(() =>
-      parseImportBundle(JSON.stringify({ ...valid, version: 3 })),
+      parseImportBundle(JSON.stringify({ ...valid, version: 4 })),
     ).toThrow("unsupported-version");
+  });
+
+  it("rejects tasks that reference an unknown type", () => {
+    expect(() =>
+      parseImportBundle(
+        JSON.stringify({
+          ...valid,
+          version: 3,
+          taskTypes: [],
+          tasks: [
+            {
+              id: "t1",
+              name: "跑步",
+              typeId: "missing",
+              order: 0,
+              createdAt: "2026-10-01T00:00:00.000Z",
+              updatedAt: "2026-10-01T00:00:00.000Z",
+            },
+          ],
+        }),
+      ),
+    ).toThrow("invalid-structure");
   });
 
   it("synthesizes one name period per task for v1 bundles", () => {
@@ -218,6 +294,11 @@ describe("parseImportBundle", () => {
         start: "2026-10-02",
         end: null,
       },
+    ]);
+    expect(bundle.tasks[0].typeId).toBe("voluntary");
+    expect(bundle.taskTypes.map((type) => type.id)).toEqual([
+      "voluntary",
+      "forced",
     ]);
   });
 
@@ -295,6 +376,10 @@ const MIGRATION_005 = readFileSync(
   resolve(process.cwd(), "src-tauri/migrations/005_task_name_periods.sql"),
   "utf8",
 );
+const MIGRATION_006 = readFileSync(
+  resolve(process.cwd(), "src-tauri/migrations/006_task_types.sql"),
+  "utf8",
+);
 
 function createDb(seed = true): SqlDatabase {
   const sqlite = new DatabaseSync(":memory:");
@@ -303,6 +388,7 @@ function createDb(seed = true): SqlDatabase {
   sqlite.exec(MIGRATION_003);
   sqlite.exec(MIGRATION_004);
   sqlite.exec(MIGRATION_005);
+  sqlite.exec(MIGRATION_006);
   if (seed) {
     sqlite.exec(
       "INSERT INTO tasks (id, name, category, sort_order, created_at, updated_at) " +
@@ -432,6 +518,28 @@ describe("importData", () => {
     expect(await listTasks(db)).toHaveLength(1);
     expect(await listCheckins(db)).toHaveLength(1);
     expect(await listTodos(db)).toHaveLength(2);
+  });
+
+  it("keeps renamed built-in types when importing a v1 file", async () => {
+    const db = createDb();
+    await updateTaskType(db, "forced", { name: "工作" });
+    const bundle = parseImportBundle(
+      JSON.stringify({
+        version: 1,
+        exportedAt: "2026-11-04T00:00:00.000Z",
+        tasks: [],
+        intervals: [],
+        checkins: [],
+        todos: [],
+        settings: {},
+      }),
+    );
+
+    await importData(db, bundle);
+
+    expect(
+      (await listTaskTypes(db)).find((type) => type.id === "forced")?.name,
+    ).toBe("工作");
   });
 
   it("round-trips an export into a fresh database unchanged", async () => {

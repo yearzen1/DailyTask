@@ -8,12 +8,14 @@ import {
   type CheckinStatus,
   type Settings,
   type Task,
+  type TaskType,
   type Todo,
 } from "../../domain/types";
 import { useCheckinsStore } from "../../stores/checkinsStore";
 import { useDayStore } from "../../stores/dayStore";
 import { emitWidgetExpand } from "../../shared/events";
 import { useSettingsStore } from "../../stores/settingsStore";
+import { useTaskTypesStore } from "../../stores/taskTypesStore";
 import { useTasksStore } from "../../stores/tasksStore";
 import { useTodosStore } from "../../stores/todosStore";
 import { CAPSULE_SIDE_KEY, CAPSULE_STORAGE_KEY } from "./capsule";
@@ -135,6 +137,7 @@ function todo(id: string, dueDate: string): Todo {
 
 function seedStores() {
   useSettingsStore.setState({ settings: DEFAULT_SETTINGS });
+  useTaskTypesStore.setState({ types: [] });
   useTasksStore.setState({
     tasks: [
       task("t1", "跑步", "voluntary", 0),
@@ -193,8 +196,8 @@ describe("Widget", () => {
     expect(screen.getByText(/还剩 3 项/)).toBeInTheDocument();
 
     // 两个分组与组内计数。
-    expect(screen.getByText("自愿任务")).toBeInTheDocument();
-    expect(screen.getByText("被迫任务")).toBeInTheDocument();
+    expect(screen.getByText("自愿")).toBeInTheDocument();
+    expect(screen.getByText("被迫")).toBeInTheDocument();
     expect(screen.getByText("0 / 1")).toBeInTheDocument();
     expect(screen.getByText("1 / 2")).toBeInTheDocument();
 
@@ -304,7 +307,7 @@ describe("Widget", () => {
   it("collapses the three sections from their headers", () => {
     render(<Widget />);
 
-    const voluntary = screen.getByRole("button", { name: "折叠自愿任务" });
+    const voluntary = screen.getByRole("button", { name: "折叠自愿" });
     expect(voluntary).toHaveAttribute("aria-expanded", "true");
     fireEvent.click(voluntary);
     expect(voluntary).toHaveAttribute("aria-expanded", "false");
@@ -324,10 +327,52 @@ describe("Widget", () => {
     expect(document.querySelector("[data-todo-bar]")).not.toBeNull();
   });
 
+  it("collapses a parent type and hides its child type", () => {
+    const types: TaskType[] = [
+      {
+        id: "health",
+        name: "健康",
+        parentId: "voluntary",
+        order: 0,
+        systemKey: null,
+        color: null,
+        createdAt: "2026-11-01T00:00:00.000Z",
+        updatedAt: "2026-11-01T00:00:00.000Z",
+      },
+      {
+        id: "run",
+        name: "跑步",
+        parentId: "health",
+        order: 0,
+        systemKey: null,
+        color: null,
+        createdAt: "2026-11-01T00:00:00.000Z",
+        updatedAt: "2026-11-01T00:00:00.000Z",
+      },
+    ];
+    useTaskTypesStore.setState({ types });
+    useTasksStore.setState({
+      tasks: [
+        { ...task("p1", "体检", "voluntary", 0), typeId: "health" },
+        { ...task("c1", "晨跑", "voluntary", 1), typeId: "run" },
+      ],
+    });
+
+    render(<Widget />);
+    expect(screen.getByText("体检")).toBeInTheDocument();
+    expect(screen.getByText("晨跑")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "折叠健康" }));
+
+    expect(screen.queryByText("体检")).not.toBeInTheDocument();
+    expect(screen.queryByText("跑步")).not.toBeInTheDocument();
+    expect(screen.queryByText("晨跑")).not.toBeInTheDocument();
+  });
+
   it("expands every section again after returning from the capsule", async () => {
     render(<Widget />);
 
-    fireEvent.click(screen.getByRole("button", { name: "折叠自愿任务" }));
+    fireEvent.click(screen.getByRole("button", { name: "折叠自愿" }));
     expect(screen.queryByText("跑步")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "收起挂件" }));
