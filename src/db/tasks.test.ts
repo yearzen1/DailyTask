@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { SqlDatabase } from "../db/client";
 import {
+  assignTasksToType,
   createTask,
   deleteTask,
   intervalFromRow,
@@ -185,6 +186,47 @@ describe("createTask", () => {
       expect.any(String),
       expect.any(String),
     ]);
+  });
+});
+
+describe("assignTasksToType", () => {
+  it("bulk assigns tasks and syncs the legacy category root", async () => {
+    const calls: { query: string; values: unknown[] }[] = [];
+    const db: SqlDatabase = {
+      select: async <T>(query: string) =>
+        (query.includes("WITH RECURSIVE")
+          ? [{ system_key: "forced" }]
+          : []) as T,
+      execute: async (query, values = []) => {
+        calls.push({ query, values });
+        return { rowsAffected: 2 };
+      },
+    };
+
+    const result = await assignTasksToType(db, ["t1", "t2"], "work");
+
+    expect(result).toEqual({
+      typeId: "work",
+      category: "forced",
+      updatedAt: expect.any(String),
+    });
+    expect(calls[0].query).toContain("WHERE id IN (?, ?)");
+    expect(calls[0].values).toEqual([
+      "work",
+      "forced",
+      expect.any(String),
+      "t1",
+      "t2",
+    ]);
+  });
+
+  it("skips the update when no tasks are selected", async () => {
+    const db: SqlDatabase = {
+      select: async <T>() => [] as T,
+      execute: async () => ({ rowsAffected: 0 }),
+    };
+
+    expect(await assignTasksToType(db, [], "work")).toBeNull();
   });
 });
 

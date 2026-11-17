@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_SETTINGS, type Task, type TaskType } from "../../../domain/types";
@@ -10,6 +10,8 @@ import Types from "./Types";
 const NOW = new Date(2026, 10, 4, 9, 0, 0);
 
 const originalCreate = useTaskTypesStore.getState().create;
+const originalMove = useTaskTypesStore.getState().move;
+const originalAssignType = useTasksStore.getState().assignType;
 
 function type(
   id: string,
@@ -57,19 +59,27 @@ describe("Types", () => {
       types: [
         type("health", "健康", "voluntary", 0),
         type("run", "跑步", "health", 0),
+        type("work", "工作", "forced", 1),
       ],
       loaded: true,
       create: originalCreate,
+      move: originalMove,
     });
     useTasksStore.setState({
-      tasks: [task("t1", "晨跑", "run", 0)],
+      tasks: [
+        task("t1", "晨跑", "run", 0),
+        task("t2", "开会", "work", 1),
+        task("t3", "背单词", "voluntary", 2),
+      ],
       loaded: true,
+      assignType: originalAssignType,
     });
   });
 
   afterEach(() => {
     vi.useRealTimers();
-    useTaskTypesStore.setState({ create: originalCreate });
+    useTaskTypesStore.setState({ create: originalCreate, move: originalMove });
+    useTasksStore.setState({ assignType: originalAssignType });
   });
 
   it("renders the tree and hides children when a parent is collapsed", () => {
@@ -87,18 +97,64 @@ describe("Types", () => {
     expect(container.querySelector('[data-type-row="run"]')).not.toBeInTheDocument();
   });
 
-  it("adds a task with the type preselected", () => {
+  it("adds multiple existing tasks and excludes the current subtree", async () => {
+    const assignType = vi.fn(async () => undefined);
+    useTasksStore.setState({ assignType });
+
     const { container } = render(<Types />);
-    const row = container.querySelector('[data-type-row="run"]') as HTMLElement;
+    const row = container.querySelector('[data-type-row="health"]') as HTMLElement;
 
     fireEvent.click(
       within(row).getByRole("button", { name: "＋任务" }),
     );
 
-    const dialog = screen.getByRole("dialog", { name: "新建任务" });
-    expect(
-      within(dialog).getByLabelText("类型"),
-    ).toHaveValue("run");
+    const dialog = screen.getByRole("dialog", {
+      name: "添加任务到「健康」",
+    });
+    expect(within(dialog).queryByText("晨跑")).not.toBeInTheDocument();
+    expect(within(dialog).getByText("开会")).toBeInTheDocument();
+    expect(within(dialog).getByText("背单词")).toBeInTheDocument();
+
+    fireEvent.click(
+      dialog.querySelector('[data-assign-task="t2"] input') as Element,
+    );
+    fireEvent.click(
+      dialog.querySelector('[data-assign-task="t3"] input') as Element,
+    );
+    await act(async () => {
+      fireEvent.click(
+        dialog.querySelector("[data-assign-submit]") as Element,
+      );
+    });
+
+    expect(assignType).toHaveBeenCalledWith(
+      expect.arrayContaining(["t2", "t3"]),
+      "health",
+    );
+  });
+
+  it("moves a type by dragging it onto another type", () => {
+    const move = vi.fn(async () => undefined);
+    useTaskTypesStore.setState({ move });
+
+    const { container } = render(<Types />);
+    const source = container.querySelector(
+      '[data-type-row="health"] > div',
+    ) as HTMLElement;
+    const target = container.querySelector(
+      '[data-type-row="work"] > div',
+    ) as HTMLElement;
+    const dataTransfer = {
+      setData: vi.fn(),
+      effectAllowed: "",
+      dropEffect: "",
+    };
+
+    fireEvent.dragStart(source, { dataTransfer });
+    fireEvent.dragOver(target, { dataTransfer, clientY: 50 });
+    fireEvent.drop(target, { dataTransfer, clientY: 50 });
+
+    expect(move).toHaveBeenCalledWith("health", "work", 0);
   });
 
   it("creates a custom type under the selected parent", async () => {

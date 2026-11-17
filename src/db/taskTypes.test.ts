@@ -9,6 +9,7 @@ import {
   createTaskType,
   deleteTaskType,
   listTaskTypes,
+  moveTaskType,
   reorderTaskTypes,
   taskTypeFromRow,
   updateTaskType,
@@ -172,6 +173,44 @@ describe("task type repository", () => {
       .filter((type) => type.parentId === health.id)
       .sort((a, b) => a.order - b.order);
     expect(children.map((type) => type.id)).toEqual([sleep.id, run.id]);
+  });
+
+  it("moves a type to another parent and renumbers both sides", async () => {
+    const health = await createTaskType(db, { name: "健康" });
+    const run = await createTaskType(db, { name: "运动", parentId: health.id });
+    const sleep = await createTaskType(db, {
+      name: "睡眠",
+      parentId: health.id,
+    });
+    const work = await createTaskType(db, { name: "工作" });
+
+    await moveTaskType(db, sleep.id, work.id, 0);
+
+    const types = await listTaskTypes(db);
+    const moved = types.find((type) => type.id === sleep.id);
+    expect(moved?.parentId).toBe(work.id);
+    expect(moved?.order).toBe(0);
+    expect(types.find((type) => type.id === run.id)?.order).toBe(0);
+    expect(
+      types
+        .filter((type) => type.parentId === work.id)
+        .map((type) => type.id),
+    ).toEqual([sleep.id]);
+  });
+
+  it("rejects moving a type into its own descendant", async () => {
+    const health = await createTaskType(db, { name: "健康" });
+    const run = await createTaskType(db, { name: "运动", parentId: health.id });
+
+    await expect(moveTaskType(db, health.id, run.id, 0)).rejects.toThrow(
+      "cycle",
+    );
+  });
+
+  it("rejects moving built-in types", async () => {
+    await expect(moveTaskType(db, "voluntary", null, 0)).rejects.toThrow(
+      "system-type",
+    );
   });
 
   it("refuses to delete built-in, non-empty, or parent types", async () => {
