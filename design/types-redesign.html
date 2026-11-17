@@ -212,11 +212,12 @@
   }
   .view-head .actions { margin-left: auto; }
 
-  .types-layout {
+  .types-card {
     flex: 1;
     min-height: 0;
     display: flex;
-    gap: var(--space-4);
+    flex-direction: column;
+    overflow: hidden;
   }
   .card {
     background: var(--color-surface);
@@ -225,20 +226,12 @@
     box-shadow: var(--shadow-card);
   }
 
-  /* ---------- 左侧类型树 ---------- */
-  .tree-card {
-    flex: none;
-    width: 320px;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    padding: var(--space-2);
-  }
+  /* ---------- 类型树 ---------- */
   .tree-scroll {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: 2px;
+    padding: var(--space-2);
   }
   .tree {
     margin: 0;
@@ -359,7 +352,7 @@
     display: none;
     position: absolute;
     left: 408px;
-    top: 286px;
+    top: 240px;
     z-index: 15;
     align-items: center;
     gap: var(--space-2);
@@ -376,14 +369,21 @@
   .drag-ghost .name { font-size: var(--text-sm); }
   body[data-state="drag"] .drag-ghost { display: flex; }
 
-  /* ---------- 右侧详情 ---------- */
-  .detail-card {
+  /* ---------- 底部详情 ---------- */
+  .detail-dock {
+    flex: none;
+    padding: var(--space-4) var(--space-6);
+    background: var(--color-bg);
+    border-top: 1px solid var(--color-border);
+  }
+  .dock-head {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-4);
+  }
+  .dock-title {
     flex: 1;
     min-width: 0;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    padding: var(--space-6);
   }
   .breadcrumb {
     color: var(--color-text-muted);
@@ -393,12 +393,12 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    margin-top: var(--space-1);
+    margin-top: 2px;
   }
   .detail-title .dot { width: 10px; height: 10px; }
   .detail-title h2 {
     margin: 0;
-    font-size: var(--text-lg);
+    font-size: var(--text-md);
     font-weight: 600;
     letter-spacing: .2px;
   }
@@ -407,19 +407,19 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    margin-top: var(--space-3);
+    margin-left: auto;
   }
   .divider {
     flex: none;
     height: 1px;
-    margin: var(--space-4) 0;
+    margin: var(--space-3) 0;
     background: var(--color-border);
   }
   .section-head {
     display: flex;
     align-items: baseline;
     gap: var(--space-2);
-    margin-bottom: var(--space-2);
+    margin-bottom: var(--space-1);
     color: var(--color-text-muted);
     font-size: var(--text-2xs);
     font-weight: 600;
@@ -436,7 +436,7 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    height: 40px;
+    height: 34px;
     padding: 0 var(--space-2);
     border-radius: var(--radius-control);
     border-top: 1px solid var(--color-border);
@@ -662,7 +662,7 @@
     <div class="stage-inner">
       <div class="caption">
         <b id="caption-title">默认态</b>
-        <span id="caption-text">选中「健康」，右侧查看类型信息与直属任务</span>
+        <span id="caption-text">选中「健康」，底部查看类型信息与直属任务</span>
       </div>
 
       <div class="window">
@@ -707,15 +707,14 @@
           <section class="content">
             <header class="view-head">
               <h1>类型</h1>
-              <span class="sub">8 个类型</span>
+              <span class="sub">12 个类型</span>
               <div class="actions">
                 <button class="btn primary" type="button">＋ 新类型</button>
               </div>
             </header>
 
-            <div class="types-layout">
-              <section class="card tree-card" aria-label="类型树">
-                <div class="tree-scroll">
+            <section class="card types-card">
+              <div class="tree-scroll">
                   <ul class="tree">
                     <li>
                       <div class="type-row is-builtin">
@@ -724,7 +723,7 @@
                         <span class="dot" style="--dot: var(--color-voluntary)"></span>
                         <span class="name">自愿</span>
                         <span class="badge">内置</span>
-                        <span class="count">4</span>
+                        <span class="count">6</span>
                       </div>
                       <ul class="tree">
                         <li>
@@ -763,7 +762,7 @@
                             <span class="chevron" aria-hidden="true">▸</span>
                             <span class="dot" style="--dot: var(--type-color-orange)"></span>
                             <span class="name">学习</span>
-                            <span class="count">0</span>
+                            <span class="count">1</span>
                           </div>
                         </li>
                       </ul>
@@ -775,7 +774,7 @@
                         <span class="dot" style="--dot: var(--color-forced)"></span>
                         <span class="name">被迫</span>
                         <span class="badge">内置</span>
-                        <span class="count">2</span>
+                        <span class="count">3</span>
                       </div>
                       <ul class="tree">
                         <li>
@@ -787,6 +786,15 @@
                             <span class="count">2</span>
                           </div>
                         </li>
+                        <li>
+                          <div class="type-row">
+                            <span class="grip" aria-hidden="true">⋮⋮</span>
+                            <span class="chevron"></span>
+                            <span class="dot" style="--dot: var(--type-color-orange)"></span>
+                            <span class="name">理财</span>
+                            <span class="count">1</span>
+                          </div>
+                        </li>
                       </ul>
                     </li>
                     <li>
@@ -795,63 +803,51 @@
                         <span class="chevron" aria-hidden="true">▸</span>
                         <span class="dot" style="--dot: var(--type-color-pink)"></span>
                         <span class="name">生活</span>
-                        <span class="count">0</span>
+                        <span class="count">2</span>
                       </div>
                     </li>
                   </ul>
                 </div>
-                <div class="tree-foot">拖动行可调整同级顺序，拖到行中间可成为子类型</div>
+
+                <div class="detail-dock" aria-label="类型详情">
+                  <div class="dock-head">
+                    <div class="dock-title">
+                      <div class="breadcrumb">类型 / 自愿 / 健康</div>
+                      <div class="detail-title">
+                        <span class="dot" style="--dot: var(--type-color-green)"></span>
+                        <h2>健康</h2>
+                        <span class="count">2 个任务</span>
+                      </div>
+                    </div>
+                    <div class="detail-actions">
+                      <button class="btn primary" type="button">＋ 添加任务</button>
+                      <button class="btn secondary" type="button">编辑</button>
+                      <button class="icon-btn" type="button" aria-label="更多操作">⋯</button>
+                    </div>
+                  </div>
+
+                  <div class="divider"></div>
+
+                  <div class="section-head">
+                    <span>直属任务</span>
+                    <span class="count">2</span>
+                  </div>
+                  <ul class="task-list">
+                    <li class="task-row">
+                      <span class="task-mark" aria-hidden="true"></span>
+                      <span class="task-name">体检</span>
+                      <span class="task-meta">每年一次 · 11/18 截止</span>
+                      <span class="task-arrow" aria-hidden="true">›</span>
+                    </li>
+                    <li class="task-row">
+                      <span class="task-mark" aria-hidden="true"></span>
+                      <span class="task-name">早睡</span>
+                      <span class="task-meta">每天</span>
+                      <span class="task-arrow" aria-hidden="true">›</span>
+                    </li>
+                  </ul>
+                </div>
               </section>
-
-              <section class="card detail-card" aria-label="类型详情">
-                <div class="breadcrumb">类型 / 自愿 / 健康</div>
-                <div class="detail-title">
-                  <span class="dot" style="--dot: var(--type-color-green)"></span>
-                  <h2>健康</h2>
-                  <span class="count">2 个任务</span>
-                </div>
-                <div class="detail-actions">
-                  <button class="btn primary" type="button">＋ 添加任务</button>
-                  <button class="btn secondary" type="button">编辑</button>
-                  <button class="icon-btn" type="button" aria-label="更多操作">⋯</button>
-                </div>
-
-                <div class="divider"></div>
-
-                <div class="section-head">
-                  <span>直属任务</span>
-                  <span class="count">2</span>
-                </div>
-                <ul class="task-list">
-                  <li class="task-row">
-                    <span class="task-mark" aria-hidden="true"></span>
-                    <span class="task-name">体检</span>
-                    <span class="task-meta">每年一次 · 11/18 截止</span>
-                    <span class="task-arrow" aria-hidden="true">›</span>
-                  </li>
-                  <li class="task-row">
-                    <span class="task-mark" aria-hidden="true"></span>
-                    <span class="task-name">早睡</span>
-                    <span class="task-meta">每天</span>
-                    <span class="task-arrow" aria-hidden="true">›</span>
-                  </li>
-                </ul>
-
-                <div class="divider"></div>
-
-                <div class="section-head">
-                  <span>子类型</span>
-                  <span class="count">2</span>
-                </div>
-                <div class="subtype-chips">
-                  <span class="subtype-chip"><i class="dot" style="--dot: var(--type-color-teal)"></i>运动</span>
-                  <span class="subtype-chip"><i class="dot" style="--dot: var(--type-color-purple)"></i>睡眠</span>
-                  <button class="btn ghost" type="button">＋ 子类型</button>
-                </div>
-
-                <div class="detail-foot">任务详情在「任务管理」中编辑</div>
-              </section>
-            </div>
           </section>
         </div>
 
@@ -913,7 +909,7 @@
 
   <script>
     const stateCaptions = {
-      default: ["默认态", "选中「健康」，右侧查看类型信息与直属任务"],
+      default: ["默认态", "选中「健康」，底部查看类型信息与直属任务"],
       assign: ["添加任务", "多选已有任务，当前类型子树已排除"],
       drag: ["拖拽态", "拖到行中间成为子类型，拖到上下边缘同级插入"],
     };

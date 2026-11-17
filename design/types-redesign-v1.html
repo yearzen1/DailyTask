@@ -1,0 +1,949 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DailyTask · 类型页重构稿</title>
+<link rel="stylesheet" href="./tokens.css">
+<style>
+  /* ---------- 评审外壳（不属于产品） ---------- */
+  :root {
+    --canvas: #ECEDEF;
+    --canvas-text: #3A3A3A;
+    --canvas-muted: #7A7A7A;
+    --canvas-line: #D8DADF;
+  }
+  :root[data-theme="dark"] {
+    --canvas: #141414;
+    --canvas-text: #D8D8D8;
+    --canvas-muted: #8A8A8A;
+    --canvas-line: #2C2C2C;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--canvas);
+    color: var(--canvas-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+
+  .review-bar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    height: 56px;
+    padding: 0 var(--space-6);
+    background: color-mix(in srgb, var(--canvas) 88%, transparent);
+    border-bottom: 1px solid var(--canvas-line);
+    backdrop-filter: blur(10px);
+  }
+  .brand {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    letter-spacing: .2px;
+  }
+  .brand span {
+    margin-left: var(--space-2);
+    color: var(--canvas-muted);
+    font-weight: 400;
+  }
+  .tabs, .theme {
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: var(--radius-pill);
+    background: var(--canvas-line);
+  }
+  .tab, .theme button {
+    border: 0;
+    background: transparent;
+    padding: 5px 12px;
+    border-radius: var(--radius-pill);
+    color: var(--canvas-muted);
+    font-size: var(--text-xs);
+  }
+  .tab.is-active, .theme button.is-active {
+    background: var(--canvas);
+    color: var(--canvas-text);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .08);
+  }
+  .theme { margin-left: auto; }
+  .theme button { padding: 5px 10px; }
+
+  /* ---------- 舞台 ---------- */
+  .stage {
+    padding: var(--space-6);
+  }
+  .stage-inner {
+    width: 1080px;
+    margin: 0 auto;
+  }
+  .caption {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+    font-size: var(--text-xs);
+    color: var(--canvas-muted);
+  }
+  .caption b {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--canvas-text);
+  }
+
+  /* ---------- 主窗口 ---------- */
+  .window {
+    position: relative;
+    width: 1080px;
+    height: 720px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, .16);
+  }
+  .titlebar {
+    flex: none;
+    height: var(--titlebar-height);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 0 var(--space-3) 0 var(--space-4);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+  }
+  .titlebar .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--color-voluntary);
+  }
+  .win-ctrl {
+    margin-left: auto;
+    display: flex;
+    gap: var(--space-4);
+    font-size: var(--text-2xs);
+    letter-spacing: 1px;
+  }
+  .app {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+  }
+
+  /* ---------- 导航 ---------- */
+  .nav {
+    flex: none;
+    width: var(--nav-width);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--space-3) var(--space-2);
+    background: var(--color-surface);
+    border-right: 1px solid var(--color-border);
+  }
+  .nav-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    height: 36px;
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-control);
+    color: var(--color-text-muted);
+    font-size: var(--text-base);
+  }
+  .nav-item svg { flex: none; }
+  .nav-item.is-active {
+    background: var(--state-selected);
+    color: var(--color-voluntary);
+    font-weight: 600;
+  }
+  .nav-item.is-active::before {
+    content: "";
+    position: absolute;
+    left: -6px;
+    top: 50%;
+    width: 3px;
+    height: 16px;
+    border-radius: 2px;
+    background: var(--color-voluntary);
+    transform: translateY(-50%);
+  }
+
+  /* ---------- 内容区 ---------- */
+  .content {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    padding: var(--space-6);
+  }
+  .view-head {
+    flex: none;
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-3);
+  }
+  .view-head h1 {
+    margin: 0;
+    font-size: var(--text-lg);
+    font-weight: 600;
+    letter-spacing: .2px;
+  }
+  .view-head .sub {
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+  }
+  .view-head .actions { margin-left: auto; }
+
+  .types-card {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    overflow: hidden;
+  }
+  .card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+
+  /* ---------- 左侧类型树 ---------- */
+  .tree-pane {
+    flex: none;
+    width: 320px;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-2);
+    background: var(--color-bg);
+    border-right: 1px solid var(--color-border);
+  }
+  .tree-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 2px;
+  }
+  .tree {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .tree .tree {
+    margin-left: 6px;
+    padding-left: 14px;
+    border-left: 1px solid var(--color-border);
+  }
+  .type-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    height: 40px;
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-control);
+    color: var(--color-text);
+    transition: background .12s ease;
+  }
+  .type-row:hover { background: var(--state-hover); }
+  .type-row.is-selected {
+    background: var(--state-selected);
+  }
+  .type-row.is-selected::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 3px;
+    height: 18px;
+    border-radius: 2px;
+    background: var(--color-voluntary);
+    transform: translateY(-50%);
+  }
+  .type-row.is-selected .name { font-weight: 600; }
+  .grip {
+    flex: none;
+    width: 12px;
+    font-size: 9px;
+    line-height: 1;
+    color: var(--color-border-strong);
+    opacity: 0;
+    cursor: grab;
+    transition: opacity .12s ease;
+  }
+  .type-row:hover .grip,
+  .type-row.is-selected .grip { opacity: 1; }
+  .type-row.is-builtin .grip { visibility: hidden; }
+  .chevron {
+    flex: none;
+    width: 12px;
+    text-align: center;
+    font-size: 9px;
+    line-height: 1;
+    color: var(--color-text-muted);
+  }
+  .dot {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--dot, var(--type-color-teal));
+  }
+  .name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-sm);
+  }
+  .badge {
+    flex: none;
+    margin-left: var(--space-1);
+    padding: 1px 6px;
+    border-radius: var(--radius-pill);
+    background: var(--state-hover);
+    color: var(--color-text-muted);
+    font-size: 10px;
+    line-height: 16px;
+  }
+  .count {
+    flex: none;
+    margin-left: auto;
+    color: var(--color-text-muted);
+    font-size: var(--text-2xs);
+    font-variant-numeric: tabular-nums;
+  }
+  .tree-foot {
+    flex: none;
+    padding: var(--space-2) var(--space-2) var(--space-1);
+    color: var(--color-text-muted);
+    font-size: var(--text-2xs);
+  }
+
+  /* 拖拽态 */
+  .drop-chip {
+    display: none;
+    flex: none;
+    margin-left: var(--space-1);
+    padding: 1px 6px;
+    border-radius: var(--radius-pill);
+    background: var(--color-voluntary);
+    color: #fff;
+    font-size: 10px;
+    line-height: 16px;
+    font-weight: 600;
+  }
+  body[data-state="drag"] .type-row.is-dragging { opacity: .45; }
+  body[data-state="drag"] .type-row.is-drop-target {
+    background: color-mix(in srgb, var(--color-voluntary) 9%, var(--color-surface));
+    box-shadow: inset 0 0 0 1px var(--color-voluntary);
+  }
+  body[data-state="drag"] .type-row.is-drop-target .drop-chip { display: inline-flex; }
+  .drag-ghost {
+    display: none;
+    position: absolute;
+    left: 408px;
+    top: 286px;
+    z-index: 15;
+    align-items: center;
+    gap: var(--space-2);
+    width: 148px;
+    height: 36px;
+    padding: 0 var(--space-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-popover);
+    transform: rotate(-1deg);
+    pointer-events: none;
+  }
+  .drag-ghost .name { font-size: var(--text-sm); }
+  body[data-state="drag"] .drag-ghost { display: flex; }
+
+  /* ---------- 右侧详情 ---------- */
+  .detail-pane {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-6);
+    background: var(--color-surface);
+  }
+  .breadcrumb {
+    color: var(--color-text-muted);
+    font-size: var(--text-2xs);
+  }
+  .detail-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-1);
+  }
+  .detail-title .dot { width: 10px; height: 10px; }
+  .detail-title h2 {
+    margin: 0;
+    font-size: var(--text-lg);
+    font-weight: 600;
+    letter-spacing: .2px;
+  }
+  .detail-title .count { margin-left: 0; font-size: var(--text-xs); }
+  .detail-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+  }
+  .divider {
+    flex: none;
+    height: 1px;
+    margin: var(--space-4) 0;
+    background: var(--color-border);
+  }
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+    color: var(--color-text-muted);
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    letter-spacing: .3px;
+  }
+  .section-head .count { margin-left: 0; }
+
+  .task-list, .subtype-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .task-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    height: 40px;
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-control);
+    border-top: 1px solid var(--color-border);
+  }
+  .task-row:first-child { border-top: 0; }
+  .task-row:hover { background: var(--state-hover); }
+  .task-mark {
+    flex: none;
+    width: 15px;
+    height: 15px;
+    border: 1.5px solid var(--color-border-strong);
+    border-radius: 4px;
+  }
+  .task-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-sm);
+  }
+  .task-meta {
+    flex: none;
+    margin-left: auto;
+    color: var(--color-text-muted);
+    font-size: var(--text-2xs);
+    font-variant-numeric: tabular-nums;
+  }
+  .task-arrow {
+    flex: none;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .subtype-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .subtype-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    height: 28px;
+    padding: 0 var(--space-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-pill);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: var(--text-xs);
+  }
+  .detail-foot {
+    margin-top: auto;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    font-size: var(--text-2xs);
+  }
+
+  /* ---------- 按钮 ---------- */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    height: 32px;
+    padding: 0 var(--space-3);
+    border: 1px solid transparent;
+    border-radius: var(--radius-control);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .btn.primary {
+    background: var(--color-voluntary);
+    color: #fff;
+  }
+  .btn.primary:hover { background: color-mix(in srgb, var(--color-voluntary) 88%, #000); }
+  .btn.secondary {
+    background: var(--color-surface);
+    border-color: var(--color-border);
+    color: var(--color-text);
+  }
+  .btn.secondary:hover { background: var(--state-hover); }
+  .btn.ghost {
+    background: transparent;
+    color: var(--color-text-muted);
+  }
+  .btn.ghost:hover { background: var(--state-hover); color: var(--color-text); }
+  .icon-btn {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--color-text-muted);
+    font-size: var(--text-md);
+    line-height: 1;
+  }
+  .icon-btn:hover { background: var(--state-hover); color: var(--color-text); }
+
+  /* ---------- 添加任务弹窗 ---------- */
+  .assign-overlay {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, .25);
+  }
+  body[data-state="assign"] .assign-overlay { display: flex; }
+  .assign-dialog {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    width: 440px;
+    max-height: 540px;
+    padding: var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-popover);
+  }
+  .assign-dialog h3 {
+    margin: 0;
+    font-size: var(--text-base);
+    font-weight: 600;
+  }
+  .assign-hint {
+    margin: calc(var(--space-1) * -1) 0 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-2xs);
+  }
+  .assign-search-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .search-box {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    height: 32px;
+    padding: 0 var(--space-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control);
+    background: var(--color-bg);
+    color: var(--color-text-muted);
+  }
+  .search-box input {
+    min-width: 0;
+    flex: 1;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--color-text);
+    font-size: var(--text-sm);
+  }
+  .assign-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    overflow-y: auto;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control);
+  }
+  .assign-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    height: 38px;
+    padding: 0 var(--space-3);
+    border-top: 1px solid var(--color-border);
+  }
+  .assign-row:first-child { border-top: 0; }
+  .assign-row:hover { background: var(--state-hover); }
+  .assign-row input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--color-voluntary);
+  }
+  .source {
+    flex: none;
+    margin-left: auto;
+    color: var(--color-text-muted);
+    font-size: var(--text-2xs);
+  }
+  .assign-foot {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .assign-foot .selected {
+    margin-right: auto;
+    color: var(--color-text-muted);
+    font-size: var(--text-2xs);
+    font-variant-numeric: tabular-nums;
+  }
+  .assign-foot .btn { height: 30px; font-size: var(--text-xs); }
+
+  /* ---------- 深色下的画布细节 ---------- */
+  :root[data-theme="dark"] .window { box-shadow: 0 24px 60px rgba(0, 0, 0, .5); }
+</style>
+</head>
+<body data-state="default">
+  <header class="review-bar">
+    <div class="brand">DailyTask <span>类型页重构稿</span></div>
+    <div class="tabs" role="tablist" aria-label="设计状态">
+      <button class="tab is-active" type="button" data-state-target="default">默认</button>
+      <button class="tab" type="button" data-state-target="assign">添加任务</button>
+      <button class="tab" type="button" data-state-target="drag">拖拽中</button>
+    </div>
+    <div class="theme" role="group" aria-label="主题">
+      <button class="is-active" type="button" data-theme-target="light">浅色</button>
+      <button type="button" data-theme-target="dark">深色</button>
+    </div>
+  </header>
+
+  <main class="stage">
+    <div class="stage-inner">
+      <div class="caption">
+        <b id="caption-title">默认态</b>
+        <span id="caption-text">选中「健康」，右侧查看类型信息与直属任务</span>
+      </div>
+
+      <div class="window">
+        <div class="titlebar">
+          <span class="dot"></span>
+          <span>DailyTask</span>
+          <span class="win-ctrl" aria-hidden="true">—　□　×</span>
+        </div>
+
+        <div class="app">
+          <nav class="nav" aria-label="主导航">
+            <div class="nav-item">
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="14" height="12" rx="2"/><path d="M3 8.5h14M7.5 3v3M12.5 3v3M7 12l1.6 1.6L12.5 10"/></svg>
+              今日
+            </div>
+            <div class="nav-item">
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="3" width="14" height="14" rx="1.5"/><path d="M3 8h14M3 12.5h14M8 3v14M12.5 3v14"/></svg>
+              任务表
+            </div>
+            <div class="nav-item">
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M8 5h9M8 10h9M8 15h6"/><circle cx="4.5" cy="5" r="1.2"/><circle cx="4.5" cy="10" r="1.2"/><circle cx="4.5" cy="15" r="1.2"/></svg>
+              待办
+            </div>
+            <div class="nav-item">
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 5h12M4 10h12M4 15h12"/><circle cx="7" cy="5" r="1.6" fill="var(--color-surface)"/><circle cx="13" cy="10" r="1.6" fill="var(--color-surface)"/><circle cx="6" cy="15" r="1.6" fill="var(--color-surface)"/></svg>
+              任务管理
+            </div>
+            <div class="nav-item is-active" aria-current="page">
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="5" height="4" rx="1"/><rect x="12" y="9" width="5" height="4" rx="1"/><rect x="12" y="15" width="5" height="4" rx="1"/><path d="M5.5 7v5.5H12M5.5 12.5V17H12M5.5 12.5H14.5M5.5 17H14.5"/></svg>
+              类型
+            </div>
+            <div class="nav-item">
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M3.5 16.5V11M8 16.5V6M12.5 16.5V8.5M17 16.5V4"/></svg>
+              统计
+            </div>
+            <div class="nav-item">
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="10" cy="10" r="2.8"/><path d="M10 2.8v1.8M10 15.4v1.8M2.8 10h1.8M15.4 10h1.8M4.9 4.9l1.3 1.3M13.8 13.8l1.3 1.3M15.1 4.9l-1.3 1.3M6.2 13.8l-1.3 1.3"/></svg>
+              设置
+            </div>
+          </nav>
+
+          <section class="content">
+            <header class="view-head">
+              <h1>类型</h1>
+              <span class="sub">8 个类型</span>
+              <div class="actions">
+                <button class="btn primary" type="button">＋ 新类型</button>
+              </div>
+            </header>
+
+            <section class="card types-card">
+              <div class="tree-pane" aria-label="类型树">
+                <div class="tree-scroll">
+                  <ul class="tree">
+                    <li>
+                      <div class="type-row is-builtin">
+                        <span class="grip" aria-hidden="true">⋮⋮</span>
+                        <span class="chevron" aria-hidden="true">▾</span>
+                        <span class="dot" style="--dot: var(--color-voluntary)"></span>
+                        <span class="name">自愿</span>
+                        <span class="badge">内置</span>
+                        <span class="count">4</span>
+                      </div>
+                      <ul class="tree">
+                        <li>
+                          <div class="type-row is-selected is-drop-target" aria-current="true">
+                            <span class="grip" aria-hidden="true">⋮⋮</span>
+                            <span class="chevron" aria-hidden="true">▾</span>
+                            <span class="dot" style="--dot: var(--type-color-green)"></span>
+                            <span class="name">健康</span>
+                            <span class="drop-chip">作为子类型</span>
+                            <span class="count">2</span>
+                          </div>
+                          <ul class="tree">
+                            <li>
+                              <div class="type-row">
+                                <span class="grip" aria-hidden="true">⋮⋮</span>
+                                <span class="chevron"></span>
+                                <span class="dot" style="--dot: var(--type-color-teal)"></span>
+                                <span class="name">运动</span>
+                                <span class="count">1</span>
+                              </div>
+                            </li>
+                            <li>
+                              <div class="type-row is-dragging">
+                                <span class="grip" aria-hidden="true">⋮⋮</span>
+                                <span class="chevron"></span>
+                                <span class="dot" style="--dot: var(--type-color-purple)"></span>
+                                <span class="name">睡眠</span>
+                                <span class="count">1</span>
+                              </div>
+                            </li>
+                          </ul>
+                        </li>
+                        <li>
+                          <div class="type-row">
+                            <span class="grip" aria-hidden="true">⋮⋮</span>
+                            <span class="chevron" aria-hidden="true">▸</span>
+                            <span class="dot" style="--dot: var(--type-color-orange)"></span>
+                            <span class="name">学习</span>
+                            <span class="count">0</span>
+                          </div>
+                        </li>
+                      </ul>
+                    </li>
+                    <li>
+                      <div class="type-row is-builtin">
+                        <span class="grip" aria-hidden="true">⋮⋮</span>
+                        <span class="chevron" aria-hidden="true">▾</span>
+                        <span class="dot" style="--dot: var(--color-forced)"></span>
+                        <span class="name">被迫</span>
+                        <span class="badge">内置</span>
+                        <span class="count">2</span>
+                      </div>
+                      <ul class="tree">
+                        <li>
+                          <div class="type-row">
+                            <span class="grip" aria-hidden="true">⋮⋮</span>
+                            <span class="chevron"></span>
+                            <span class="dot" style="--dot: var(--type-color-blue)"></span>
+                            <span class="name">工作</span>
+                            <span class="count">2</span>
+                          </div>
+                        </li>
+                      </ul>
+                    </li>
+                    <li>
+                      <div class="type-row">
+                        <span class="grip" aria-hidden="true">⋮⋮</span>
+                        <span class="chevron" aria-hidden="true">▸</span>
+                        <span class="dot" style="--dot: var(--type-color-pink)"></span>
+                        <span class="name">生活</span>
+                        <span class="count">0</span>
+                      </div>
+                    </li>
+                  </ul>
+                </div>
+                <div class="tree-foot">拖动行可调整同级顺序，拖到行中间可成为子类型</div>
+              </div>
+
+              <div class="detail-pane" aria-label="类型详情">
+                <div class="breadcrumb">类型 / 自愿 / 健康</div>
+                <div class="detail-title">
+                  <span class="dot" style="--dot: var(--type-color-green)"></span>
+                  <h2>健康</h2>
+                  <span class="count">2 个任务</span>
+                </div>
+                <div class="detail-actions">
+                  <button class="btn primary" type="button">＋ 添加任务</button>
+                  <button class="btn secondary" type="button">编辑</button>
+                  <button class="icon-btn" type="button" aria-label="更多操作">⋯</button>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="section-head">
+                  <span>直属任务</span>
+                  <span class="count">2</span>
+                </div>
+                <ul class="task-list">
+                  <li class="task-row">
+                    <span class="task-mark" aria-hidden="true"></span>
+                    <span class="task-name">体检</span>
+                    <span class="task-meta">每年一次 · 11/18 截止</span>
+                    <span class="task-arrow" aria-hidden="true">›</span>
+                  </li>
+                  <li class="task-row">
+                    <span class="task-mark" aria-hidden="true"></span>
+                    <span class="task-name">早睡</span>
+                    <span class="task-meta">每天</span>
+                    <span class="task-arrow" aria-hidden="true">›</span>
+                  </li>
+                </ul>
+
+                <div class="divider"></div>
+
+                <div class="section-head">
+                  <span>子类型</span>
+                  <span class="count">2</span>
+                </div>
+                <div class="subtype-chips">
+                  <span class="subtype-chip"><i class="dot" style="--dot: var(--type-color-teal)"></i>运动</span>
+                  <span class="subtype-chip"><i class="dot" style="--dot: var(--type-color-purple)"></i>睡眠</span>
+                  <button class="btn ghost" type="button">＋ 子类型</button>
+                </div>
+
+                <div class="detail-foot">任务详情在「任务管理」中编辑</div>
+              </div>
+            </section>
+          </section>
+        </div>
+
+        <div class="drag-ghost" aria-hidden="true">
+          <span class="grip">⋮⋮</span>
+          <span class="dot" style="--dot: var(--type-color-purple)"></span>
+          <span class="name">睡眠</span>
+          <span class="count">1</span>
+        </div>
+
+        <div class="assign-overlay">
+          <div class="assign-dialog" role="dialog" aria-modal="true" aria-label="添加任务到健康">
+            <div>
+              <h3>添加任务到「健康」</h3>
+              <p class="assign-hint">勾选后会把任务从原类型移入当前类型</p>
+            </div>
+
+            <div class="assign-search-row">
+              <label class="search-box">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="6.8" cy="6.8" r="4.3"/><path d="M10 10l3.5 3.5"/></svg>
+                <input type="search" placeholder="搜索任务" aria-label="搜索任务">
+              </label>
+              <button class="btn ghost" type="button">全选</button>
+            </div>
+
+            <ul class="assign-list">
+              <li class="assign-row">
+                <input type="checkbox" checked aria-label="体检">
+                <span class="task-name">体检</span>
+                <span class="source">工作</span>
+              </li>
+              <li class="assign-row">
+                <input type="checkbox" checked aria-label="阅读">
+                <span class="task-name">阅读</span>
+                <span class="source">学习</span>
+              </li>
+              <li class="assign-row">
+                <input type="checkbox" aria-label="整理房间">
+                <span class="task-name">整理房间</span>
+                <span class="source">生活</span>
+              </li>
+              <li class="assign-row">
+                <input type="checkbox" aria-label="交周报">
+                <span class="task-name">交周报</span>
+                <span class="source">被迫 / 工作</span>
+              </li>
+            </ul>
+
+            <div class="assign-foot">
+              <span class="selected">已选 2 个</span>
+              <button class="btn ghost" type="button">取消</button>
+              <button class="btn primary" type="button">添加 2 个</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const stateCaptions = {
+      default: ["默认态", "选中「健康」，右侧查看类型信息与直属任务"],
+      assign: ["添加任务", "多选已有任务，当前类型子树已排除"],
+      drag: ["拖拽态", "拖到行中间成为子类型，拖到上下边缘同级插入"],
+    };
+
+    const setState = (state) => {
+      document.body.dataset.state = state;
+      document.querySelectorAll("[data-state-target]").forEach((tab) => {
+        tab.classList.toggle("is-active", tab.dataset.stateTarget === state);
+      });
+      const caption = stateCaptions[state];
+      document.getElementById("caption-title").textContent = caption[0];
+      document.getElementById("caption-text").textContent = caption[1];
+    };
+
+    document.querySelectorAll("[data-state-target]").forEach((tab) => {
+      tab.addEventListener("click", () => setState(tab.dataset.stateTarget));
+    });
+
+    document.querySelectorAll("[data-theme-target]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const theme = button.dataset.themeTarget;
+        document.documentElement.dataset.theme = theme;
+        document.querySelectorAll("[data-theme-target]").forEach((item) => {
+          item.classList.toggle("is-active", item === button);
+        });
+      });
+    });
+  </script>
+</body>
+</html>
