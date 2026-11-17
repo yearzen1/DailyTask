@@ -104,8 +104,9 @@ describe("Types", () => {
     const { container } = render(<Types />);
     const row = container.querySelector('[data-type-row="health"]') as HTMLElement;
 
+    fireEvent.click(row.firstElementChild as Element);
     fireEvent.click(
-      within(row).getByRole("button", { name: "＋任务" }),
+      container.querySelector('[data-dock-action="add-task"]') as Element,
     );
 
     const dialog = screen.getByRole("dialog", {
@@ -184,10 +185,12 @@ describe("Types", () => {
   it("does not allow deleting built-in types", () => {
     const { container } = render(<Types />);
 
+    fireEvent.click(
+      container.querySelector('[data-type-row="voluntary"] > div') as Element,
+    );
+
     expect(
-      container.querySelector(
-        '[data-type-row="voluntary"] [data-type-action="delete"]',
-      ),
+      container.querySelector('[data-dock-action="delete"]'),
     ).toBeDisabled();
   });
 });
