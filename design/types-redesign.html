@@ -442,13 +442,11 @@
     border-top: 1px solid var(--color-border);
   }
   .task-row:first-child { border-top: 0; }
-  .task-row:hover { background: var(--state-hover); }
   .task-mark {
     flex: none;
-    width: 15px;
-    height: 15px;
-    border: 1.5px solid var(--color-border-strong);
-    border-radius: 4px;
+    width: 16px;
+    height: 16px;
+    color: var(--color-text-muted);
   }
   .task-name {
     min-width: 0;
@@ -812,7 +810,7 @@
                 <div class="detail-dock" aria-label="类型详情">
                   <div class="dock-head">
                     <div class="dock-title">
-                      <div class="breadcrumb">类型 / 自愿 / 健康</div>
+                      <div class="breadcrumb">自愿</div>
                       <div class="detail-title">
                         <span class="dot" style="--dot: var(--type-color-green)"></span>
                         <h2>健康</h2>
@@ -834,16 +832,14 @@
                   </div>
                   <ul class="task-list">
                     <li class="task-row">
-                      <span class="task-mark" aria-hidden="true"></span>
+                      <svg class="task-mark" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="13" height="13" rx="2.5"/><path d="M7 8h6M7 11.5h4.5"/></svg>
                       <span class="task-name">体检</span>
                       <span class="task-meta">每年一次 · 11/18 截止</span>
-                      <span class="task-arrow" aria-hidden="true">›</span>
                     </li>
                     <li class="task-row">
-                      <span class="task-mark" aria-hidden="true"></span>
+                      <svg class="task-mark" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="13" height="13" rx="2.5"/><path d="M7 8h6M7 11.5h4.5"/></svg>
                       <span class="task-name">早睡</span>
                       <span class="task-meta">每天</span>
-                      <span class="task-arrow" aria-hidden="true">›</span>
                     </li>
                   </ul>
                 </div>
