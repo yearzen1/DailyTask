@@ -1,5 +1,11 @@
 import { clsx } from "clsx";
-import { useMemo, useState, type DragEvent, type FormEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type DragEvent,
+  type FormEvent,
+} from "react";
 
 import {
   descendantTypeIds,
@@ -55,9 +61,7 @@ export default function Types() {
   const [dialog, setDialog] = useState<Dialog>(null);
   const [assignTarget, setAssignTarget] = useState<TaskType | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
-  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(
-    () => new Set(),
-  );
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{
     id: string;
@@ -104,20 +108,22 @@ export default function Types() {
         .some((ancestor) => collapsed.has(ancestor.id)),
   );
 
+  const selectedNode = selectedId
+    ? flat.find((node) => node.type.id === selectedId)
+    : undefined;
+  const selected = selectedNode?.type ?? null;
+
+  useEffect(() => {
+    if (selectedId && flat.some((node) => node.type.id === selectedId)) {
+      return;
+    }
+    const next =
+      flat.find((node) => node.type.systemKey === null) ?? flat[0] ?? null;
+    setSelectedId(next?.type.id ?? null);
+  }, [flat, selectedId]);
+
   const toggleCollapse = (typeId: string) => {
     setCollapsed((current) => {
-      const next = new Set(current);
-      if (next.has(typeId)) {
-        next.delete(typeId);
-      } else {
-        next.add(typeId);
-      }
-      return next;
-    });
-  };
-
-  const toggleTasks = (typeId: string) => {
-    setExpandedTasks((current) => {
       const next = new Set(current);
       if (next.has(typeId)) {
         next.delete(typeId);
@@ -169,21 +175,24 @@ export default function Types() {
         </button>
       </header>
 
-      <section className={`${CARD} min-h-0 flex-1 overflow-auto p-2`}>
-        <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+      <section
+        className={`${CARD} flex min-h-0 flex-1 flex-col overflow-hidden`}
+      >
+        <div className="min-h-0 flex-1 overflow-y-auto p-2">
+          <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
           {visibleRows.map((node) => {
             const type = node.type;
-            const directTasks = tasksByType.get(type.id) ?? [];
             const count = subtreeCount(type.id);
             const children = hasChildren(type.id);
             const open = !collapsed.has(type.id);
-            const showTasks = expandedTasks.has(type.id);
             const name = typeDisplayName(type, t);
             const drop = dropTarget?.id === type.id ? dropTarget.position : null;
+            const isSelected = selectedId === type.id;
 
             return (
               <li key={type.id} data-type-row={type.id}>
                 <div
+                  onClick={() => setSelectedId(type.id)}
                   draggable={type.systemKey === null}
                   onDragStart={(event) => {
                     event.dataTransfer.setData("text/plain", type.id);
@@ -248,8 +257,11 @@ export default function Types() {
                   }}
                   data-dragging={draggingId === type.id ? "" : undefined}
                   data-drop-position={drop ?? undefined}
+                  data-selected={isSelected ? "" : undefined}
+                  aria-current={isSelected ? "true" : undefined}
                   className={clsx(
-                    "group flex min-h-[38px] items-center gap-2 rounded-[var(--radius-control)] px-2 hover:bg-[var(--state-hover)]",
+                    "group relative flex h-10 cursor-pointer items-center gap-2 rounded-[var(--radius-control)] px-2 hover:bg-[var(--state-hover)]",
+                    isSelected && "bg-[var(--state-selected)]",
                     draggingId === type.id && "opacity-60",
                     drop === "inside" &&
                       "bg-[color-mix(in_srgb,var(--color-voluntary)_8%,var(--color-surface))]",
@@ -269,15 +281,48 @@ export default function Types() {
                               : undefined,
                   }}
                 >
+                  {Array.from({ length: node.depth }, (_, index) => (
+                    <span
+                      key={index}
+                      aria-hidden="true"
+                      className="pointer-events-none absolute top-0 h-full w-px bg-[var(--color-border)]"
+                      style={{ left: 14 + index * 18 }}
+                    />
+                  ))}
+                  {isSelected ? (
+                    <span
+                      aria-hidden="true"
+                      className="absolute left-0 top-1/2 h-[18px] w-[3px] -translate-y-1/2 rounded-[2px] bg-[var(--color-voluntary)]"
+                    />
+                  ) : null}
+
+                  <span
+                    aria-hidden="true"
+                    title={type.systemKey === null ? t("grid.drag") : undefined}
+                    className={clsx(
+                      "shrink-0 text-[9px] leading-none text-[var(--color-border-strong)] opacity-0 transition-opacity group-hover:opacity-100",
+                      isSelected && "opacity-100",
+                      type.systemKey === null
+                        ? "cursor-grab"
+                        : "invisible",
+                    )}
+                  >
+                    ⋮⋮
+                  </span>
+
                   <button
                     type="button"
-                    aria-label={t(open ? "common.collapseSection" : "common.expandSection", {
-                      section: name,
-                    })}
+                    aria-label={t(
+                      open ? "common.collapseSection" : "common.expandSection",
+                      { section: name },
+                    )}
                     aria-expanded={open}
                     data-type-collapse={type.id}
                     disabled={!children}
-                    onClick={() => toggleCollapse(type.id)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      toggleCollapse(type.id);
+                    }}
                     className={clsx(
                       "grid size-4 shrink-0 place-items-center rounded-[3px] text-[10px]",
                       children
@@ -293,15 +338,6 @@ export default function Types() {
                     className="size-[7px] shrink-0 rounded-full"
                     style={{ background: typeColorVar(type) }}
                   />
-                  {type.systemKey === null ? (
-                    <span
-                      aria-hidden="true"
-                      title={t("grid.drag")}
-                      className="shrink-0 cursor-grab text-[9px] leading-none text-[var(--color-border-strong)]"
-                    >
-                      ⋮⋮
-                    </span>
-                  ) : null}
 
                   <span className="min-w-0 flex-1 truncate">{name}</span>
                   {drop === "inside" ? (
@@ -320,93 +356,32 @@ export default function Types() {
                     </span>
                   ) : null}
                   <span className="shrink-0 text-[var(--text-2xs)] tabular-nums text-[var(--color-text-muted)]">
-                    {t("types.tasksCount", { count })}
+                    {count}
                   </span>
-
-                  <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                    <button
-                      type="button"
-                      data-type-action="add-task"
-                      onClick={() => setAssignTarget(type)}
-                      className="rounded-[var(--radius-control)] px-1.5 py-0.5 text-[var(--text-2xs)] text-[var(--color-text-muted)] hover:bg-[var(--state-active)]"
-                    >
-                      ＋{t("types.addTask")}
-                    </button>
-                    <button
-                      type="button"
-                      data-type-action="add-child"
-                      onClick={() =>
-                        setDialog({ mode: "create", parentId: type.id })
-                      }
-                      className="rounded-[var(--radius-control)] px-1.5 py-0.5 text-[var(--text-2xs)] text-[var(--color-text-muted)] hover:bg-[var(--state-active)]"
-                    >
-                      ＋{t("types.addChild")}
-                    </button>
-                    <button
-                      type="button"
-                      data-type-action="edit"
-                      onClick={() => setDialog({ mode: "edit", type })}
-                      className="rounded-[var(--radius-control)] px-1.5 py-0.5 text-[var(--text-2xs)] text-[var(--color-text-muted)] hover:bg-[var(--state-active)]"
-                    >
-                      {t("manage.edit")}
-                    </button>
-                    <ConfirmDeleteButton
-                      data-type-action="delete"
-                      name={name}
-                      description={t("types.deleteHint")}
-                      errorMessage={t("types.deleteFailed")}
-                      disabled={type.systemKey !== null}
-                      onConfirm={async (confirmation) => {
-                        await useTaskTypesStore
-                          .getState()
-                          .remove(type.id, confirmation);
-                      }}
-                      className="rounded-[var(--radius-control)] px-1.5 py-0.5 text-[var(--text-2xs)] text-[var(--color-text-muted)] hover:bg-[var(--state-hover)] hover:text-[var(--color-missed)] disabled:opacity-30"
-                    >
-                      {t("manage.delete")}
-                    </ConfirmDeleteButton>
-                  </div>
-
-                  {directTasks.length > 0 ? (
-                    <button
-                      type="button"
-                      data-type-tasks-toggle={type.id}
-                      aria-expanded={showTasks}
-                      aria-label={t(
-                        showTasks ? "types.collapseTasks" : "types.expandTasks",
-                        { name },
-                      )}
-                      onClick={() => toggleTasks(type.id)}
-                      className="shrink-0 rounded-[var(--radius-control)] px-1 text-[10px] text-[var(--color-text-muted)] hover:bg-[var(--state-active)]"
-                    >
-                      {showTasks ? "▾" : "▸"}
-                    </button>
-                  ) : null}
                 </div>
-
-                {showTasks ? (
-                  <ul
-                    data-type-task-list={type.id}
-                    className="m-0 mb-1 ml-6 flex list-none flex-col gap-px border-l border-[var(--color-border)] pl-3"
-                  >
-                    {directTasks.map((task) => (
-                      <li
-                        key={task.id}
-                        className="truncate py-0.5 text-[var(--text-2xs)] text-[var(--color-text-muted)]"
-                      >
-                        {task.name}
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
               </li>
             );
           })}
-        </ul>
-        {tree.every((type) => type.systemKey !== null) ? (
-          <p className="m-0 px-2 py-3 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
-            {t("types.empty")}
-          </p>
+          </ul>
+          {tree.every((type) => type.systemKey !== null) ? (
+            <p className="m-0 px-2 py-3 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+              {t("types.empty")}
+            </p>
+          ) : null}
+        </div>
+
+        {selected && selectedNode ? (
+          <TypeDetailDock
+            type={selected}
+            path={selectedNode.path}
+            count={subtreeCount(selected.id)}
+            directTasks={tasksByType.get(selected.id) ?? []}
+            onAddTask={() => setAssignTarget(selected)}
+            onEdit={() => setDialog({ mode: "edit", type: selected })}
+            onAddChild={() =>
+              setDialog({ mode: "create", parentId: selected.id })
+            }
+          />
         ) : null}
       </section>
 
@@ -429,6 +404,123 @@ export default function Types() {
         />
       ) : null}
     </>
+  );
+}
+
+function TypeDetailDock({
+  type,
+  path,
+  count,
+  directTasks,
+  onAddTask,
+  onEdit,
+  onAddChild,
+}: {
+  type: TaskType;
+  path: TaskType[];
+  count: number;
+  directTasks: Task[];
+  onAddTask: () => void;
+  onEdit: () => void;
+  onAddChild: () => void;
+}) {
+  const t = useT();
+  const name = typeDisplayName(type, t);
+
+  return (
+    <section
+      data-type-dock
+      className="flex-none border-t border-[var(--color-border)] bg-[var(--color-bg)] px-6 py-4"
+    >
+      <div className="flex items-start gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+            {path.map((item) => typeDisplayName(item, t)).join(" / ")}
+          </div>
+          <div className="mt-0.5 flex items-center gap-2">
+            <i
+              aria-hidden="true"
+              className="size-2.5 shrink-0 rounded-full"
+              style={{ background: typeColorVar(type) }}
+            />
+            <h2 className="m-0 text-[var(--text-md)] font-semibold">{name}</h2>
+            <span className="text-xs text-[var(--color-text-muted)]">
+              {t("types.tasksCount", { count })}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            data-dock-action="add-task"
+            onClick={onAddTask}
+            className="rounded-[var(--radius-control)] bg-[var(--color-voluntary)] px-3 py-1 text-[var(--text-2xs)] font-semibold text-white"
+          >
+            ＋ {t("types.addTask")}
+          </button>
+          <button
+            type="button"
+            data-dock-action="edit"
+            onClick={onEdit}
+            className="rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1 text-[var(--text-2xs)] text-[var(--color-text)] hover:bg-[var(--state-hover)]"
+          >
+            {t("manage.edit")}
+          </button>
+          <button
+            type="button"
+            data-dock-action="add-child"
+            onClick={onAddChild}
+            className="rounded-[var(--radius-control)] px-2 py-1 text-[var(--text-2xs)] text-[var(--color-text-muted)] hover:bg-[var(--state-hover)] hover:text-[var(--color-text)]"
+          >
+            ＋ {t("types.addChild")}
+          </button>
+          <ConfirmDeleteButton
+            data-dock-action="delete"
+            name={name}
+            description={t("types.deleteHint")}
+            errorMessage={t("types.deleteFailed")}
+            disabled={type.systemKey !== null}
+            onConfirm={async (confirmation) => {
+              await useTaskTypesStore.getState().remove(type.id, confirmation);
+            }}
+            className="rounded-[var(--radius-control)] px-2 py-1 text-[var(--text-2xs)] text-[var(--color-text-muted)] hover:bg-[var(--state-hover)] hover:text-[var(--color-missed)] disabled:opacity-30"
+          >
+            {t("manage.delete")}
+          </ConfirmDeleteButton>
+        </div>
+      </div>
+
+      <div className="my-3 h-px bg-[var(--color-border)]" />
+
+      <div className="flex items-baseline gap-2 text-[var(--text-2xs)] font-semibold text-[var(--color-text-muted)]">
+        <span>{t("types.taskList")}</span>
+        <span className="font-normal tabular-nums">{directTasks.length}</span>
+      </div>
+
+      {directTasks.length === 0 ? (
+        <p className="m-0 px-2 pt-1 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+          {t("types.detailEmpty")} · {t("types.detailEmptyHint")}
+        </p>
+      ) : (
+        <ul className="m-0 flex list-none flex-col p-0">
+          {directTasks.map((task) => (
+            <li
+              key={task.id}
+              className="flex h-[34px] items-center gap-2 border-t border-[var(--color-border)] px-2 first:border-t-0"
+            >
+              <span
+                aria-hidden="true"
+                className="size-[15px] shrink-0 rounded-[4px] border-[1.5px] border-[var(--color-border-strong)]"
+              />
+              <span className="min-w-0 flex-1 truncate text-sm">
+                {task.name}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 

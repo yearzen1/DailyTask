@@ -173,6 +173,8 @@ export const en: Messages = {
   "types.error.notFound": "The type no longer exists. Please refresh and try again.",
   "types.error.saveFailed": "Save failed. Please try again.",
   "types.taskList": "Direct tasks",
+  "types.detailEmpty": "No direct tasks yet",
+  "types.detailEmptyHint": "Use \"Add tasks\" to move existing tasks here",
   "types.addTasksTitle": "Add tasks to \"{name}\"",
   "types.addTasksHint": "Checked tasks move from their current type into this type",
   "types.searchTasks": "Search tasks",

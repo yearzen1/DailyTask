@@ -174,6 +174,8 @@ export const zhCN = {
   "types.error.notFound": "类型不存在，请刷新后重试",
   "types.error.saveFailed": "保存失败，请重试",
   "types.taskList": "直属任务",
+  "types.detailEmpty": "还没有直属任务",
+  "types.detailEmptyHint": "用「添加任务」把已有任务归到这里",
   "types.addTasksTitle": "添加任务到「{name}」",
   "types.addTasksHint": "勾选后会把任务从原类型移入当前类型",
   "types.searchTasks": "搜索任务",
