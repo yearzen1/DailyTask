@@ -25,6 +25,7 @@ import {
 import { useTaskTypesStore } from "../../../stores/taskTypesStore";
 import { useTasksStore } from "../../../stores/tasksStore";
 import { ConfirmDeleteButton } from "../../../ui/ConfirmDeleteButton";
+import { Icon } from "../../../ui/Icon";
 import {
   nextTypeColor,
   TYPE_COLORS,
@@ -412,17 +413,20 @@ function TypeDetailDock({
 }) {
   const t = useT();
   const name = typeDisplayName(type, t);
+  const trail = path.slice(0, -1);
 
   return (
     <section
       data-type-dock
-      className="flex-none border-t border-[var(--color-border)] bg-[var(--color-bg)] px-6 py-4"
+      className="flex max-h-[45%] min-h-0 flex-none flex-col border-t border-[var(--color-border)] bg-[var(--color-bg)] px-6 py-4"
     >
-      <div className="flex items-start gap-4">
+      <div className="flex flex-none items-start gap-4">
         <div className="min-w-0 flex-1">
-          <div className="text-[var(--text-2xs)] text-[var(--color-text-muted)]">
-            {path.map((item) => typeDisplayName(item, t)).join(" / ")}
-          </div>
+          {trail.length > 0 ? (
+            <div className="text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+              {trail.map((item) => typeDisplayName(item, t)).join(" / ")}
+            </div>
+          ) : null}
           <div className="mt-0.5 flex items-center gap-2">
             <i
               aria-hidden="true"
@@ -478,27 +482,31 @@ function TypeDetailDock({
         </div>
       </div>
 
-      <div className="my-3 h-px bg-[var(--color-border)]" />
+      <div className="my-3 h-px flex-none bg-[var(--color-border)]" />
 
-      <div className="flex items-baseline gap-2 text-[var(--text-2xs)] font-semibold text-[var(--color-text-muted)]">
+      <div className="flex flex-none items-center gap-2 text-[var(--text-2xs)] font-semibold text-[var(--color-text-muted)]">
+        <span aria-hidden="true" className="size-4 shrink-0" />
         <span>{t("types.taskList")}</span>
         <span className="font-normal tabular-nums">{directTasks.length}</span>
       </div>
 
       {directTasks.length === 0 ? (
-        <p className="m-0 px-2 pt-1 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+        <p className="m-0 py-1 pl-8 pr-2 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
           {t("types.detailEmpty")} · {t("types.detailEmptyHint")}
         </p>
       ) : (
-        <ul className="m-0 flex list-none flex-col p-0">
+        <ul
+          data-type-task-list
+          className="m-0 flex min-h-0 flex-1 list-none flex-col overflow-y-auto p-0"
+        >
           {directTasks.map((task) => (
             <li
               key={task.id}
               className="flex h-[34px] items-center gap-2 border-t border-[var(--color-border)] px-2 first:border-t-0"
             >
-              <span
-                aria-hidden="true"
-                className="size-[15px] shrink-0 rounded-[4px] border-[1.5px] border-[var(--color-border-strong)]"
+              <Icon
+                name="task"
+                className="size-4 shrink-0 text-[var(--color-text-muted)]"
               />
               <span className="min-w-0 flex-1 truncate text-sm">
                 {task.name}

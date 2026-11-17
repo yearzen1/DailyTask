@@ -7,7 +7,8 @@ export type IconName =
   | "manage"
   | "types"
   | "stats"
-  | "settings";
+  | "settings"
+  | "task";
 
 const PATHS: Record<IconName, ReactNode> = {
   today: (
@@ -55,6 +56,12 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <circle cx="10" cy="10" r="2.8" />
       <path d="M10 2.8v1.8M10 15.4v1.8M2.8 10h1.8M15.4 10h1.8M4.9 4.9l1.3 1.3M13.8 13.8l1.3 1.3M15.1 4.9l-1.3 1.3M6.2 13.8l-1.3 1.3" />
+    </>
+  ),
+  task: (
+    <>
+      <rect x="3.5" y="3.5" width="13" height="13" rx="2.5" />
+      <path d="M7 8h6M7 11.5h4.5" />
     </>
   ),
 };
