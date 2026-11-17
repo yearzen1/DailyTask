@@ -1,4 +1,7 @@
-import { isTypeDescendant } from "../domain/taskTypes";
+import {
+  compareTaskTypes,
+  isTypeDescendant,
+} from "../domain/taskTypes";
 import type { TaskCategory, TaskType, TaskTypeColor } from "../domain/types";
 import type { SqlDatabase } from "./client";
 
@@ -260,6 +263,70 @@ export async function reorderTaskTypes(
       [index, now, id, parentId ?? ""],
     );
   }
+}
+
+/**
+ * 拖拽移动：改父级并插入到指定同级下标，旧父级与新父级都会重排。
+ * index 是在「排除被移动节点后」的同级列表里的下标。
+ */
+export async function moveTaskType(
+  db: SqlDatabase,
+  id: string,
+  parentId: string | null,
+  index: number,
+): Promise<TaskType[]> {
+  const types = await listTaskTypes(db);
+  const target = types.find((type) => type.id === id);
+  if (!target) {
+    throw new TaskTypeError("not-found");
+  }
+  if (target.systemKey !== null) {
+    throw new TaskTypeError("system-type");
+  }
+  if (parentId !== null) {
+    if (!types.some((type) => type.id === parentId)) {
+      throw new TaskTypeError("not-found");
+    }
+    if (parentId === id || isTypeDescendant(types, id, parentId)) {
+      throw new TaskTypeError("cycle");
+    }
+  }
+
+  const now = new Date().toISOString();
+  const newSiblings = types
+    .filter((type) => type.parentId === parentId && type.id !== id)
+    .sort(compareTaskTypes);
+  const at = Math.max(0, Math.min(Math.round(index), newSiblings.length));
+  const ordered = [
+    ...newSiblings.slice(0, at).map((type) => type.id),
+    id,
+    ...newSiblings.slice(at).map((type) => type.id),
+  ];
+
+  await db.execute(
+    "UPDATE task_types SET parent_id = ?, sort_order = ?, updated_at = ? WHERE id = ?",
+    [parentId, at, now, id],
+  );
+  for (const [position, siblingId] of ordered.entries()) {
+    await db.execute(
+      "UPDATE task_types SET sort_order = ?, updated_at = ? WHERE id = ?",
+      [position, now, siblingId],
+    );
+  }
+
+  if (target.parentId !== parentId) {
+    const oldSiblings = types
+      .filter((type) => type.parentId === target.parentId && type.id !== id)
+      .sort(compareTaskTypes);
+    for (const [position, siblingId] of oldSiblings.entries()) {
+      await db.execute(
+        "UPDATE task_types SET sort_order = ?, updated_at = ? WHERE id = ?",
+        [position, now, siblingId.id],
+      );
+    }
+  }
+
+  return listTaskTypes(db);
 }
 
 export async function deleteTaskType(

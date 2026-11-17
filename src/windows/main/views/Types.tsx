@@ -1,18 +1,21 @@
 import { clsx } from "clsx";
 import { useMemo, useState, type DragEvent, type FormEvent } from "react";
 
-import { logicalToday } from "../../../domain/date";
 import {
   descendantTypeIds,
   flattenTypeTree,
   isTypeDescendant,
   resolveTaskTypeId,
   resolveTaskTypes,
+  sortedTasksByType,
 } from "../../../domain/taskTypes";
 import type { MessageKey } from "../../../shared/i18n";
 import type { Task, TaskType, TaskTypeColor } from "../../../domain/types";
-import { useDayNow } from "../../../stores/dayStore";
-import { useSettingsStore } from "../../../stores/settingsStore";
+import {
+  planTypeMove,
+  typeDropZone,
+  type TypeDropPosition,
+} from "../../../domain/typeDrop";
 import { useTaskTypesStore } from "../../../stores/taskTypesStore";
 import { useTasksStore } from "../../../stores/tasksStore";
 import { ConfirmDeleteButton } from "../../../ui/ConfirmDeleteButton";
@@ -24,7 +27,6 @@ import {
   typeDisplayName,
 } from "../../../ui/taskType";
 import { useT } from "../../../ui/useT";
-import { CreateTaskDialog } from "./Manage";
 
 const CARD =
   "rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-card)]";
@@ -48,18 +50,19 @@ export default function Types() {
   const t = useT();
   const types = useTaskTypesStore((state) => state.types);
   const tasks = useTasksStore((state) => state.tasks);
-  const reorder = useTaskTypesStore((state) => state.reorder);
-  const today = useDayNow();
-  const dayStartHour = useSettingsStore((state) => state.settings.dayStartHour);
-  const logicalTodayString = logicalToday(today, dayStartHour);
+  const moveType = useTaskTypesStore((state) => state.move);
 
   const [dialog, setDialog] = useState<Dialog>(null);
-  const [creatingTaskFor, setCreatingTaskFor] = useState<string | null>(null);
+  const [assignTarget, setAssignTarget] = useState<TaskType | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(
     () => new Set(),
   );
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{
+    id: string;
+    position: TypeDropPosition;
+  } | null>(null);
 
   const tree = useMemo(() => resolveTaskTypes(types), [types]);
   const flat = useMemo(() => flattenTypeTree(tree), [tree]);
@@ -125,35 +128,26 @@ export default function Types() {
     });
   };
 
-  const siblingIds = (type: TaskType): string[] =>
-    tree
-      .filter(
-        (item) => item.parentId === type.parentId && item.systemKey === null,
-      )
-      .sort(
-        (a, b) =>
-          a.order - b.order ||
-          a.createdAt.localeCompare(b.createdAt) ||
-          a.id.localeCompare(b.id),
-      )
-      .map((item) => item.id);
-
-  const dropOn = (source: TaskType, target: TaskType) => {
-    if (source.parentId !== target.parentId) {
+  const dropOn = (
+    sourceId: string,
+    target: TaskType,
+    position: TypeDropPosition,
+  ) => {
+    const plan = planTypeMove(tree, sourceId, target.id, position);
+    if (!plan) {
       return;
     }
-    if (target.systemKey !== null) {
-      return;
+    void moveType(sourceId, plan.parentId, plan.index);
+    if (position === "inside") {
+      setCollapsed((current) => {
+        if (!current.has(target.id)) {
+          return current;
+        }
+        const next = new Set(current);
+        next.delete(target.id);
+        return next;
+      });
     }
-    const ids = siblingIds(source);
-    const from = ids.indexOf(source.id);
-    const to = ids.indexOf(target.id);
-    if (from < 0 || to < 0 || from === to) {
-      return;
-    }
-    const [moved] = ids.splice(from, 1);
-    ids.splice(to, 0, moved);
-    void reorder(source.parentId, ids);
   };
 
   return (
@@ -185,35 +179,95 @@ export default function Types() {
             const open = !collapsed.has(type.id);
             const showTasks = expandedTasks.has(type.id);
             const name = typeDisplayName(type, t);
+            const drop = dropTarget?.id === type.id ? dropTarget.position : null;
 
             return (
               <li key={type.id} data-type-row={type.id}>
                 <div
                   draggable={type.systemKey === null}
-                  onDragStart={() => setDraggingId(type.id)}
-                  onDragEnd={() => setDraggingId(null)}
+                  onDragStart={(event) => {
+                    event.dataTransfer.setData("text/plain", type.id);
+                    event.dataTransfer.effectAllowed = "move";
+                    setDraggingId(type.id);
+                  }}
+                  onDragEnd={() => {
+                    setDraggingId(null);
+                    setDropTarget(null);
+                  }}
                   onDragOver={(event: DragEvent) => {
-                    if (draggingId !== null && draggingId !== type.id) {
+                    if (draggingId === null || draggingId === type.id) {
+                      return;
+                    }
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    const raw = typeDropZone(
+                      event.clientY,
+                      rect.top,
+                      rect.height,
+                      type.systemKey !== null,
+                    );
+                    const valid =
+                      planTypeMove(tree, draggingId, type.id, raw) !== null;
+                    setDropTarget({
+                      id: type.id,
+                      position: valid ? raw : "invalid",
+                    });
+                    if (valid) {
                       event.preventDefault();
+                      if (event.dataTransfer) {
+                        event.dataTransfer.dropEffect = "move";
+                      }
+                    } else if (event.dataTransfer) {
+                      event.dataTransfer.dropEffect = "none";
+                    }
+                  }}
+                  onDragLeave={(event) => {
+                    if (
+                      !event.currentTarget.contains(
+                        event.relatedTarget as Node | null,
+                      )
+                    ) {
+                      setDropTarget((current) =>
+                        current?.id === type.id ? null : current,
+                      );
                     }
                   }}
                   onDrop={(event) => {
                     event.preventDefault();
-                    if (draggingId === null) {
-                      return;
-                    }
-                    const source = tree.find((item) => item.id === draggingId);
-                    if (source) {
-                      dropOn(source, type);
+                    if (draggingId !== null) {
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      const position = typeDropZone(
+                        event.clientY,
+                        rect.top,
+                        rect.height,
+                        type.systemKey !== null,
+                      );
+                      dropOn(draggingId, type, position);
                     }
                     setDraggingId(null);
+                    setDropTarget(null);
                   }}
                   data-dragging={draggingId === type.id ? "" : undefined}
+                  data-drop-position={drop ?? undefined}
                   className={clsx(
                     "group flex min-h-[38px] items-center gap-2 rounded-[var(--radius-control)] px-2 hover:bg-[var(--state-hover)]",
                     draggingId === type.id && "opacity-60",
+                    drop === "inside" &&
+                      "bg-[color-mix(in_srgb,var(--color-voluntary)_8%,var(--color-surface))]",
+                    drop === "invalid" && "cursor-no-drop",
                   )}
-                  style={{ paddingLeft: 8 + node.depth * 18 }}
+                  style={{
+                    paddingLeft: 8 + node.depth * 18,
+                    boxShadow:
+                      drop === "before"
+                        ? "inset 0 2px 0 var(--color-voluntary)"
+                        : drop === "after"
+                          ? "inset 0 -2px 0 var(--color-voluntary)"
+                          : drop === "inside"
+                            ? "inset 0 0 0 1px var(--color-voluntary)"
+                            : drop === "invalid"
+                              ? "inset 0 0 0 1px var(--color-missed)"
+                              : undefined,
+                  }}
                 >
                   <button
                     type="button"
@@ -250,6 +304,16 @@ export default function Types() {
                   ) : null}
 
                   <span className="min-w-0 flex-1 truncate">{name}</span>
+                  {drop === "inside" ? (
+                    <span className="shrink-0 rounded-[var(--radius-pill)] bg-[var(--color-voluntary)] px-1.5 py-px text-[10px] font-semibold text-white">
+                      {t("types.dropInside")}
+                    </span>
+                  ) : null}
+                  {drop === "invalid" ? (
+                    <span className="shrink-0 text-[10px] text-[var(--color-missed)]">
+                      {t("types.dropInvalid")}
+                    </span>
+                  ) : null}
                   {type.systemKey !== null ? (
                     <span className="shrink-0 rounded-[var(--radius-pill)] bg-[var(--state-hover)] px-1.5 py-px text-[10px] text-[var(--color-text-muted)]">
                       {t("types.builtin")}
@@ -263,7 +327,7 @@ export default function Types() {
                     <button
                       type="button"
                       data-type-action="add-task"
-                      onClick={() => setCreatingTaskFor(type.id)}
+                      onClick={() => setAssignTarget(type)}
                       className="rounded-[var(--radius-control)] px-1.5 py-0.5 text-[var(--text-2xs)] text-[var(--color-text-muted)] hover:bg-[var(--state-active)]"
                     >
                       ＋{t("types.addTask")}
@@ -356,14 +420,214 @@ export default function Types() {
         />
       ) : null}
 
-      {creatingTaskFor !== null ? (
-        <CreateTaskDialog
-          today={logicalTodayString}
-          defaultTypeId={creatingTaskFor}
-          onClose={() => setCreatingTaskFor(null)}
+      {assignTarget !== null ? (
+        <AssignTasksDialog
+          target={assignTarget}
+          types={tree}
+          tasks={tasks}
+          onClose={() => setAssignTarget(null)}
         />
       ) : null}
     </>
+  );
+}
+
+function AssignTasksDialog({
+  target,
+  types,
+  tasks,
+  onClose,
+}: {
+  target: TaskType;
+  types: TaskType[];
+  tasks: Task[];
+  onClose: () => void;
+}) {
+  const t = useT();
+  const assignType = useTasksStore((state) => state.assignType);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [query, setQuery] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const pathById = useMemo(
+    () => new Map(flattenTypeTree(types).map((node) => [node.type.id, node.path])),
+    [types],
+  );
+  const candidates = useMemo(() => {
+    const excluded = descendantTypeIds(types, target.id);
+    return sortedTasksByType(
+      tasks.filter((task) => !excluded.has(resolveTaskTypeId(task))),
+      types,
+    );
+  }, [tasks, types, target.id]);
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) {
+      return candidates;
+    }
+    return candidates.filter((task) =>
+      task.name.toLowerCase().includes(needle),
+    );
+  }, [candidates, query]);
+  const allSelected =
+    filtered.length > 0 && filtered.every((task) => selected.has(task.id));
+
+  const toggle = (taskId: string) => {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (allSelected) {
+        filtered.forEach((task) => next.delete(task.id));
+      } else {
+        filtered.forEach((task) => next.add(task.id));
+      }
+      return next;
+    });
+  };
+
+  const submit = async () => {
+    if (selected.size === 0 || pending) {
+      return;
+    }
+    setPending(true);
+    setError(null);
+    try {
+      await assignType([...selected], target.id);
+      onClose();
+    } catch {
+      setError(t("types.addTaskFailed"));
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <button
+        type="button"
+        aria-label={t("manage.cancel")}
+        tabIndex={-1}
+        onClick={onClose}
+        className="absolute inset-0 cursor-default bg-black/25"
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("types.addTasksTitle", {
+          name: typeDisplayName(target, t),
+        })}
+        data-assign-dialog
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.stopPropagation();
+            onClose();
+          }
+        }}
+        className="relative z-10 flex max-h-[calc(100vh-48px)] w-[440px] max-w-[calc(100vw-32px)] flex-col gap-3 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-popover)]"
+      >
+        <h2 className="m-0 text-sm font-semibold">
+          {t("types.addTasksTitle", { name: typeDisplayName(target, t) })}
+        </h2>
+        <p className="m-0 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+          {t("types.addTasksHint")}
+        </p>
+
+        <div className="flex items-center gap-2">
+          <input
+            autoFocus
+            data-assign-search
+            value={query}
+            aria-label={t("types.searchTasks")}
+            placeholder={t("types.searchTasks")}
+            onChange={(event) => setQuery(event.target.value)}
+            className="min-w-0 flex-1 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1 text-sm text-[var(--color-text)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
+          />
+          <button
+            type="button"
+            data-assign-toggle-all
+            onClick={toggleAll}
+            className="shrink-0 rounded-[var(--radius-control)] px-2 py-1 text-[var(--text-2xs)] text-[var(--color-text-muted)] hover:bg-[var(--state-hover)]"
+          >
+            {allSelected ? t("types.clearAll") : t("types.selectAll")}
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto rounded-[var(--radius-control)] border border-[var(--color-border)]">
+          {filtered.length === 0 ? (
+            <p className="m-0 px-3 py-6 text-center text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+              {t("types.noAvailableTasks")}
+            </p>
+          ) : (
+            filtered.map((task) => {
+              const path = pathById.get(resolveTaskTypeId(task));
+              const currentType = path
+                ? path.map((type) => typeDisplayName(type, t)).join(" / ")
+                : "";
+              return (
+                <label
+                  key={task.id}
+                  data-assign-task={task.id}
+                  className="flex min-h-[34px] cursor-pointer items-center gap-2 border-b border-[var(--color-border)] px-3 last:border-b-0 hover:bg-[var(--state-hover)]"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.has(task.id)}
+                    onChange={() => toggle(task.id)}
+                  />
+                  <span className="min-w-0 flex-1 truncate text-xs">
+                    {task.name}
+                  </span>
+                  <span className="shrink-0 text-[10px] text-[var(--color-text-muted)]">
+                    {currentType}
+                  </span>
+                </label>
+              );
+            })
+          )}
+        </div>
+
+        {error ? (
+          <p className="m-0 text-[var(--text-2xs)] text-[var(--color-missed)]">
+            {error}
+          </p>
+        ) : null}
+
+        <div className="flex items-center justify-end gap-2">
+          <span className="mr-auto text-[var(--text-2xs)] tabular-nums text-[var(--color-text-muted)]">
+            {t("types.selectedCount", { count: selected.size })}
+          </span>
+          <button
+            type="button"
+            data-assign-cancel
+            onClick={onClose}
+            className="rounded-[var(--radius-control)] px-2.5 py-1 text-[var(--text-2xs)] text-[var(--color-text-muted)] hover:bg-[var(--state-hover)]"
+          >
+            {t("manage.cancel")}
+          </button>
+          <button
+            type="button"
+            data-assign-submit
+            disabled={selected.size === 0 || pending}
+            onClick={() => void submit()}
+            className="rounded-[var(--radius-control)] bg-[var(--color-voluntary)] px-2.5 py-1 text-[var(--text-2xs)] font-semibold text-white disabled:opacity-40"
+          >
+            {t("types.addSelected", { count: selected.size })}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -173,21 +173,18 @@ export default function Manage() {
   );
 }
 
-export function CreateTaskDialog({
+function CreateTaskDialog({
   today,
-  defaultTypeId,
   onClose,
 }: {
   today: string;
-  /** 从类型页「＋任务」进入时预选类型。 */
-  defaultTypeId?: string;
   onClose: () => void;
 }) {
   const t = useT();
   const create = useTasksStore((state) => state.create);
   const types = useTaskTypesStore((state) => state.types);
   const [name, setName] = useState("");
-  const [typeId, setTypeId] = useState(defaultTypeId ?? "voluntary");
+  const [typeId, setTypeId] = useState("voluntary");
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState("");
   const [everyDays, setEveryDays] = useState("1");

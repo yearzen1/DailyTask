@@ -24,6 +24,8 @@ export interface TaskTypesState {
   reload: () => Promise<void>;
   create: (input: repo.CreateTaskTypeInput) => Promise<TaskType>;
   update: (id: string, patch: repo.TaskTypePatch) => Promise<void>;
+  /** 拖拽移动：改父级并插入到指定同级下标。 */
+  move: (id: string, parentId: string | null, index: number) => Promise<void>;
   /** 按传入顺序重排同一父级下的类型。 */
   reorder: (parentId: string | null, ids: string[]) => Promise<void>;
   remove: (id: string, confirmation: DeleteConfirmation) => Promise<void>;
@@ -54,6 +56,13 @@ export const useTaskTypesStore = create<TaskTypesState>()((set, get) => ({
       set({
         types: get().types.map((type) => (type.id === id ? updated : type)),
       });
+      notifyTaskTypesChanged();
+    }),
+
+  move: (id, parentId, index) =>
+    enqueueWrite(async () => {
+      const types = await repo.moveTaskType(await getDb(), id, parentId, index);
+      set({ types });
       notifyTaskTypesChanged();
     }),
 

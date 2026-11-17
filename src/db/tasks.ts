@@ -254,6 +254,31 @@ export async function updateTask(
   );
 }
 
+export interface AssignTasksResult {
+  typeId: string;
+  category: TaskCategory;
+  updatedAt: string;
+}
+
+/** 批量把任务移到指定类型；一次 UPDATE，category 根缓存同步。 */
+export async function assignTasksToType(
+  db: SqlDatabase,
+  taskIds: string[],
+  typeId: string,
+): Promise<AssignTasksResult | null> {
+  if (taskIds.length === 0) {
+    return null;
+  }
+  const category = await rootCategoryForTaskType(db, typeId);
+  const updatedAt = new Date().toISOString();
+  const placeholders = taskIds.map(() => "?").join(", ");
+  await db.execute(
+    `UPDATE tasks SET type_id = ?, category = ?, updated_at = ? WHERE id IN (${placeholders})`,
+    [typeId, category, updatedAt, ...taskIds],
+  );
+  return { typeId, category, updatedAt };
+}
+
 export async function deleteTask(db: SqlDatabase, id: string): Promise<void> {
   // SQLite 外键默认可能关闭，级联删除不要只依赖 ON DELETE CASCADE。
   await db.execute("DELETE FROM checkins WHERE task_id = ?", [id]);

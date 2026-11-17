@@ -65,7 +65,7 @@ function builtinRank(type: TaskType): number {
   return 2;
 }
 
-function compareTypes(a: TaskType, b: TaskType): number {
+export function compareTaskTypes(a: TaskType, b: TaskType): number {
   return (
     builtinRank(a) - builtinRank(b) ||
     a.order - b.order ||
@@ -96,7 +96,7 @@ function wouldCreateCycle(
 
 /** 建树；父节点缺失或形成环时把节点当根处理，保证不丢任务。 */
 export function buildTypeTree(types: readonly TaskType[]): TypeNode[] {
-  const all = [...resolveTaskTypes(types)].sort(compareTypes);
+  const all = [...resolveTaskTypes(types)].sort(compareTaskTypes);
   const byId = new Map(all.map((type) => [type.id, type]));
   const nodes = new Map<string, TypeNode>();
   for (const type of all) {

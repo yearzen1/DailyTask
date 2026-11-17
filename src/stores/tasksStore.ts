@@ -52,6 +52,8 @@ export interface TasksState {
   ) => Promise<void>;
   /** 按传入的全局顺序重排任务（拖拽排序）。 */
   reorder: (taskIds: string[]) => Promise<void>;
+  /** 批量把任务移到指定类型。 */
+  assignType: (taskIds: string[], typeId: string) => Promise<void>;
 }
 
 const now = () => new Date().toISOString();
@@ -207,6 +209,32 @@ export const useTasksStore = create<TasksState>()((set, get) => ({
         tasks: get().tasks.map((task) =>
           orders.has(task.id)
             ? { ...task, order: orders.get(task.id) as number, updatedAt: stamp }
+            : task,
+        ),
+      });
+      notifyTasksChanged();
+    }),
+
+  assignType: (taskIds, typeId) =>
+    enqueueWrite(async () => {
+      const result = await repo.assignTasksToType(
+        await getDb(),
+        taskIds,
+        typeId,
+      );
+      if (!result) {
+        return;
+      }
+      const ids = new Set(taskIds);
+      set({
+        tasks: get().tasks.map((task) =>
+          ids.has(task.id)
+            ? {
+                ...task,
+                typeId: result.typeId,
+                category: result.category,
+                updatedAt: result.updatedAt,
+              }
             : task,
         ),
       });
