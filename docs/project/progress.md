@@ -259,6 +259,18 @@
 
 ---
 
+## 16. v0.1.21 完成记录（2026-11-17）
+
+全量校验：`npm run test` **454 passed**、`npm run lint`、`npm run typecheck`、`cargo check`、`npm run docs:check`、`npm run build`、`tauri build` 全绿。已发布 v0.1.21：<https://github.com/yearzen1/DailyTask/releases/tag/v0.1.21>。
+
+- 任务类型从写死的自愿 / 被迫升级为可自建、可嵌套的树；新增 `task_types` 表（迁移 `006_task_types.sql`），既有任务按 `category` 回填 `type_id`，旧列保留为兼容缓存。
+- 新增「类型」页：建类型 / 子类型、改上级与颜色、同级拖拽排序、删除保护、直接给类型加任务；内置类型可改名、不可删除、不可互相嵌套。
+- 今日页、任务表、挂件按类型树分组并逐级折叠；顶部小计改为顶层类型；网格类型筛选选父类型包含全部后代。
+- 任务管理的新建 / 编辑弹窗改为缩进类型树选择器，类型列显示叶子类型与完整路径。
+- JSON 导出升级 v3（新增 `taskTypes` 与 `tasks[].typeId`），v1/v2 导入按 `category` 映射内置类型并保留本地改过的默认类型名。
+
+---
+
 ## 15. v0.1.20 完成记录（2026-11-15）
 
 全量校验：`npm run test` **420 passed**、`npm run lint`、`npm run typecheck`、`cargo check`、`npm run docs:check`、`tauri build` 全绿。已发布 v0.1.20：<https://github.com/yearzen1/DailyTask/releases/tag/v0.1.20>。
