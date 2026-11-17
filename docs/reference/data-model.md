@@ -102,7 +102,8 @@ CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 ### 2.2 任务类型
 
 - 类型是一棵树：`parent_id = NULL` 为顶层，子类型缩进显示。
-- 内置类型 id 固定为 `voluntary` / `forced`，`system_key` 非空，不可删除。
+- 内置类型 id 固定为 `voluntary` / `forced`，`system_key` 非空；行为与自定义类型一致，可拖动、嵌套和删除。
+- 至少保留一个类型；有任务或子类型时拒绝删除。
 - 内置类型 `name IS NULL` 时显示 `t("type.voluntary")` / `t("type.forced")`；改名后写 `name`。
 - 同一父级下类型名唯一；改父级时禁止形成环。
 - `tasks.type_id` 是任务归属的唯一读取来源；`tasks.category` 只作为旧版本兼容列，写入时按类型根节点同步。
