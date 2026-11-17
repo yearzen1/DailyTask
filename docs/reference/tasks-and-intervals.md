@@ -13,12 +13,29 @@
 |---|---|---|
 | `id` | string | UUID |
 | `name` | string | 当前名字；有 `namePeriods` 时以最新段为准 |
-| `category` | `voluntary` / `forced` | 只影响分组与颜色 |
+| `typeId` | string | 所属类型 id；缺省时回退 `category`（兼容旧数据） |
+| `category` | `voluntary` / `forced` | 类型根节点缓存；只用于兼容旧版本与导出回退 |
 | `intervals` | Interval[] | 至少一段 |
 | `namePeriods` | NamePeriod[] | 名称历史；缺省时按 `name` 合成一段 |
 | `order` | number | `sort_order` |
 | `createdAt` | ISO string | |
 | `updatedAt` | ISO string | |
+
+## 1.5 TaskType
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `id` | string | 内置为 `voluntary` / `forced`，自定义为 UUID |
+| `name` | `string \| null` | null = 内置类型，显示跟随界面语言 |
+| `parentId` | `string \| null` | null = 顶层 |
+| `order` | number | 同级 `sort_order` |
+| `systemKey` | `voluntary` / `forced` \| null | 内置类型标记 |
+| `color` | string \| null | 调色板 key；null 用默认色 |
+
+- 一个任务只属于一个类型
+- 类型可任意嵌套；父组折叠隐藏全部子孙
+- 内置类型不可删除，可改名、可加子类型
+- 同一父级下名称唯一；不能把类型挂到自己的子孙下
 
 ## 2. Interval
 

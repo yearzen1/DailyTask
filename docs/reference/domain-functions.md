@@ -57,6 +57,24 @@ nameOn(task: Task, date: string): string
 - 日期落在段外时 `nameOn` 退回最近的段，保证异常数据下也有名字
 - 网格与统计按名称段拆行；今日页、挂件继续使用 `currentName`
 
+## 2.6 任务类型树
+
+```ts
+resolveTaskTypeId(task: Task): string          // typeId ?? category
+resolveTaskTypes(types?: TaskType[]): TaskType[]
+buildTypeTree(types: TaskType[]): TypeNode[]
+flattenTypeTree(types: TaskType[]): FlatType[] // 带 depth / path
+descendantTypeIds(types: TaskType[], id: string): Set<string>
+isTypeDescendant(types, ancestorId, id): boolean
+sortedTasksByType(tasks: Task[], types: TaskType[]): Task[]
+```
+
+- 内置类型 id 为 `voluntary` / `forced`，可被改名，但节点始终存在
+- 树顺序：先父后子；同级按 `sort_order`，相同再按 `created_at`
+- 父组计数聚合整棵子树；父组折叠隐藏全部子孙
+- 旧数据只有 `category` 时按同名内置类型分组
+- 改父级不能形成环；同一父级下名称唯一
+
 ## 3. 格子投影
 
 ```ts
@@ -166,6 +184,7 @@ resetColumnWidth(widths: number[], index: number): number[]
 - `today` 边界、自动结算开关
 - skipped 对 streak / 完成率的影响
 - 名称段边界、旧段统计终点
+- 类型树嵌套、父组聚合、环拒绝、旧数据回退
 - 旧 `recorded` 数据迁移后按 done 计算
 
 测试文件：

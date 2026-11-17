@@ -42,7 +42,7 @@ sqlite.exec(readFileSync("src-tauri/migrations/001_init.sql", "utf8"));
 
 ## 3. 夹具
 
-- 任务：`task(id, name, category, start, end, order)`
+- 任务：`task(id, name, typeId | category, start, end, order)`；旧夹具只用 `category` 时按内置类型回退
 - 打卡：`checkin(taskId, date, status)`
 - 设置：`DEFAULT_SETTINGS`
 - 日期固定：`vi.setSystemTime(new Date(...))`

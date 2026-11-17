@@ -20,6 +20,7 @@
 
 - [日常使用](how-to/daily-use.md) —— 今日页与挂件。
 - [管理任务](how-to/manage-tasks.md) —— 新建、停用、启用、每 N 天。
+- [管理任务类型](how-to/manage-types.md) —— 新建、嵌套、排序、删除类型。
 - [管理待办](how-to/manage-todos.md) —— 增删改期。
 - [使用任务表](how-to/use-the-grid.md) —— 筛选、缩放、编辑、横滚。
 - [切换语言](how-to/switch-language.md)

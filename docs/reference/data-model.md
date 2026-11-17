@@ -20,14 +20,28 @@
 ## 2. 当前表结构
 
 ```sql
+CREATE TABLE task_types (
+  id         TEXT PRIMARY KEY,
+  name       TEXT,                        -- NULL = 内置类型，显示走 i18n
+  parent_id  TEXT REFERENCES task_types(id),
+  sort_order INTEGER NOT NULL DEFAULT 0,  -- 只在同级内比较
+  system_key TEXT UNIQUE,                 -- 'voluntary' | 'forced'
+  color      TEXT,                        -- 调色板 key；NULL 用默认色
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  CHECK (parent_id IS NULL OR parent_id <> id)
+);
+
 CREATE TABLE tasks (
   id          TEXT PRIMARY KEY,
   name        TEXT NOT NULL,
-  category    TEXT NOT NULL CHECK (category IN ('voluntary','forced')),
+  category    TEXT NOT NULL CHECK (category IN ('voluntary','forced')), -- 旧版本兼容列
+  type_id     TEXT,                        -- 权威类型；NULL 时回退 category
   sort_order  INTEGER NOT NULL DEFAULT 0,
   created_at  TEXT NOT NULL,
   updated_at  TEXT NOT NULL
 );
+CREATE INDEX idx_tasks_type ON tasks(type_id);
 
 CREATE TABLE task_intervals (
   id          TEXT PRIMARY KEY,
@@ -85,6 +99,15 @@ CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 - 默认 `rewrite-current`：原地改写当前段，不新增段
 - 取消勾选 → `from-today`：当前段截到昨天、从今天追加一段；历史打卡永远挂在原名下，不会被新名字追溯覆盖
 
+### 2.2 任务类型
+
+- 类型是一棵树：`parent_id = NULL` 为顶层，子类型缩进显示。
+- 内置类型 id 固定为 `voluntary` / `forced`，`system_key` 非空，不可删除。
+- 内置类型 `name IS NULL` 时显示 `t("type.voluntary")` / `t("type.forced")`；改名后写 `name`。
+- 同一父级下类型名唯一；改父级时禁止形成环。
+- `tasks.type_id` 是任务归属的唯一读取来源；`tasks.category` 只作为旧版本兼容列，写入时按类型根节点同步。
+- 删除类型：有直属任务或有子类型时拒绝；空类型才允许删除。
+
 ## 3. 迁移历史
 
 | 版本 | 文件 | 内容 |
@@ -94,6 +117,7 @@ CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 | 3 | `003_task_interval_every_days.sql` | 区间加 `every_days` |
 | 4 | `004_drop_recorded_status.sql` | 重建 checkins，移除 `recorded`，旧值转 `done` |
 | 5 | `005_task_name_periods.sql` | 新增 `task_name_periods`，按最早区间启用日回填一段 |
+| 6 | `006_task_types.sql` | 新增 `task_types`；插入两个内置类型；`tasks` 加 `type_id` 并回填 |
 
 规则：
 
@@ -116,12 +140,20 @@ CASE WHEN status = 'recorded' THEN 'done' ELSE status END
 
 旧 JSON 导入时也做同样归一。
 
-## 4. JSON v2 导出 / 导入
+### 3.3 006：任务类型
+
+- 新建 `task_types`，插入 `voluntary` / `forced` 两个内置类型
+- `tasks` 增加 `type_id`，按 `category` 回填
+- `category` 保留为旧版本兼容列，写任务时按类型根节点同步
+- 索引 `idx_tasks_type` 加速按类型过滤
+
+## 4. JSON v3 导出 / 导入
 
 ```json
 {
-  "version": 2,
+  "version": 3,
   "exportedAt": "2026-11-05T00:00:00.000Z",
+  "taskTypes": [],
   "tasks": [],
   "namePeriods": [],
   "intervals": [],
@@ -131,11 +163,14 @@ CASE WHEN status = 'recorded' THEN 'done' ELSE status END
 }
 ```
 
-- 任务、名称段与区间分开放，导入按 id upsert
+- 任务、类型、名称段与区间分开放，导入按 id upsert
+- `tasks[].typeId` 指向 `taskTypes[].id`；引用不存在的类型视为结构错误
 - 名称段以 `(task_id, start_date)` 为语义键合并，重名不产生重复行
 - 打卡按 `(task_id, date)` 语义键合并
 - 本地多出来的行保留，不删数据
-- v1 文件仍可导入：每个任务按最早区间启用日合成一段名称
+- v1/v2 文件仍可导入：`category` 映射到同名内置类型，导出时补齐 `typeId`
+- v1/v2 导入只补内置类型，不覆盖本地改过的默认类型名
+- v1 文件没有名称段：每个任务按最早区间启用日合成一段名称
 - 旧 JSON 的 `recorded` 转 `done`
 - 旧 JSON 缺少 `everyDays` 按 `1` 处理
 - 导出不包含备份文件和 WebView localStorage
@@ -154,6 +189,7 @@ CASE WHEN status = 'recorded' THEN 'done' ELSE status END
 ## 6. 删除策略
 
 - 删除任务：显式删除 `checkins → task_name_periods → task_intervals → tasks`，不依赖 SQLite 外键开关
+- 删除类型：有直属任务或有子类型时拒绝；空类型直接删除
 - 删除待办：单表删除
 - 所有 UI 删除入口必须走 `ConfirmDeleteButton`
 - store 删除方法要求 `DeleteConfirmation` 令牌
@@ -164,6 +200,7 @@ CASE WHEN status = 'recorded' THEN 'done' ELSE status END
 |---|---|
 | `src/db/client.ts` | `Database.load` + 迁移入口 |
 | `src/db/tasks.ts` | 任务/区间/名称段 CRUD、改名、级联删除 |
+| `src/db/taskTypes.ts` | 类型树 CRUD、排序、改父级、删除保护 |
 | `src/db/checkins.ts` | 状态、值、备注、删除 |
 | `src/db/todos.ts` | 待办 CRUD |
 | `src/db/settings.ts` | kv JSON 读写与 sanitize |

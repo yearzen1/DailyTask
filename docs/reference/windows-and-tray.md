@@ -36,10 +36,11 @@
 
 - 标题 + 日期
 - 完成率环、百分比、剩余数量（任务 + 今日到期待办）
-- 自愿 / 被迫 / 待办分项
-- 分组任务：已完成 / 跳过 / 漏打全部显示；挂件不显示任务截止日期或倒计时
+- 顶层类型 / 待办分项
+- 按类型树分组：子类型缩进显示；父组折叠隐藏全部子组；空类型不显示
+- 已完成 / 跳过 / 漏打全部显示；挂件不显示任务截止日期或倒计时
 - 今日到期待办：逾期在前；当天完成的保留并显示勾选，次日移除；挂件仍只显示今天/逾期待办
-- 三个区块组头都可整行点击折叠，折叠后保留标题与 `x / n`
+- 各类型组头与待办组头都可整行点击折叠，折叠后保留标题与 `x / n`
 
 标题与进度固定，中间内容滚动；滚动条 4px 半透明。
 
@@ -84,6 +85,7 @@
 export const Events = {
   checkinsChanged: "checkins:changed",
   tasksChanged: "tasks:changed",
+  taskTypesChanged: "task-types:changed",
   todosChanged: "todos:changed",
   settingsChanged: "settings:changed",
   widgetExpand: "widget:expand",
@@ -94,6 +96,7 @@ export const Events = {
 |---|---|---|---|
 | `checkinsChanged` | `{ date, source }` | 写打卡的窗口 | 另一窗口 |
 | `tasksChanged` | `{ source }` | 主窗 | 挂件 |
+| `taskTypesChanged` | `{ source }` | 主窗 | 挂件 |
 | `todosChanged` | `{ source }` | 主窗/挂件 | 另一窗口 |
 | `settingsChanged` | `{ source }` | 主窗 | 挂件 |
 | `widgetExpand` | `{ source }` | 挂件 | 主窗 |

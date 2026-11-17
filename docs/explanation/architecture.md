@@ -33,15 +33,16 @@ DailyTask/
 │  ├─ migrations/003_task_interval_every_days.sql
 │  ├─ migrations/004_drop_recorded_status.sql
 │  ├─ migrations/005_task_name_periods.sql
+│  ├─ migrations/006_task_types.sql
 │  └─ tauri.conf.json                # 双窗口尺寸/透明/置顶
 ├─ src/
 │  ├─ main.tsx  App.tsx
 │  ├─ app/                           # init、跨窗口同步、托盘进度/文案、更新检查
 │  ├─ shared/                        # events、i18n、deleteConfirmation、queue
 │  ├─ domain/                        # 纯 TS：types、date、applicability、settle、stats
-│  ├─ db/                            # client、tasks、checkins、todos、settings、backup、transfer
-│  ├─ stores/                        # 5 个 Zustand store + selectors
-│  ├─ windows/main/                  # 主窗与 6 个视图
+│  ├─ db/                            # client、tasks、taskTypes、checkins、todos、settings、backup、transfer
+│  ├─ stores/                        # 6 个 Zustand store + selectors
+│  ├─ windows/main/                  # 主窗与 7 个视图
 │  ├─ windows/widget/                # 挂件与胶囊
 │  └─ ui/                            # tokens、DateField、CheckCell、ProgressRing、ConfirmDeleteButton
 ├─ docs/                             # 文档地图见 docs/README.md
@@ -62,9 +63,9 @@ flowchart LR
 ```
 
 - **写**：view → store action → `db/*` → 成功后更新内存 → emit `*Changed`。
-- **读**：启动时一次性加载 tasks / checkins / todos / settings；派生值现算不落库。
-- **派生**：今日进度、格子投影、streak 由 `domain/*` + `stores/selectors/*` 计算。
-- **启动顺序**：`app/init.ts` 串行加载 settings → tasks → checkins → todos，全部就绪前不渲染业务视图。
+- **读**：启动时一次性加载 tasks / taskTypes / checkins / todos / settings；派生值现算不落库。
+- **派生**：今日进度、格子投影、streak、类型树分组由 `domain/*` + `stores/selectors/*` 计算。
+- **启动顺序**：`app/init.ts` 串行加载 settings → tasks → taskTypes → checkins → todos，全部就绪前不渲染业务视图。
 - **跨窗口**：主窗与挂件使用同一套前端；挂件作为常驻桌面入口保留，主窗关闭时销毁较大的主 WebView，数据从 SQLite 重新加载。
 - **权限边界**：只有 `db/*` 允许出现 SQL；`domain/*` 不 import Tauri / React / db。
 
@@ -73,6 +74,7 @@ flowchart LR
 | store | 持有 | 允许依赖 |
 |---|---|---|
 | `useTasksStore` | tasks + intervals、CRUD | `db/tasks`、domain |
+| `useTaskTypesStore` | 类型树、CRUD、排序 | `db/taskTypes`、domain |
 | `useCheckinsStore` | 打卡 Map，键 `taskId\|date` | `db/checkins` |
 | `useTodosStore` | todos、CRUD | `db/todos` |
 | `useSettingsStore` | settings（主题、语言、gridZoom、dayStartHour 等） | `db/settings` |

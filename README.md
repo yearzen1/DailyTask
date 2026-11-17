@@ -11,9 +11,10 @@ tasks, a floating widget, and a spreadsheet-style grid. Windows only.
 
 - **Daily check-ins** — done / missed / skip today, optional free-form values.
 - **Intervals** — pause and resume a task without rewriting history; repeat every N days.
-- **Today** — progress ring, voluntary/forced groups, due todos.
+- **Today** — progress ring, nested task-type groups, due todos.
 - **Widget** — always-on-top card sharing the main window palette; click to cycle states.
-- **Grid** — date columns, sticky headers, keyboard navigation, filters, zoom.
+- **Grid** — date columns, sticky headers, keyboard navigation, nested type groups, filters, zoom.
+- **Task types** — create your own nested types; voluntary/forced are the two built-in defaults.
 - **Todos** — overdue / today / this week / later, with date editing and safe delete.
 - **Stats** — per-task streak and 30-day completion rate.
 - **Local first** — SQLite on disk, no account, no cloud sync; signed updates from GitHub.
