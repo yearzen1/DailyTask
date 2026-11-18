@@ -82,7 +82,7 @@ export const GridCell = memo(function GridCell({
     renderCount += 1;
   }
 
-  const symbol = state === "none" ? "▫" : CELL_SYMBOLS[state];
+  const symbol = CELL_SYMBOLS[state];
   const hasValue = !overview && Boolean(value);
   const canNote =
     !overview && (state === "done" || state === "missed" || state === "skipped");
@@ -104,7 +104,7 @@ export const GridCell = memo(function GridCell({
           ? "border border-dashed border-[var(--color-border-strong)] text-[var(--color-text-tertiary)]"
           : state === "pending"
             ? "border-[1.5px] border-[var(--color-border-strong)]"
-            : "text-[var(--color-text-tertiary)]";
+            : "";
 
   const valueClass =
     state === "done"
@@ -168,9 +168,9 @@ export const GridCell = memo(function GridCell({
           >
             {value}
           </span>
-        ) : (
+        ) : state === "none" ? null : (
           <span
-            data-cell-marker={state === "none" ? undefined : ""}
+            data-cell-marker=""
             aria-hidden="true"
             className={clsx(
               "grid size-5 shrink-0 place-items-center rounded-[6px] text-xs font-semibold leading-none",
