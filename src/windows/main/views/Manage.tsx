@@ -11,6 +11,7 @@ import { namePeriodsOf } from "../../../domain/names";
 import type { MessageKey } from "../../../shared/i18n";
 import type { Task, TaskCategory } from "../../../domain/types";
 import {
+  splitManageRows,
   useManageRows,
   type ManageRow,
   type ManageStatus,
@@ -38,7 +39,9 @@ const STATUS_META: Record<
 export default function Manage() {
   const t = useT();
   const { today, rows } = useManageRows();
+  const { visible, disabled } = splitManageRows(rows);
   const [creating, setCreating] = useState(false);
+  const [disabledOpen, setDisabledOpen] = useState(false);
 
   return (
     <>
@@ -93,9 +96,60 @@ export default function Manage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
+              {visible.map((row) => (
                 <ManageTableRow key={row.task.id} row={row} today={today} />
               ))}
+
+              {disabled.length > 0 ? (
+                <tr data-manage-group="disabled">
+                  <th
+                    scope="rowgroup"
+                    colSpan={6}
+                    className={`p-0 bg-[var(--color-surface-2)] ${
+                      disabledOpen
+                        ? "border-b border-[var(--color-border)]"
+                        : ""
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      data-disabled-toggle
+                      aria-expanded={disabledOpen}
+                      aria-label={t(
+                        disabledOpen
+                          ? "manage.group.collapse"
+                          : "manage.group.expand",
+                      )}
+                      onClick={() => setDisabledOpen((open) => !open)}
+                      className="flex h-[34px] w-full items-center gap-2 px-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--state-hover)]"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="w-2.5 shrink-0 text-[9px] text-[var(--color-text-tertiary)]"
+                      >
+                        {disabledOpen ? "▾" : "▸"}
+                      </span>
+                      <span>{t("manage.status.disabled")}</span>
+                      <span
+                        data-group-count
+                        className="inline-flex h-4 items-center rounded-[var(--radius-pill)] bg-[var(--state-active)] px-1.5 text-[11px] font-semibold tabular-nums text-[var(--color-text-muted)]"
+                      >
+                        {disabled.length}
+                      </span>
+                    </button>
+                  </th>
+                </tr>
+              ) : null}
+
+              {disabledOpen
+                ? disabled.map((row) => (
+                    <ManageTableRow
+                      key={row.task.id}
+                      row={row}
+                      today={today}
+                    />
+                  ))
+                : null}
             </tbody>
           </table>
         </section>

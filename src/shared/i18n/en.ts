@@ -85,6 +85,8 @@ export const en: Messages = {
   "manage.status.endingToday": "Ends today",
   "manage.status.endingLater": "Ending soon",
   "manage.status.disabled": "Disabled",
+  "manage.group.expand": "Expand disabled",
+  "manage.group.collapse": "Collapse disabled",
   "manage.never": "—",
   "manage.intervals": "{count} segments",
   "manage.intervalsHint": "Only the latest segment is shown; earlier segments and history are kept",
