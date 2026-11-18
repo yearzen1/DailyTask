@@ -320,6 +320,9 @@ describe("TaskGrid", () => {
     );
     expect(beforeStart).toHaveAttribute("data-state", "none");
     expect(beforeStart).toBeDisabled();
+    // 不适用格留白：不再画 ▫ 字形，也不渲染状态标记
+    expect(beforeStart).not.toHaveTextContent("▫");
+    expect(beforeStart?.querySelector("[data-cell-marker]")).toBeNull();
   });
 
   it("follows scrolling to swap the month pill", () => {
