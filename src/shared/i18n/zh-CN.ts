@@ -90,6 +90,8 @@ export const zhCN = {
   "manage.status.endingToday": "今日为止",
   "manage.status.endingLater": "即将停用",
   "manage.status.disabled": "已停用",
+  "manage.group.expand": "展开已停用",
+  "manage.group.collapse": "折叠已停用",
   "manage.never": "—",
   "manage.intervals": "{count} 段",
   "manage.intervalsHint": "只显示最新一段，更早的区间与历史打卡都保留",

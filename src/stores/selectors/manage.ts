@@ -101,6 +101,26 @@ export function buildManageRows(
     });
 }
 
+/**
+ * 拆分「未停用」与「已停用」两组，组内保持原顺序。
+ * 已停用组在任务管理里收在表尾折叠显示。
+ */
+export function splitManageRows(rows: ManageRow[]): {
+  visible: ManageRow[];
+  disabled: ManageRow[];
+} {
+  const visible: ManageRow[] = [];
+  const disabled: ManageRow[] = [];
+  for (const row of rows) {
+    if (row.status === "disabled") {
+      disabled.push(row);
+    } else {
+      visible.push(row);
+    }
+  }
+  return { visible, disabled };
+}
+
 export function useManageRows(): { today: string; rows: ManageRow[] } {
   const tasks = useTasksStore((state) => state.tasks);
   const types = useTaskTypesStore((state) => state.types);

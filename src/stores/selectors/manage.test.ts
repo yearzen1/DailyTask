@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Task } from "../../domain/types";
-import { buildManageRows } from "./manage";
+import { buildManageRows, splitManageRows } from "./manage";
 
 const TODAY = "2026-11-04";
 
@@ -119,5 +119,55 @@ describe("buildManageRows", () => {
     const rows = buildManageRows([task("empty", 0, [])], TODAY);
 
     expect(rows[0]).toMatchObject({ status: "disabled", hasOpen: false });
+  });
+});
+
+describe("splitManageRows", () => {
+  it("keeps running tasks first and moves disabled tasks to the end", () => {
+    const rows = buildManageRows(
+      [
+        task("active", 0, [{ start: "2026-10-01", end: null }]),
+        task("stopped", 1, [{ start: "2026-09-01", end: "2026-10-01" }]),
+        task("scheduled", 2, [{ start: "2026-12-01", end: null }]),
+        task("ending-today", 3, [{ start: "2026-10-01", end: TODAY }]),
+      ],
+      TODAY,
+    );
+
+    const { visible, disabled } = splitManageRows(rows);
+
+    expect(visible.map((row) => row.task.id)).toEqual([
+      "active",
+      "scheduled",
+      "ending-today",
+    ]);
+    expect(disabled.map((row) => row.task.id)).toEqual(["stopped"]);
+  });
+
+  it("returns an empty group when no task is disabled", () => {
+    const rows = buildManageRows(
+      [task("active", 0, [{ start: "2026-10-01", end: null }])],
+      TODAY,
+    );
+
+    const { visible, disabled } = splitManageRows(rows);
+
+    expect(visible).toHaveLength(1);
+    expect(disabled).toHaveLength(0);
+  });
+
+  it("keeps the group empty when every task is disabled", () => {
+    const rows = buildManageRows(
+      [
+        task("first", 0, [{ start: "2026-09-01", end: "2026-10-01" }]),
+        task("second", 1, []),
+      ],
+      TODAY,
+    );
+
+    const { visible, disabled } = splitManageRows(rows);
+
+    expect(visible).toHaveLength(0);
+    expect(disabled.map((row) => row.task.id)).toEqual(["first", "second"]);
   });
 });

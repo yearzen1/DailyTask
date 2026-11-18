@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DailyTask · 任务管理「已停用」折叠组</title>
+<link rel="stylesheet" href="./tokens.css">
+<style>
+  /* ============================================================
+     评审稿外壳（不属于产品 token）
+     ============================================================ */
+  :root {
+    --canvas: #ECEDEF;
+    --canvas-text: #3A3A3A;
+    --canvas-muted: #7A7A7A;
+    --canvas-line: #D8DADF;
+  }
+  :root[data-theme="dark"] {
+    --canvas: #141414;
+    --canvas-text: #D8D8D8;
+    --canvas-muted: #8A8A8A;
+    --canvas-line: #2C2C2C;
+  }
+
+  * { box-sizing: border-box; }
+  html { height: 100%; }
+  body {
+    margin: 0;
+    min-height: 100%;
+    padding: var(--space-6);
+    background: var(--canvas);
+    color: var(--canvas-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+
+  .page-head {
+    display: flex; align-items: baseline; gap: var(--space-3);
+    max-width: 1160px; margin: 0 auto var(--space-4);
+  }
+  .page-head h1 { margin: 0; font-size: var(--text-md); font-weight: 600; }
+  .page-head p { margin: 0; font-size: var(--text-xs); color: var(--canvas-muted); }
+  .page-head .tools { margin-left: auto; display: flex; gap: var(--space-2); }
+
+  .switch { display: flex; gap: 2px; padding: 3px; border-radius: var(--radius-pill); background: var(--canvas-line); }
+  .switch button {
+    border: 0; background: transparent;
+    padding: 4px 10px; border-radius: var(--radius-pill);
+    font-size: var(--text-xs); color: var(--canvas-muted);
+  }
+  .switch button.is-active { background: var(--canvas); color: var(--canvas-text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+
+  /* ============================================================
+     主窗口外壳（对齐 src 里的布局尺寸）
+     ============================================================ */
+  .window {
+    width: 1160px; height: 720px; margin: 0 auto;
+    display: flex; flex-direction: column;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 24px 60px rgba(0,0,0,.16);
+  }
+  .titlebar {
+    height: var(--titlebar-height); flex: none;
+    display: flex; align-items: center; gap: var(--space-2);
+    padding: 0 var(--space-3) 0 var(--space-4);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    font-size: var(--text-xs); color: var(--color-text-muted);
+  }
+  .titlebar .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-voluntary); }
+  .win-ctrl { margin-left: auto; font-size: var(--text-2xs); letter-spacing: 1px; }
+
+  .app { flex: 1; display: flex; min-height: 0; }
+  .nav {
+    width: var(--nav-width); flex: none;
+    display: flex; flex-direction: column; gap: 2px;
+    padding: var(--space-3) var(--space-2);
+    background: var(--color-surface);
+    border-right: 1px solid var(--color-border);
+  }
+  .nav-item {
+    position: relative;
+    display: flex; align-items: center; gap: var(--space-2);
+    height: 36px; padding: 0 var(--space-2); border-radius: var(--radius-control);
+    font-size: var(--text-base); color: var(--color-text-muted);
+  }
+  .nav-item.is-active { background: var(--state-selected); color: var(--color-voluntary); font-weight: 600; }
+  .nav-item.is-active::before {
+    content: ""; position: absolute; left: -6px; top: 50%;
+    width: 3px; height: 16px; margin-top: -8px; border-radius: 2px;
+    background: var(--color-voluntary);
+  }
+  .nav-item .glyph { width: 16px; text-align: center; font-size: 13px; }
+
+  .content {
+    flex: 1; min-width: 0; min-height: 0;
+    display: flex; flex-direction: column; gap: var(--space-4);
+    padding: var(--space-6);
+    overflow: hidden;
+  }
+  .view-head { display: flex; align-items: baseline; gap: var(--space-3); flex: none; }
+  .view-head h1 { margin: 0; font-size: var(--text-lg); font-weight: 600; letter-spacing: .2px; }
+  .view-head .sub { font-size: var(--text-sm); color: var(--color-text-muted); }
+  .view-head .tools { margin-left: auto; }
+
+  .btn-primary {
+    height: 26px; padding: 0 12px; border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--color-voluntary); color: #fff;
+    font-size: var(--text-2xs); font-weight: 600;
+  }
+
+  .card {
+    flex: 1; min-height: 0; overflow: auto;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+
+  /* ---------- 表格 ---------- */
+  .table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: var(--text-sm); }
+  .table col.c-cat { width: 92px; }
+  .table col.c-start { width: 124px; }
+  .table col.c-end { width: 124px; }
+  .table col.c-status { width: 132px; }
+  .table col.c-actions { width: 190px; }
+
+  .table thead th {
+    position: sticky; top: 0; z-index: 2;
+    height: 36px; padding: 0 var(--space-3);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    text-align: left; font-size: var(--text-xs); font-weight: 500;
+    color: var(--color-text-muted);
+  }
+  .table tbody td {
+    height: 38px; padding: 0 var(--space-3);
+    border-bottom: 1px solid var(--color-border);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .table tbody tr:last-child td { border-bottom: 0; }
+  .table tbody tr[data-manage-row]:hover { background: var(--state-hover); }
+  .table td.is-muted { color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+
+  .task { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+  .task .dot { width: 5px; height: 5px; border-radius: 50%; flex: none; }
+  .task .name { overflow: hidden; text-overflow: ellipsis; }
+
+  .row-actions { display: flex; align-items: center; gap: 2px; }
+  .row-actions button {
+    border: 0; background: transparent;
+    padding: 2px 6px; border-radius: var(--radius-control);
+    font-size: var(--text-2xs); color: var(--color-text-muted);
+  }
+  .row-actions button:hover { background: var(--state-active); }
+  .row-actions button.danger:hover { color: var(--color-missed); }
+  .row-actions button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+  /* ---------- chip ---------- */
+  .chip {
+    display: inline-flex; align-items: center;
+    height: 18px; padding: 0 7px;
+    border-radius: var(--radius-pill);
+    font-size: var(--text-2xs); font-weight: 600; line-height: 1;
+    white-space: nowrap;
+  }
+  .chip.success { color: var(--color-voluntary); background: color-mix(in srgb, var(--color-voluntary) 12%, transparent); }
+  .chip.warning { color: var(--color-warning); background: color-mix(in srgb, var(--color-warning) 14%, transparent); }
+  .chip.neutral { color: var(--color-text-muted); background: var(--state-hover); }
+  .chip.info { color: var(--color-forced); background: color-mix(in srgb, var(--color-forced) 12%, transparent); }
+
+  /* ---------- 已停用分组行（本次新增） ---------- */
+  .group-row th {
+    padding: 0;
+    background: var(--color-surface-2);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .group-toggle {
+    display: flex; align-items: center; gap: var(--space-2);
+    width: 100%; height: 34px; padding: 0 var(--space-3);
+    border: 0; background: transparent;
+    font-size: var(--text-xs); font-weight: 600;
+    color: var(--color-text-secondary);
+    text-align: left;
+  }
+  .group-toggle:hover { background: var(--state-hover); }
+  .group-toggle:focus-visible { outline: none; box-shadow: inset var(--focus-ring); }
+  .group-toggle .arrow {
+    width: 10px; flex: none;
+    font-size: 9px; color: var(--color-text-tertiary);
+  }
+  .group-toggle .count {
+    height: 16px; padding: 0 6px;
+    display: inline-flex; align-items: center;
+    border-radius: var(--radius-pill);
+    background: var(--state-active);
+    font-size: var(--text-2xs); font-weight: 600;
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .group-toggle .hint {
+    margin-left: auto; font-weight: 400;
+    font-size: var(--text-2xs); color: var(--color-text-tertiary);
+    opacity: 0; transition: opacity .12s;
+  }
+  .group-toggle:hover .hint, .group-toggle:focus-visible .hint { opacity: 1; }
+
+  .table tr[data-status="disabled"] td { color: var(--color-text-muted); }
+  .table tr[data-status="disabled"] .chip { opacity: .8; }
+
+  /* ---------- 说明 ---------- */
+  .notes {
+    display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);
+    max-width: 1160px; margin: var(--space-4) auto 0;
+  }
+  .note {
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    font-size: var(--text-xs); color: var(--color-text-secondary);
+    line-height: 1.6;
+  }
+  .note h3 {
+    margin: 0 0 var(--space-2);
+    font-size: var(--text-xs); font-weight: 600; color: var(--color-text);
+  }
+  .note ul { margin: 0; padding-left: 18px; }
+  .note code {
+    font-family: var(--font-mono); font-size: 11px;
+    padding: 1px 4px; border-radius: 4px;
+    background: var(--state-hover);
+  }
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <h1>任务管理 · 「已停用」折叠组</h1>
+  <p>已停用的任务收在表尾，默认收起</p>
+  <div class="tools">
+    <div class="switch" data-switch="theme">
+      <button type="button" data-theme-set="light" class="is-active">浅色</button>
+      <button type="button" data-theme-set="dark">深色</button>
+    </div>
+    <div class="switch" data-switch="lang">
+      <button type="button" data-lang-set="zh" class="is-active">中文</button>
+      <button type="button" data-lang-set="en">English</button>
+    </div>
+  </div>
+</div>
+
+<div class="window">
+  <div class="titlebar">
+    <span class="dot"></span><span>DailyTask</span>
+    <span class="win-ctrl" aria-hidden="true">—&nbsp;&nbsp;▢&nbsp;&nbsp;✕</span>
+  </div>
+  <div class="app">
+    <aside class="nav">
+      <div class="nav-item"><span class="glyph">◎</span>今日</div>
+      <div class="nav-item"><span class="glyph">▦</span>任务表</div>
+      <div class="nav-item"><span class="glyph">☑</span>待办</div>
+      <div class="nav-item is-active"><span class="glyph">☰</span>任务管理</div>
+      <div class="nav-item"><span class="glyph">◔</span>统计</div>
+      <div class="nav-item"><span class="glyph">⚙</span>设置</div>
+    </aside>
+
+    <div class="content">
+      <div class="view-head">
+        <h1 id="view-title">任务管理</h1>
+        <span class="sub" id="view-count"></span>
+        <div class="tools">
+          <button class="btn-primary" type="button" id="new-task">＋ 新任务</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <table class="table" data-manage-table>
+          <colgroup>
+            <col>
+            <col class="c-cat">
+            <col class="c-start">
+            <col class="c-end">
+            <col class="c-status">
+            <col class="c-actions">
+          </colgroup>
+          <thead>
+            <tr>
+              <th id="th-task">任务</th>
+              <th id="th-cat">类型</th>
+              <th id="th-start">启用日期</th>
+              <th id="th-end">截止日期</th>
+              <th id="th-status">状态</th>
+              <th id="th-actions">操作</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="notes">
+  <div class="note">
+    <h3>本次改动</h3>
+    <ul>
+      <li>未停用任务（进行中 / 未开始 / 即将停用 / 今日为止）保持原顺序</li>
+      <li>已停用任务整组挪到表尾，默认收起，点组行展开</li>
+      <li>表头计数仍为总数，折叠组自己显示数量</li>
+      <li>停用某行后直接归组，不自动展开</li>
+    </ul>
+  </div>
+  <div class="note">
+    <h3>实现对齐</h3>
+    <ul>
+      <li>组行是表格内一行：<code>&lt;th colSpan="6" scope="rowgroup"&gt;</code>，列宽自然对齐</li>
+      <li>箭头 <code>▸ / ▾</code>、<code>aria-expanded</code>、<code>data-manage-group="disabled"</code>，与任务表分组头一致</li>
+      <li>底色 <code>surface-2</code> + 12px 字，停用行文字置灰、色点透明度 0.35</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+  const state = { lang: "zh", collapsed: true };
+
+  const TEXT = {
+    zh: {
+      title: "任务管理",
+      count: (n) => `${n} 个任务`,
+      newTask: "＋ 新任务",
+      cols: ["任务", "类型", "启用日期", "截止日期", "状态", "操作"],
+      category: { voluntary: "自愿", forced: "被迫" },
+      status: {
+        active: "进行中",
+        scheduled: "未开始",
+        endingToday: "今日为止",
+        endingLater: "即将停用",
+        disabled: "已停用",
+      },
+      actions: { stop: "停用", resume: "重新启用", edit: "编辑", remove: "删除" },
+      segments: (n) => `${n} 段`,
+      everyDays: (n) => `每 ${n} 天`,
+      never: "从未",
+      group: "已停用",
+      expand: "展开已停用",
+      collapse: "折叠已停用",
+      hint: { expand: "点击展开", collapse: "点击收起" },
+    },
+    en: {
+      title: "Task management",
+      count: (n) => `${n} tasks`,
+      newTask: "＋ New task",
+      cols: ["Task", "Type", "Start", "Deadline", "Status", "Actions"],
+      category: { voluntary: "Voluntary", forced: "Forced" },
+      status: {
+        active: "Active",
+        scheduled: "Scheduled",
+        endingToday: "Ends today",
+        endingLater: "Ending soon",
+        disabled: "Disabled",
+      },
+      actions: { stop: "Stop", resume: "Resume", edit: "Edit", remove: "Delete" },
+      segments: (n) => `${n} ranges`,
+      everyDays: (n) => `Every ${n} days`,
+      never: "Never",
+      group: "Disabled",
+      expand: "Expand disabled",
+      collapse: "Collapse disabled",
+      hint: { expand: "Click to expand", collapse: "Click to collapse" },
+    },
+  };
+
+  const STATUS_CHIP = {
+    active: "success",
+    scheduled: "warning",
+    endingToday: "warning",
+    endingLater: "warning",
+    disabled: "neutral",
+  };
+
+  const TASKS = [
+    {
+      id: "t1", name: { zh: "早起", en: "Wake up early" }, category: "voluntary",
+      start: "08/01", end: null, status: "active",
+    },
+    {
+      id: "t2", name: { zh: "背单词", en: "Words" }, category: "voluntary",
+      start: "10/16", end: null, status: "active", segments: 2, everyDays: 2,
+    },
+    {
+      id: "t3", name: { zh: "交周报", en: "Weekly report" }, category: "forced",
+      start: "11/10", end: "11/20", status: "endingLater",
+    },
+    {
+      id: "t4", name: { zh: "冥想", en: "Meditation" }, category: "voluntary",
+      start: "11/18", end: null, status: "scheduled",
+    },
+    {
+      id: "t5", name: { zh: "跑步", en: "Running" }, category: "voluntary",
+      start: "09/01", end: "11/18", status: "endingToday",
+    },
+    {
+      id: "t6", name: { zh: "跳绳", en: "Jump rope" }, category: "voluntary",
+      start: "06/01", end: "10/31", status: "disabled",
+    },
+    {
+      id: "t7", name: { zh: "阅读", en: "Reading" }, category: "voluntary",
+      start: "07/01", end: "09/30", status: "disabled", segments: 2,
+    },
+    {
+      id: "t8", name: { zh: "拉伸", en: "Stretching" }, category: "forced",
+      start: "08/05", end: "10/20", status: "disabled",
+    },
+  ];
+
+  const CATEGORY_COLOR = {
+    voluntary: "var(--color-voluntary)",
+    forced: "var(--color-forced)",
+  };
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"]/g, (ch) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;",
+    })[ch]);
+  }
+
+  function taskRow(task, t) {
+    const retired = task.status === "disabled";
+    const chips = [];
+    if (task.segments > 1) {
+      chips.push(`<span class="chip info">${escapeHtml(t.segments(task.segments))}</span>`);
+    }
+    if (task.everyDays > 1) {
+      chips.push(`<span class="chip info">${escapeHtml(t.everyDays(task.everyDays))}</span>`);
+    }
+    return `
+      <tr data-manage-row="${task.id}" data-status="${task.status}">
+        <td>
+          <div class="task">
+            <i class="dot" aria-hidden="true" style="background:${CATEGORY_COLOR[task.category]};opacity:${retired ? 0.35 : 1}"></i>
+            <span class="name" style="${retired ? "color:var(--color-text-muted)" : ""}">${escapeHtml(task.name[state.lang])}</span>
+            ${chips.join("")}
+          </div>
+        </td>
+        <td class="is-muted">${escapeHtml(t.category[task.category])}</td>
+        <td class="is-muted">${escapeHtml(task.start)}</td>
+        <td class="is-muted">${escapeHtml(task.end ?? t.never)}</td>
+        <td>
+          <span class="chip ${STATUS_CHIP[task.status]}">${escapeHtml(t.status[task.status])}</span>
+        </td>
+        <td>
+          <div class="row-actions">
+            <button type="button" data-manage-action="${retired ? "resume" : "stop"}">${escapeHtml(retired ? t.actions.resume : t.actions.stop)}</button>
+            <button type="button" data-manage-action="edit">${escapeHtml(t.actions.edit)}</button>
+            <button type="button" class="danger" data-manage-action="delete">${escapeHtml(t.actions.remove)}</button>
+          </div>
+        </td>
+      </tr>`;
+  }
+
+  function render() {
+    const t = TEXT[state.lang];
+    const visible = TASKS.filter((task) => task.status !== "disabled");
+    const disabled = TASKS.filter((task) => task.status === "disabled");
+
+    document.documentElement.lang = state.lang === "zh" ? "zh-CN" : "en";
+    document.getElementById("view-title").textContent = t.title;
+    document.getElementById("view-count").textContent = t.count(TASKS.length);
+    document.getElementById("new-task").textContent = t.newTask;
+
+    const columnIds = ["th-task", "th-cat", "th-start", "th-end", "th-status", "th-actions"];
+    columnIds.forEach((id, index) => {
+      document.getElementById(id).textContent = t.cols[index];
+    });
+
+    const body = document.getElementById("rows");
+    const toggleLabel = t[state.collapsed ? "expand" : "collapse"];
+
+    body.innerHTML = [
+      ...visible.map((task) => taskRow(task, t)),
+      disabled.length === 0
+        ? ""
+        : `<tr class="group-row" data-manage-group="disabled">
+        <th colspan="6" scope="rowgroup">
+          <button
+            type="button"
+            class="group-toggle"
+            data-disabled-toggle
+            aria-expanded="${!state.collapsed}"
+            aria-label="${escapeHtml(toggleLabel)}"
+          >
+            <span class="arrow" aria-hidden="true">${state.collapsed ? "▸" : "▾"}</span>
+            <span>${escapeHtml(t.group)}</span>
+            <span class="count">${disabled.length}</span>
+            <span class="hint">${escapeHtml(t.hint[state.collapsed ? "expand" : "collapse"])}</span>
+          </button>
+        </th>
+      </tr>`,
+      state.collapsed
+        ? ""
+        : disabled.map((task) => taskRow(task, t)).join(""),
+    ].join("");
+
+    const toggle = body.querySelector("[data-disabled-toggle]");
+    if (toggle) {
+      toggle.addEventListener("click", () => {
+        state.collapsed = !state.collapsed;
+        render();
+      });
+    }
+  }
+
+  document.querySelectorAll("[data-theme-set]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const theme = button.dataset.themeSet;
+      document.documentElement.dataset.theme = theme;
+      document.querySelectorAll("[data-theme-set]").forEach((item) => {
+        item.classList.toggle("is-active", item === button);
+      });
+    });
+  });
+
+  document.querySelectorAll("[data-lang-set]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.lang = button.dataset.langSet;
+      document.querySelectorAll("[data-lang-set]").forEach((item) => {
+        item.classList.toggle("is-active", item === button);
+      });
+      render();
+    });
+  });
+
+  render();
+</script>
+</body>
+</html>

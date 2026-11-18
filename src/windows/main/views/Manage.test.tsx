@@ -227,11 +227,12 @@ describe("Manage", () => {
     vi.useRealTimers();
   });
 
-  it("renders every task with category, dates and status", () => {
+  it("renders running tasks with category, dates and status", () => {
     const { container } = render(<Manage />);
 
     const rows = container.querySelectorAll("[data-manage-row]");
-    expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(2);
+    expect(container.querySelector("header")).toHaveTextContent("3 个任务");
 
     const running = container.querySelector(
       '[data-manage-row="t1"]',
@@ -246,12 +247,36 @@ describe("Manage", () => {
       container.querySelector('[data-manage-row="t2"]'),
     ).toHaveTextContent("被迫");
 
+    expect(
+      container.querySelector('[data-manage-row="t3"]'),
+    ).not.toBeInTheDocument();
+  });
+
+  it("folds retired tasks into a collapsed group at the bottom", () => {
+    const { container } = render(<Manage />);
+
+    const group = container.querySelector(
+      '[data-manage-group="disabled"]',
+    ) as HTMLElement;
+    const toggle = group.querySelector("[data-disabled-toggle]") as HTMLElement;
+    expect(group).toHaveTextContent("已停用");
+    expect(group.querySelector("[data-group-count]")).toHaveTextContent("1");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+
     const retired = container.querySelector(
       '[data-manage-row="t3"]',
     ) as HTMLElement;
     expect(retired).toHaveAttribute("data-status", "disabled");
     expect(retired).toHaveTextContent("已停用");
     expect(retired).toHaveTextContent("10/01");
+    expect(container.querySelectorAll("[data-manage-row]")).toHaveLength(3);
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(container.querySelectorAll("[data-manage-row]")).toHaveLength(2);
   });
 
   it("shows an empty state without tasks", () => {
@@ -416,6 +441,9 @@ describe("Manage", () => {
     const { container } = render(<Manage />);
 
     fireEvent.click(
+      container.querySelector("[data-disabled-toggle]") as Element,
+    );
+    fireEvent.click(
       container.querySelector(
         '[data-manage-row="t3"] [data-manage-action="resume"]',
       ) as Element,
@@ -426,6 +454,30 @@ describe("Manage", () => {
     const row = container.querySelector('[data-manage-row="t3"]') as HTMLElement;
     expect(row).toHaveTextContent("2 段");
     expect(row).toHaveAttribute("data-status", "active");
+  });
+
+  it("moves a task into the collapsed group once its latest end is past", () => {
+    const { container } = render(<Manage />);
+
+    fireEvent.click(
+      container.querySelector(
+        '[data-manage-row="t2"] [data-manage-action="edit"]',
+      ) as Element,
+    );
+    fireEvent.click(container.querySelector("[data-edit-open]") as Element);
+    fireEvent.click(container.querySelector("[data-edit-submit]") as Element);
+
+    expect(
+      container.querySelector('[data-manage-row="t2"]'),
+    ).not.toBeInTheDocument();
+
+    const group = container.querySelector(
+      '[data-manage-group="disabled"]',
+    ) as HTMLElement;
+    expect(group.querySelector("[data-group-count]")).toHaveTextContent("2");
+    expect(
+      group.querySelector("[data-disabled-toggle]"),
+    ).toHaveAttribute("aria-expanded", "false");
   });
 
   it("shows re-enable and 今日为止 for a task stopped today", () => {
