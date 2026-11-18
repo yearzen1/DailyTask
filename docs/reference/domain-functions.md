@@ -40,7 +40,7 @@ currentInterval(intervals: Interval[], date: string): Interval | null
 3. 同一任务多段区间任一命中即适用
 4. 每段区间的周期独立锚定，编辑某段不影响其他段
 
-显示为 `▫` 且不可点。
+不画任何标记（留白）且不可点。
 
 ## 2.5 名称段
 

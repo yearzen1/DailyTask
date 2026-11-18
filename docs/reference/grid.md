@@ -67,7 +67,7 @@ budget   = max(visible, floor(2000 / 渲染行数))
 - 同一日期列所有行共享同一列宽；任务列所有行共享同一任务列宽
 - 写回 `settings.gridZoom`
 - `cellSize < 24` 自动概览
-- 概览色块：✓ 实心绿 / ✗ 半透明红 / – 灰蓝 / ▫ `--color-na`
+- 概览色块：done 实心绿 / missed 半透明红 / skipped 灰蓝 / none `--color-na` 底色（不画符号）
 - 概览点击：回到 32px，并以该日期为中心
 - `Shift + 滚轮`：横向滚动
 - 页脚提示：`Ctrl + 滚轮缩放 · Shift + 滚轮横滚`
@@ -89,7 +89,7 @@ budget   = max(visible, floor(2000 / 渲染行数))
 
 - 五态：`done / missed / skipped / pending / none`
 - 今天列绿底只覆盖 `pending / done / missed`；`skipped` 与区间外 `none` 保持自己的底色，不被染绿
-- 区间外 / 非周期日 / 名称段外 → `none`，显示 `▫`，不可点
+- 区间外 / 非周期日 / 名称段外 → `none`，格子留白，不可点
 - 自由值：详细模式有值时用值替换符号；列宽按该列最长值自适应，不截断
 - 自由值超过 320px 列宽时换行显示，行高自动增高
 - 概览模式保持统一窄列，不启用自适应宽度
