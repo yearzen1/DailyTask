@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>不适用格标记 · 方案对比</title>
+<link rel="stylesheet" href="tokens.css" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- 顶部控制条 ---------- */
+  .bar {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; gap: var(--space-4);
+    padding: var(--space-3) var(--space-6);
+    background: color-mix(in srgb, var(--color-surface) 92%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .bar h1 {
+    font-size: var(--text-base);
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: -.01em;
+  }
+  .bar p {
+    margin: 0;
+    font-size: var(--text-xs);
+    color: var(--color-text-tertiary);
+  }
+  .bar .spacer { flex: 1; }
+
+  .segment {
+    display: inline-flex;
+    padding: 2px;
+    gap: 2px;
+    border-radius: var(--radius-control);
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+  }
+  .segment button {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: var(--color-text-secondary);
+    font: inherit;
+    font-size: var(--text-xs);
+    line-height: 1;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .segment button:hover { background: var(--state-hover); }
+  .segment button[aria-pressed="true"] {
+    background: var(--color-surface);
+    color: var(--color-text);
+    box-shadow: 0 1px 2px rgba(26, 26, 26, .06);
+  }
+  .label-sm {
+    font-size: var(--text-2xs);
+    color: var(--color-text-tertiary);
+  }
+
+  /* ---------- 画布 ---------- */
+  main {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: var(--space-6);
+    display: grid;
+    gap: var(--space-4);
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    align-items: start;
+  }
+
+  .card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+  }
+  .card-head {
+    display: flex; align-items: baseline; gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--color-divider);
+  }
+  .card-head strong { font-size: var(--text-sm); font-weight: 600; }
+  .card-head .desc {
+    font-size: var(--text-2xs);
+    color: var(--color-text-tertiary);
+  }
+  .card-head .tag {
+    margin-left: auto;
+    font-size: var(--text-2xs);
+    color: var(--color-voluntary);
+    background: color-mix(in srgb, var(--color-voluntary) 10%, transparent);
+    border-radius: var(--radius-pill);
+    padding: 2px 8px;
+    white-space: nowrap;
+  }
+  .card-body {
+    padding: var(--space-4);
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  /* ---------- 网格片段 ---------- */
+  .demo {
+    --cell: 32px;
+    --row: 36px;
+    position: relative;
+    display: grid;
+    grid-template-columns: 104px repeat(6, var(--cell));
+    width: max-content;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--color-surface);
+  }
+  .demo .th {
+    height: 30px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: var(--text-2xs);
+    color: var(--color-text-tertiary);
+    border-left: 1px solid var(--color-divider);
+    background: var(--color-surface-2);
+  }
+  .demo .th.task {
+    justify-content: flex-start;
+    padding-left: var(--space-2);
+    border-left: 0;
+  }
+  .demo .th .pill {
+    display: grid;
+    place-items: center;
+    width: 20px; height: 20px;
+    border-radius: 6px;
+    font-size: var(--text-2xs);
+    font-weight: 600;
+  }
+  .demo .th.is-today .pill {
+    background: var(--color-voluntary);
+    color: var(--color-on-green);
+  }
+
+  .demo .name {
+    height: var(--row);
+    display: flex; align-items: center;
+    padding-left: var(--space-2);
+    font-size: var(--text-xs);
+    color: var(--color-text-secondary);
+    border-bottom: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+    background: var(--color-surface);
+    white-space: nowrap;
+  }
+  .demo .cell {
+    height: var(--row);
+    display: flex; align-items: center; justify-content: center;
+    border-left: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+    background: var(--color-surface);
+  }
+  .demo .cell.is-today { background: color-mix(in srgb, var(--color-voluntary) 6%, transparent); }
+
+  /* 状态标记：与 GridCell 保持一致 */
+  .mark {
+    display: grid;
+    place-items: center;
+    width: 20px; height: 20px;
+    border-radius: 6px;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    line-height: 1;
+    flex: none;
+  }
+  .mark.done {
+    background: color-mix(in srgb, var(--color-voluntary) 13%, transparent);
+    color: var(--color-voluntary);
+  }
+  .mark.missed {
+    background: color-mix(in srgb, var(--color-missed) 11%, transparent);
+    color: var(--color-missed);
+  }
+  .mark.skipped {
+    border: 1px dashed var(--color-border-strong);
+    color: var(--color-text-tertiary);
+    font-weight: 500;
+  }
+  .mark.pending { border: 1.5px solid var(--color-border-strong); }
+
+  /* 现状：Unicode ▫ 字形 */
+  .mark.none-glyph {
+    color: var(--color-text-tertiary);
+    font-size: 12px;
+  }
+
+  /* 候选：CSS 圆点 */
+  .dot { border-radius: 50%; display: block; }
+  .none-a .dot { width: 4px; height: 4px; background: color-mix(in srgb, var(--color-border-strong) 70%, transparent); }
+  .none-b .dot { width: 4px; height: 4px; background: color-mix(in srgb, var(--color-border-strong) 50%, transparent); }
+  .none-c .dot { width: 6px; height: 6px; background: color-mix(in srgb, var(--color-border-strong) 65%, transparent); }
+  .none-d .dot {
+    width: 12px; height: 12px;
+    background: transparent;
+    border: 1px solid color-mix(in srgb, var(--color-border-strong) 60%, transparent);
+  }
+  .none-e .dot { display: none; }
+
+  /* ---------- 细节放大 ---------- */
+  .zoom {
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-surface-2);
+    border-top: 1px solid var(--color-divider);
+    display: flex; align-items: center; gap: var(--space-4);
+  }
+  .zoom .hint {
+    font-size: var(--text-2xs);
+    color: var(--color-text-tertiary);
+    line-height: 1.6;
+  }
+  .zoom .hint b { color: var(--color-text-secondary); font-weight: 500; }
+
+  /* 1:1 / 3× 放大镜：只缩放标记本身，不放大整张网格 */
+  .loupe {
+    --cell: 32px;
+    position: relative;
+    display: grid; place-items: center;
+    width: 56px; height: 56px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    flex: none;
+  }
+  .loupe::after {
+    content: "3×";
+    position: absolute; right: 2px; bottom: 0;
+    font-size: 9px;
+    line-height: 1;
+    color: var(--color-text-tertiary);
+  }
+  .loupe.scaled .mark { transform: scale(3); }
+  .loupe.scaled .mark.none-glyph { font-size: 12px; }
+
+  footer {
+    max-width: 1180px;
+    margin: 0 auto var(--space-8);
+    padding: 0 var(--space-6);
+    font-size: var(--text-xs);
+    color: var(--color-text-tertiary);
+    line-height: 1.6;
+  }
+
+  @media (max-width: 720px) {
+    main { grid-template-columns: 1fr; padding: var(--space-4); }
+    .bar { padding: var(--space-2) var(--space-4); flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <div>
+    <h1>「不适用」格标记方案对比</h1>
+    <p>真实 32px 格子 · 混在 done / missed / skipped / pending 里看层级</p>
+  </div>
+  <span class="spacer"></span>
+  <span class="label-sm">主题</span>
+  <div class="segment" data-control="theme">
+    <button type="button" data-value="light" aria-pressed="true">浅色</button>
+    <button type="button" data-value="dark" aria-pressed="false">深色</button>
+  </div>
+</div>
+
+<main id="root"></main>
+
+<footer>
+  说明：所有卡片共用同一段网格，日期列从 11/16 到 11/21；第 2 行是“已停用 / 区间外”的任务，
+  这一整行都是 <code>none</code>。注意看 A/B/C 里的圆点会不会抢过 pending 的空框，以及 3× 放大后边缘是否毛躁。
+</footer>
+
+<script>
+  const DATES = ["16", "17", "18", "19", "20", "21"];
+  const TODAY_INDEX = 2; // 11/18
+
+  // 第 1 行：混合状态；第 2 行：整行 none
+  const ROWS = [
+    {
+      name: "跑步 30 分钟",
+      states: ["done", "missed", "pending", "none", "none", "pending"],
+    },
+    { name: "背单词（已停用）", states: ["none", "none", "none", "none", "none", "none"] },
+  ];
+
+  const SYMBOL = { done: "✓", missed: "✗", skipped: "–", pending: "" };
+
+  const VARIANTS = [
+    {
+      key: "none-glyph",
+      title: "现状",
+      desc: "Unicode ▫ 字形",
+      note: "对照用：字形大小由字体决定",
+    },
+    {
+      key: "none-a",
+      title: "A · 4px 圆点 70%",
+      desc: "border-strong 70% 透明",
+      note: "比现状清楚，但仍会留下注意力",
+    },
+    { key: "none-b", title: "B · 4px 圆点 50%", desc: "更淡，几乎隐形" },
+    { key: "none-c", title: "C · 6px 圆点 65%", desc: "更大更实" },
+    { key: "none-d", title: "D · 12px 细圆环", desc: "1px 描边空心圈" },
+    {
+      key: "none-e",
+      title: "E · 完全留白",
+      desc: "什么都不画",
+      note: "已采用",
+      best: true,
+    },
+  ];
+
+  function marker(state, variant) {
+    if (state !== "none") {
+      return `<span class="mark ${state}" aria-hidden="true">${SYMBOL[state] ?? ""}</span>`;
+    }
+    if (variant === "none-glyph") {
+      return `<span class="mark none-glyph" aria-hidden="true">▫</span>`;
+    }
+    if (variant === "none-e") {
+      return `<span class="mark ${variant}" aria-hidden="true"></span>`;
+    }
+    return `<span class="mark ${variant}" aria-hidden="true"><span class="dot"></span></span>`;
+  }
+
+  function grid(variant) {
+    const head = DATES.map(
+      (d, i) =>
+        `<div class="th${i === TODAY_INDEX ? " is-today" : ""}"><span class="pill">${d}</span></div>`,
+    ).join("");
+
+    const body = ROWS.map(
+      (row) =>
+        `<div class="name">${row.name}</div>` +
+        row.states
+          .map(
+            (s, i) =>
+              `<div class="cell${i === TODAY_INDEX ? " is-today" : ""}" data-state="${s}">${marker(s, variant)}</div>`,
+          )
+          .join(""),
+    ).join("");
+
+    return `<div class="demo"><div class="th task">任务</div>${head}${body}</div>`;
+  }
+
+  function card(v) {
+    return `
+      <section class="card">
+        <div class="card-head">
+          <strong>${v.title}</strong>
+          <span class="desc">${v.desc}</span>
+          ${v.best ? '<span class="tag">推荐</span>' : ""}
+        </div>
+        <div class="card-body">${grid(v.key)}</div>
+        <div class="zoom">
+          <div class="loupe scaled">${marker("none", v.key)}</div>
+          <div class="hint">
+            <b>${v.note ?? v.desc}</b><br />
+            标记槽 20px，圆点居中，与其它状态同一中心线；放大只作用于标记本身
+          </div>
+        </div>
+      </section>`;
+  }
+
+  document.getElementById("root").innerHTML = VARIANTS.map(card).join("");
+
+  // ---- 控制条 ----
+  document.querySelectorAll("[data-control]").forEach((group) => {
+    group.addEventListener("click", (event) => {
+      const button = event.target.closest("button");
+      if (!button) return;
+      group.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b === button)));
+
+      const kind = group.dataset.control;
+      const value = button.dataset.value;
+      if (kind === "theme") {
+        document.documentElement.dataset.theme = value === "dark" ? "dark" : "";
+      }
+    });
+  });
+</script>
+</body>
+</html>

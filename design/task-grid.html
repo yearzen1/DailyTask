@@ -701,7 +701,8 @@ svg { display: block; }
 .g-cell.is-weekend { background: var(--weekend); }
 .g-cell.is-today { background: var(--green-wash); }
 .g-cell.is-none { cursor: default; color: var(--text-4); }
-.g-cell.is-none .mark { font-size: 12px; color: var(--border-strong); }
+/* 不适用格留白：不画任何标记 */
+.g-cell.is-none .mark { display: none; }
 
 .task-line:hover .g-cell.is-pending:not(.is-today):not(.is-weekend) { background: var(--row-hover); }
 
@@ -1356,7 +1357,7 @@ kbd {
   };
 
   const cellText = (c) => {
-    if (c.status === "none") return "·";
+    if (c.status === "none") return "";
     if (c.value) return c.value;
     return { done: "✓", missed: "✗", skipped: "–", pending: "" }[c.status];
   };
