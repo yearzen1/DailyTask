@@ -29,9 +29,12 @@ range(start: string, end: string): string[]
 isApplicable(intervals: Interval[], date: string): boolean
 applicableTasks(tasks: Task[], date: string): Task[]
 currentInterval(intervals: Interval[], date: string): Interval | null
+isRetired(task: Task, today: string): boolean
 ```
 
 `currentInterval` 返回当天命中的最新一段区间，用于读取截止日期；多段重叠时以 `start` 最晚的为准。
+
+`isRetired`：今天不再适用且所有区间都已结束 → 已停用；未来才启用的任务不算。
 
 规则：
 
