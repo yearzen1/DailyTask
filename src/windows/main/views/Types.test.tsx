@@ -33,15 +33,22 @@ function type(
   };
 }
 
-function task(id: string, name: string, typeId: string, order: number): Task {
+function task(
+  id: string,
+  name: string,
+  typeId: string,
+  order: number,
+  interval: { start: string; end: string | null } = {
+    start: "2026-11-01",
+    end: null,
+  },
+): Task {
   return {
     id,
     name,
     typeId,
     category: "voluntary",
-    intervals: [
-      { id: `${id}-i`, taskId: id, start: "2026-11-01", end: null },
-    ],
+    intervals: [{ id: `${id}-i`, taskId: id, ...interval }],
     order,
     createdAt: "2026-11-01T00:00:00.000Z",
     updatedAt: "2026-11-01T00:00:00.000Z",
@@ -125,15 +132,17 @@ describe("Types", () => {
     expect(dock.textContent?.match(/跑步/g)).toHaveLength(1);
   });
 
-  it("renders dock tasks as read-only rows with an icon", () => {
+  it("renders selectable dock tasks with a checkbox and an icon", () => {
     const { container } = render(<Types />);
     const list = container.querySelector(
       "[data-type-task-list]",
     ) as HTMLElement;
 
     expect(list).toHaveClass("overflow-y-auto");
-    expect(list.querySelector('input[type="checkbox"]')).toBeNull();
-    for (const row of Array.from(list.querySelectorAll("li"))) {
+    const rows = Array.from(list.querySelectorAll("li"));
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.querySelector('input[type="checkbox"]')).not.toBeNull();
       expect(row.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
     }
   });
@@ -181,6 +190,105 @@ describe("Types", () => {
       expect.arrayContaining(["t2", "t3"]),
       "health",
     );
+  });
+
+  it("hides disabled tasks from the add-task dialog", () => {
+    useTasksStore.setState({
+      tasks: [
+        task("t1", "晨跑", "run", 0),
+        task("t2", "开会", "work", 1),
+        task("t3", "背单词", "voluntary", 2),
+        task("t4", "旧任务", "voluntary", 3, {
+          start: "2026-10-01",
+          end: "2026-10-31",
+        }),
+        task("t5", "未来任务", "voluntary", 4, {
+          start: "2026-12-01",
+          end: null,
+        }),
+      ],
+    });
+
+    const { container } = render(<Types />);
+    const row = container.querySelector('[data-type-row="health"]') as HTMLElement;
+
+    fireEvent.click(row.firstElementChild as Element);
+    fireEvent.click(
+      container.querySelector('[data-dock-action="add-task"]') as Element,
+    );
+
+    const dialog = screen.getByRole("dialog", {
+      name: "添加任务到「健康」",
+    });
+    expect(within(dialog).queryByText("旧任务")).not.toBeInTheDocument();
+    expect(within(dialog).getByText("未来任务")).toBeInTheDocument();
+  });
+
+  it("enables move-out after selecting a single dock task", () => {
+    const { container } = render(<Types />);
+
+    fireEvent.click(
+      container.querySelector('[data-dock-task-check="t3"]') as Element,
+    );
+
+    const moveOut = container.querySelector(
+      '[data-dock-action="move-out"]',
+    ) as HTMLButtonElement;
+    expect(moveOut).toBeEnabled();
+    expect(moveOut).toHaveTextContent("移出 1 个");
+  });
+
+  it("moves selected dock tasks out to another type", async () => {
+    const assignType = vi.fn(async () => undefined);
+    useTasksStore.setState({
+      assignType,
+      tasks: [
+        ...useTasksStore.getState().tasks,
+        task("t4", "阅读", "voluntary", 3),
+      ],
+    });
+
+    const { container } = render(<Types />);
+    const dock = container.querySelector("[data-type-dock]") as HTMLElement;
+
+    fireEvent.click(
+      dock.querySelector("[data-dock-select-all]") as Element,
+    );
+    fireEvent.click(
+      dock.querySelector('[data-dock-action="move-out"]') as Element,
+    );
+
+    const dialog = screen.getByRole("dialog", {
+      name: "移出「自愿」的任务",
+    });
+    const select = dialog.querySelector(
+      '[data-type-picker="move-out"]',
+    ) as HTMLSelectElement;
+    expect(Array.from(select.options).map((option) => option.value)).toEqual([
+      "forced",
+      "work",
+    ]);
+
+    fireEvent.change(select, { target: { value: "work" } });
+    await act(async () => {
+      fireEvent.click(
+        dialog.querySelector("[data-move-out-submit]") as Element,
+      );
+    });
+
+    expect(assignType).toHaveBeenCalledWith(["t3", "t4"], "work");
+  });
+
+  it("disables moving tasks out when no target type exists", () => {
+    useTaskTypesStore.setState({
+      types: [type("voluntary", "自愿", null, 0, "voluntary")],
+    });
+
+    const { container } = render(<Types />);
+
+    expect(
+      container.querySelector('[data-dock-action="move-out"]'),
+    ).toBeDisabled();
   });
 
   it("moves a type by dragging it onto another type", () => {
