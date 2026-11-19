@@ -2,11 +2,14 @@ import { clsx } from "clsx";
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type DragEvent,
   type FormEvent,
 } from "react";
 
+import { logicalToday } from "../../../domain/date";
+import { isRetired } from "../../../domain/grid";
 import {
   descendantTypeIds,
   flattenTypeTree,
@@ -22,6 +25,8 @@ import {
   typeDropZone,
   type TypeDropPosition,
 } from "../../../domain/typeDrop";
+import { useDayNow } from "../../../stores/dayStore";
+import { useSettingsStore } from "../../../stores/settingsStore";
 import { useTaskTypesStore } from "../../../stores/taskTypesStore";
 import { useTasksStore } from "../../../stores/tasksStore";
 import { ConfirmDeleteButton } from "../../../ui/ConfirmDeleteButton";
@@ -34,6 +39,7 @@ import {
   typeDisplayName,
 } from "../../../ui/taskType";
 import { useT } from "../../../ui/useT";
+import { TaskTypePicker } from "./TaskTypePicker";
 
 const CARD =
   "rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-card)]";
@@ -360,6 +366,7 @@ export default function Types() {
             path={selectedNode.path}
             count={subtreeCount(selected.id)}
             directTasks={tasksByType.get(selected.id) ?? []}
+            types={tree}
             canDelete={tree.length > 1}
             onAddTask={() => setAssignTarget(selected)}
             onEdit={() => setDialog({ mode: "edit", type: selected })}
@@ -397,6 +404,7 @@ function TypeDetailDock({
   path,
   count,
   directTasks,
+  types,
   canDelete,
   onAddTask,
   onEdit,
@@ -406,6 +414,7 @@ function TypeDetailDock({
   path: TaskType[];
   count: number;
   directTasks: Task[];
+  types: TaskType[];
   canDelete: boolean;
   onAddTask: () => void;
   onEdit: () => void;
@@ -414,6 +423,72 @@ function TypeDetailDock({
   const t = useT();
   const name = typeDisplayName(type, t);
   const trail = path.slice(0, -1);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [moveOpen, setMoveOpen] = useState(false);
+  const selectAllRef = useRef<HTMLInputElement>(null);
+
+  const moveTargets = useMemo(() => {
+    const excluded = descendantTypeIds(types, type.id);
+    return flattenTypeTree(types).filter(
+      (node) => !excluded.has(node.type.id),
+    );
+  }, [types, type.id]);
+  const canMoveOut = moveTargets.length > 0;
+  const selectedTasks = directTasks.filter((task) =>
+    selectedTaskIds.has(task.id),
+  );
+  const allSelected =
+    directTasks.length > 0 &&
+    directTasks.every((task) => selectedTaskIds.has(task.id));
+
+  useEffect(() => {
+    setSelectedTaskIds(new Set());
+    setMoveOpen(false);
+  }, [type.id]);
+
+  useEffect(() => {
+    const available = new Set(directTasks.map((task) => task.id));
+    setSelectedTaskIds((current) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of current) {
+        if (available.has(id)) {
+          next.add(id);
+        } else {
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [directTasks]);
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate =
+        selectedTaskIds.size > 0 &&
+        selectedTaskIds.size < directTasks.length;
+    }
+  }, [selectedTaskIds, directTasks.length]);
+
+  const toggleTask = (taskId: string) => {
+    setSelectedTaskIds((current) => {
+      const next = new Set(current);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    setSelectedTaskIds(
+      allSelected ? new Set() : new Set(directTasks.map((task) => task.id)),
+    );
+  };
 
   return (
     <section
@@ -488,6 +563,36 @@ function TypeDetailDock({
         <span aria-hidden="true" className="size-4 shrink-0" />
         <span>{t("types.taskList")}</span>
         <span className="font-normal tabular-nums">{directTasks.length}</span>
+        {directTasks.length > 0 ? (
+          <div className="ml-auto flex items-center gap-3 font-normal">
+            <label className="inline-flex cursor-pointer items-center gap-1">
+              <input
+                ref={selectAllRef}
+                type="checkbox"
+                data-dock-select-all
+                checked={allSelected}
+                onChange={toggleAll}
+                aria-label={t("types.selectAll")}
+                className="size-4 cursor-pointer accent-[var(--color-voluntary)]"
+              />
+              {t("types.selectAll")}
+            </label>
+            <button
+              type="button"
+              data-dock-action="move-out"
+              disabled={selectedTaskIds.size === 0 || !canMoveOut}
+              title={!canMoveOut ? t("types.noMoveTarget") : undefined}
+              onClick={() => setMoveOpen(true)}
+              className="rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 text-[var(--text-2xs)] text-[var(--color-text)] hover:bg-[var(--state-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {selectedTaskIds.size > 0
+                ? t("types.moveOutSelected", {
+                    count: selectedTaskIds.size,
+                  })
+                : t("types.moveOut")}
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {directTasks.length === 0 ? (
@@ -499,23 +604,200 @@ function TypeDetailDock({
           data-type-task-list
           className="m-0 flex min-h-0 flex-1 list-none flex-col overflow-y-auto p-0"
         >
-          {directTasks.map((task) => (
-            <li
-              key={task.id}
-              className="flex h-[34px] items-center gap-2 border-t border-[var(--color-border)] px-2 first:border-t-0"
-            >
-              <Icon
-                name="task"
-                className="size-4 shrink-0 text-[var(--color-text-muted)]"
-              />
-              <span className="min-w-0 flex-1 truncate text-sm">
-                {task.name}
-              </span>
-            </li>
-          ))}
+          {directTasks.map((task) => {
+            const checked = selectedTaskIds.has(task.id);
+            return (
+              <li
+                key={task.id}
+                className="border-t border-[var(--color-border)] first:border-t-0"
+              >
+                <label
+                  data-dock-task={task.id}
+                  className={clsx(
+                    "flex h-[34px] cursor-pointer items-center gap-2 rounded-[var(--radius-control)] px-2 hover:bg-[var(--state-hover)] focus-within:shadow-[var(--focus-ring)]",
+                    checked && "bg-[var(--state-selected)]",
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    data-dock-task-check={task.id}
+                    checked={checked}
+                    onChange={() => toggleTask(task.id)}
+                    aria-label={t("types.selectTask", { name: task.name })}
+                    className="size-4 cursor-pointer accent-[var(--color-voluntary)]"
+                  />
+                  <Icon
+                    name="task"
+                    className="size-4 shrink-0 text-[var(--color-text-muted)]"
+                  />
+                  <span
+                    className={clsx(
+                      "min-w-0 flex-1 truncate text-sm",
+                      checked && "font-semibold",
+                    )}
+                  >
+                    {task.name}
+                  </span>
+                </label>
+              </li>
+            );
+          })}
         </ul>
       )}
+
+      {moveOpen && selectedTasks.length > 0 ? (
+        <MoveTasksDialog
+          source={type}
+          tasks={selectedTasks}
+          types={types}
+          onClose={() => setMoveOpen(false)}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function MoveTasksDialog({
+  source,
+  tasks,
+  types,
+  onClose,
+}: {
+  source: TaskType;
+  tasks: Task[];
+  types: TaskType[];
+  onClose: () => void;
+}) {
+  const t = useT();
+  const assignType = useTasksStore((state) => state.assignType);
+  const excluded = useMemo(
+    () => descendantTypeIds(types, source.id),
+    [types, source.id],
+  );
+  const targets = useMemo(
+    () =>
+      flattenTypeTree(types).filter(
+        (node) => !excluded.has(node.type.id),
+      ),
+    [types, excluded],
+  );
+  const [targetId, setTargetId] = useState(
+    () => targets[0]?.type.id ?? "",
+  );
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (targetId === "" || pending) {
+      return;
+    }
+    setPending(true);
+    setError(null);
+    try {
+      await assignType(
+        tasks.map((task) => task.id),
+        targetId,
+      );
+      onClose();
+    } catch {
+      setError(t("types.moveOutFailed"));
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <button
+        type="button"
+        aria-label={t("manage.cancel")}
+        tabIndex={-1}
+        onClick={onClose}
+        className="absolute inset-0 cursor-default bg-black/25"
+      />
+      <form
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("types.moveOutTitle", {
+          name: typeDisplayName(source, t),
+        })}
+        data-move-out-dialog
+        onSubmit={(event) => void submit(event)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.stopPropagation();
+            onClose();
+          }
+        }}
+        className="relative z-10 flex w-[420px] max-w-[calc(100vw-32px)] flex-col gap-3 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-popover)]"
+      >
+        <h2 className="m-0 text-sm font-semibold">
+          {t("types.moveOutTitle", {
+            name: typeDisplayName(source, t),
+          })}
+        </h2>
+        <p className="m-0 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+          {t("types.moveOutHint")}
+        </p>
+
+        <div className="flex flex-wrap gap-1">
+          {tasks.map((task) => (
+            <span
+              key={task.id}
+              className="inline-flex h-6 items-center rounded-[var(--radius-pill)] bg-[var(--state-selected)] px-2 text-[var(--text-2xs)] text-[var(--color-text-secondary)]"
+            >
+              {task.name}
+            </span>
+          ))}
+        </div>
+
+        <label className="flex flex-col gap-1 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
+          {t("types.field.targetType")}
+          <TaskTypePicker
+            value={targetId}
+            onChange={setTargetId}
+            types={types}
+            excludeIds={excluded}
+            dataAttribute="move-out"
+            ariaLabel={t("types.field.targetType")}
+          />
+        </label>
+
+        <div className="flex items-start gap-1 rounded-[var(--radius-control)] bg-[var(--color-surface-2)] p-2 text-[var(--text-2xs)] leading-normal text-[var(--color-text-tertiary)]">
+          <span aria-hidden="true">ⓘ</span>
+          <span>{t("types.moveOutNote")}</span>
+        </div>
+
+        {error ? (
+          <p className="m-0 text-[var(--text-2xs)] text-[var(--color-missed)]">
+            {error}
+          </p>
+        ) : null}
+
+        <div className="flex items-center justify-end gap-2">
+          <span className="mr-auto text-[var(--text-2xs)] tabular-nums text-[var(--color-text-muted)]">
+            {t("types.selectedCount", { count: tasks.length })}
+          </span>
+          <button
+            type="button"
+            data-move-out-cancel
+            onClick={onClose}
+            className="rounded-[var(--radius-control)] px-2.5 py-1 text-[var(--text-2xs)] text-[var(--color-text-muted)] hover:bg-[var(--state-hover)]"
+          >
+            {t("manage.cancel")}
+          </button>
+          <button
+            type="submit"
+            data-move-out-submit
+            disabled={targetId === "" || pending}
+            className="rounded-[var(--radius-control)] bg-[var(--color-voluntary)] px-2.5 py-1 text-[var(--text-2xs)] font-semibold text-white disabled:opacity-40"
+          >
+            {t("types.moveOutSelected", { count: tasks.length })}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 
@@ -532,6 +814,14 @@ function AssignTasksDialog({
 }) {
   const t = useT();
   const assignType = useTasksStore((state) => state.assignType);
+  const now = useDayNow();
+  const dayStartHour = useSettingsStore(
+    (state) => state.settings.dayStartHour,
+  );
+  const today = useMemo(
+    () => logicalToday(now, dayStartHour),
+    [now, dayStartHour],
+  );
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [query, setQuery] = useState("");
   const [pending, setPending] = useState(false);
@@ -544,10 +834,13 @@ function AssignTasksDialog({
   const candidates = useMemo(() => {
     const excluded = descendantTypeIds(types, target.id);
     return sortedTasksByType(
-      tasks.filter((task) => !excluded.has(resolveTaskTypeId(task))),
+      tasks.filter(
+        (task) =>
+          !excluded.has(resolveTaskTypeId(task)) && !isRetired(task, today),
+      ),
       types,
     );
-  }, [tasks, types, target.id]);
+  }, [tasks, types, target.id, today]);
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) {
@@ -628,7 +921,7 @@ function AssignTasksDialog({
           {t("types.addTasksTitle", { name: typeDisplayName(target, t) })}
         </h2>
         <p className="m-0 text-[var(--text-2xs)] text-[var(--color-text-muted)]">
-          {t("types.addTasksHint")}
+          {t("types.addTasksHint")} · {t("types.disabledHiddenHint")}
         </p>
 
         <div className="flex items-center gap-2">

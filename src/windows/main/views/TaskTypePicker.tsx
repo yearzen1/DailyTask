@@ -13,6 +13,7 @@ export function TaskTypePicker({
   disabled,
   dataAttribute = "type",
   ariaLabel,
+  excludeIds,
 }: {
   value: string;
   onChange: (typeId: string) => void;
@@ -20,17 +21,21 @@ export function TaskTypePicker({
   disabled?: boolean;
   dataAttribute?: string;
   ariaLabel?: string;
+  /** 过滤掉的类型 id；用于移出任务时排除当前类型子树。 */
+  excludeIds?: ReadonlySet<string>;
 }) {
   const t = useT();
   const locale = useLocale();
   const options = useMemo(
     () =>
-      flattenTypeTree(resolveTaskTypes(types)).map((node) => ({
-        id: node.type.id,
-        depth: node.depth,
-        label: typeDisplayName(node.type, t),
-      })),
-    [types, t, locale],
+      flattenTypeTree(resolveTaskTypes(types))
+        .filter((node) => !excludeIds?.has(node.type.id))
+        .map((node) => ({
+          id: node.type.id,
+          depth: node.depth,
+          label: typeDisplayName(node.type, t),
+        })),
+    [types, t, locale, excludeIds],
   );
 
   return (
