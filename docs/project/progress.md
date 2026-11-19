@@ -259,6 +259,16 @@
 
 ---
 
+## 18. v0.1.23 完成记录（2026-11-19）
+
+全量校验：`npm run test` **489 passed**、`npm run lint`、`npm run typecheck`、`npm run docs:check`、`npm run build`、`tauri build`（签名 + NSIS）通过。已发布 v0.1.23：<https://github.com/yearzen1/DailyTask/releases/tag/v0.1.23>。
+
+- 类型页「＋任务」过滤已停用任务：复用 `isRetired`，未来才启用的任务仍显示。
+- 类型页直属任务支持勾选 / 全选后批量移出当前类型；目标类型排除当前子树，只改 `type_id`，不删除任务、区间、名称历史或打卡记录。
+- 文档补充：今日页与挂件的类型组顺序跟随类型页；任务移出规则写入 how-to / reference / spec。
+
+---
+
 ## 17. v0.1.22 完成记录（2026-11-17）
 
 校验：`npm run typecheck`、`npm run lint`（改动文件）、`npm run docs:check`、`npm run build`、`tauri build`（签名 + NSIS）通过；本轮未跑 `npm run test`，合并前已在 `feat` 分支验证。已发布 v0.1.22：<https://github.com/yearzen1/DailyTask/releases/tag/v0.1.22>。
