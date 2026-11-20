@@ -46,4 +46,17 @@ describe("MenuSurface", () => {
     expect(heading).toHaveClass("wrap-anywhere");
     expect(heading).not.toHaveClass("truncate");
   });
+
+  it("closes a menu from the heading button", () => {
+    const onClose = vi.fn();
+
+    render(
+      <MenuSurface label="任务操作">
+        <MenuHeading onClose={onClose}>跑步</MenuHeading>
+      </MenuSurface>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "关闭菜单" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });

@@ -369,6 +369,20 @@ describe("Todos", () => {
     expect(container.querySelector("[data-todo-menu]")).not.toBeInTheDocument();
   });
 
+  it("closes the right-click menu from the close button", () => {
+    const { container } = render(<Todos />);
+
+    fireEvent.contextMenu(
+      container.querySelector('[data-todo="买猫粮"]') as Element,
+    );
+    expect(container.querySelector("[data-todo-menu]")).toBeInTheDocument();
+
+    fireEvent.click(
+      container.querySelector("[data-menu-close]") as Element,
+    );
+    expect(container.querySelector("[data-todo-menu]")).not.toBeInTheDocument();
+  });
+
   it("shows an empty state when there are no todos at all", () => {
     useTodosStore.setState({ todos: [] });
 

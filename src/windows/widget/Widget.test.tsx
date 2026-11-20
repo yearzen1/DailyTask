@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { checkinKey } from "../../domain/keys";
@@ -93,6 +93,10 @@ const TODAY = "2026-11-02";
 const originalSetStatus = useCheckinsStore.getState().setStatus;
 const originalSetValue = useCheckinsStore.getState().setValue;
 const originalSetDone = useTodosStore.getState().setDone;
+const originalClipboard = Object.getOwnPropertyDescriptor(
+  navigator,
+  "clipboard",
+);
 
 function task(
   id: string,
@@ -185,6 +189,11 @@ describe("Widget", () => {
     useCheckinsStore.setState({ setStatus: originalSetStatus });
     useCheckinsStore.setState({ setValue: originalSetValue });
     useTodosStore.setState({ setDone: originalSetDone });
+    if (originalClipboard) {
+      Object.defineProperty(navigator, "clipboard", originalClipboard);
+    } else {
+      delete (navigator as { clipboard?: Clipboard }).clipboard;
+    }
   });
 
   it("renders the full today content: progress, groups, all tasks and todos", () => {
@@ -520,6 +529,63 @@ describe("Widget", () => {
     fireEvent.contextMenu(screen.getByText("背单词"));
     fireEvent.click(screen.getByRole("menuitem", { name: "取消" }));
     expect(setStatus).toHaveBeenCalledWith("t3", TODAY, null);
+  });
+
+  it("copies task and todo names from the widget menus", async () => {
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    const setStatus = vi.fn(async () => undefined);
+    const setDone = vi.fn(async () => undefined);
+    useCheckinsStore.setState({ setStatus });
+    useTodosStore.setState({ setDone });
+
+    render(<Widget />);
+
+    fireEvent.contextMenu(
+      screen.getByRole("button", { name: "切换 跑步 状态" }),
+    );
+    const taskMenu = screen.getByRole("menu", { name: "任务操作" });
+    expect(
+      within(taskMenu).getByRole("menuitem", { name: "已完成" }),
+    ).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(
+        within(taskMenu).getByRole("menuitem", { name: "复制名字" }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(writeText).toHaveBeenCalledWith("跑步");
+    expect(setStatus).not.toHaveBeenCalled();
+    expect(screen.getByRole("status")).toHaveTextContent("已复制");
+
+    fireEvent.contextMenu(screen.getByText("买猫粮"));
+    const todoMenu = screen.getByRole("menu", { name: "待办操作" });
+    await act(async () => {
+      fireEvent.click(
+        within(todoMenu).getByRole("menuitem", { name: "复制名字" }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(writeText).toHaveBeenCalledWith("买猫粮");
+    expect(setDone).not.toHaveBeenCalled();
+  });
+
+  it("closes the widget task menu from the close button", () => {
+    render(<Widget />);
+
+    fireEvent.contextMenu(
+      screen.getByRole("button", { name: "切换 跑步 状态" }),
+    );
+    expect(screen.getByRole("menu", { name: "任务操作" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "关闭菜单" }));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
   it("asks the main window to expand and collapses the widget", async () => {

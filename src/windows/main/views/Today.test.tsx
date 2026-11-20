@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -19,6 +19,10 @@ import Today from "./Today";
 const NOW = new Date(2026, 10, 2, 9, 0, 0);
 const TODAY = "2026-11-02";
 const originalSetDone = useTodosStore.getState().setDone;
+const originalClipboard = Object.getOwnPropertyDescriptor(
+  navigator,
+  "clipboard",
+);
 
 function todo(id: string, dueDate: string | null, done = false): Todo {
   return {
@@ -324,5 +328,76 @@ describe("Today values", () => {
     const row = name.closest('[role="button"]') as HTMLElement;
     expect(row).toHaveClass("min-h-[34px]");
     expect(row).not.toHaveClass("h-[34px]");
+  });
+});
+
+describe("Today copy menu", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+
+    useSettingsStore.setState({ settings: DEFAULT_SETTINGS });
+    useTasksStore.setState({ tasks: [task()] });
+    useTaskTypesStore.setState({ types: [] });
+    useCheckinsStore.setState({ byKey: new Map() });
+    useTodosStore.setState({ todos: [todo("买猫粮", TODAY)] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    if (originalClipboard) {
+      Object.defineProperty(navigator, "clipboard", originalClipboard);
+    } else {
+      delete (navigator as { clipboard?: Clipboard }).clipboard;
+    }
+  });
+
+  it("copies task and todo names from the right-click menu", async () => {
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    const setStatus = vi.fn(async () => undefined);
+    useCheckinsStore.setState({ setStatus });
+
+    render(<Today />);
+
+    fireEvent.contextMenu(screen.getByText("引体向上"));
+    const taskMenu = screen.getByRole("menu", { name: "任务操作" });
+    expect(within(taskMenu).getByText("引体向上")).toBeInTheDocument();
+    expect(setStatus).not.toHaveBeenCalled();
+
+    await act(async () => {
+      fireEvent.click(
+        within(taskMenu).getByRole("menuitem", { name: "复制名字" }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(writeText).toHaveBeenCalledWith("引体向上");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("已复制");
+
+    fireEvent.contextMenu(screen.getByText("买猫粮"));
+    const todoMenu = screen.getByRole("menu", { name: "待办操作" });
+    await act(async () => {
+      fireEvent.click(
+        within(todoMenu).getByRole("menuitem", { name: "复制名字" }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(writeText).toHaveBeenCalledWith("买猫粮");
+  });
+
+  it("closes the right-click menu from the close button", () => {
+    render(<Today />);
+
+    fireEvent.contextMenu(screen.getByText("引体向上"));
+    expect(screen.getByRole("menu", { name: "任务操作" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "关闭菜单" }));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 });
