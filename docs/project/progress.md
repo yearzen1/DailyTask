@@ -259,6 +259,15 @@
 
 ---
 
+## 19. v0.1.24 完成记录（2026-11-20）
+
+全量校验：`npm run test` **508 passed**、`npm run lint`、`npm run typecheck`、`cargo check`、`npm run docs:check`、`tauri build`（签名 + NSIS）通过。已发布 v0.1.24：<https://github.com/yearzen1/DailyTask/releases/tag/v0.1.24>。
+
+- 今日、任务表、任务管理、统计、类型页和挂件中的任务名完整换行，行高随内容增长，不再被截断或省略。
+- 今日页和挂件支持右键复制任务 / 待办名字；菜单右上角可关闭，复制后显示轻提示。
+
+---
+
 ## 18. v0.1.23 完成记录（2026-11-19）
 
 全量校验：`npm run test` **489 passed**、`npm run lint`、`npm run typecheck`、`npm run docs:check`、`npm run build`、`tauri build`（签名 + NSIS）通过。已发布 v0.1.23：<https://github.com/yearzen1/DailyTask/releases/tag/v0.1.23>。
