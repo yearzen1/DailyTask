@@ -614,7 +614,7 @@ function TypeDetailDock({
                 <label
                   data-dock-task={task.id}
                   className={clsx(
-                    "flex h-[34px] cursor-pointer items-center gap-2 rounded-[var(--radius-control)] px-2 hover:bg-[var(--state-hover)] focus-within:shadow-[var(--focus-ring)]",
+                    "flex min-h-[34px] cursor-pointer items-center gap-2 rounded-[var(--radius-control)] px-2 py-1 hover:bg-[var(--state-hover)] focus-within:shadow-[var(--focus-ring)]",
                     checked && "bg-[var(--state-selected)]",
                   )}
                 >
@@ -632,7 +632,7 @@ function TypeDetailDock({
                   />
                   <span
                     className={clsx(
-                      "min-w-0 flex-1 truncate text-sm",
+                      "min-w-0 flex-1 wrap-anywhere text-sm",
                       checked && "font-semibold",
                     )}
                   >
@@ -745,9 +745,10 @@ function MoveTasksDialog({
           {tasks.map((task) => (
             <span
               key={task.id}
-              className="inline-flex h-6 items-center rounded-[var(--radius-pill)] bg-[var(--state-selected)] px-2 text-[var(--text-2xs)] text-[var(--color-text-secondary)]"
+              data-move-out-task={task.id}
+              className="inline-flex min-h-6 max-w-full items-center rounded-[var(--radius-pill)] bg-[var(--state-selected)] px-2 py-0.5 text-[var(--text-2xs)] text-[var(--color-text-secondary)]"
             >
-              {task.name}
+              <span className="min-w-0 wrap-anywhere">{task.name}</span>
             </span>
           ))}
         </div>
@@ -959,14 +960,14 @@ function AssignTasksDialog({
                 <label
                   key={task.id}
                   data-assign-task={task.id}
-                  className="flex min-h-[34px] cursor-pointer items-center gap-2 border-b border-[var(--color-border)] px-3 last:border-b-0 hover:bg-[var(--state-hover)]"
+                  className="flex min-h-[34px] cursor-pointer items-center gap-2 border-b border-[var(--color-border)] px-3 py-1 last:border-b-0 hover:bg-[var(--state-hover)]"
                 >
                   <input
                     type="checkbox"
                     checked={selected.has(task.id)}
                     onChange={() => toggle(task.id)}
                   />
-                  <span className="min-w-0 flex-1 truncate text-xs">
+                  <span className="min-w-0 flex-1 wrap-anywhere text-xs">
                     {task.name}
                   </span>
                   <span className="shrink-0 text-[10px] text-[var(--color-text-muted)]">

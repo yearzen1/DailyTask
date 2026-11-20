@@ -37,14 +37,17 @@ export function MenuSurface({
 export function MenuHeading({
   children,
   className,
+  wrap = false,
 }: {
   children: ReactNode;
   className?: string;
+  wrap?: boolean;
 }) {
   return (
     <p
       className={clsx(
-        "m-0 truncate px-1 pb-1 text-[11px] text-[var(--color-text-muted)]",
+        "m-0 px-1 pb-1 text-[11px] text-[var(--color-text-muted)]",
+        wrap ? "wrap-anywhere" : "truncate",
         className,
       )}
     >

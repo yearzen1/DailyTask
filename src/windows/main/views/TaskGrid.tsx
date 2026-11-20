@@ -1141,10 +1141,12 @@ export default function TaskGrid() {
               data-filter-chip="task"
               aria-label={t("grid.filter.remove", { name: activeTaskName })}
               onClick={() => setGridFilter({ taskId: null })}
-              className="inline-flex h-6 items-center gap-1 rounded-[var(--radius-pill)] bg-[var(--state-selected)] px-2 text-xs text-[var(--color-voluntary)]"
+              className="inline-flex min-h-6 max-w-full items-center gap-1 rounded-[var(--radius-pill)] bg-[var(--state-selected)] px-2 py-0.5 text-left text-xs text-[var(--color-voluntary)]"
             >
-              {activeTaskName}
-              <span aria-hidden="true">×</span>
+              <span className="min-w-0 wrap-anywhere">{activeTaskName}</span>
+              <span aria-hidden="true" className="shrink-0">
+                ×
+              </span>
             </button>
           ) : null}
           {filter.from || filter.to ? (
@@ -1449,7 +1451,10 @@ export default function TaskGrid() {
               style={{ left: cellTarget.left, top: cellTarget.top }}
             >
               <div className="mb-3 min-w-0">
-                <div className="truncate text-sm font-semibold text-[var(--color-text)]">
+                <div
+                  data-cell-editor-title
+                  className="wrap-anywhere text-sm font-semibold text-[var(--color-text)]"
+                >
                   {format(parseISO(cellTarget.date), "MM/dd")}{" "}
                   {cellTarget.taskName}
                 </div>

@@ -432,7 +432,7 @@ export function Widget() {
             style={{ left: menu.x, top: menu.y }}
             className="fixed flex w-[148px] flex-col gap-0.5"
           >
-            <MenuHeading className="text-[10px]">
+            <MenuHeading className="text-[10px]" wrap>
               {menu.row.task.name}
             </MenuHeading>
             <MenuItem
@@ -772,10 +772,10 @@ function WidgetTaskRow({
   const finished = useRef(false);
   const nameClass =
     row.state === "skipped"
-      ? "min-w-0 flex-1 truncate text-[var(--color-text-muted)] line-through"
+      ? "min-w-0 flex-1 wrap-anywhere text-[var(--color-text-muted)] line-through"
       : row.state === "done"
-        ? "min-w-0 flex-1 truncate text-[var(--color-text-muted)]"
-        : "min-w-0 flex-1 truncate";
+        ? "min-w-0 flex-1 wrap-anywhere text-[var(--color-text-muted)]"
+        : "min-w-0 flex-1 wrap-anywhere";
 
   useEffect(() => {
     if (!editing) {
@@ -805,7 +805,7 @@ function WidgetTaskRow({
   };
 
   const base =
-    "flex h-[26px] w-full items-center gap-[6px] rounded-[5px] px-1 pr-6 text-left text-xs";
+    "flex min-h-[26px] w-full items-center gap-[6px] rounded-[5px] px-1 py-0.5 pr-6 text-left text-xs";
 
   return (
     <div className="group relative" data-state={row.state}>

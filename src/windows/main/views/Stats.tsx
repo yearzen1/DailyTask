@@ -132,14 +132,14 @@ function StatsRow({
         row.current ? "" : "text-[var(--color-text-muted)]"
       }`}
     >
-      <td className="h-[38px] px-4">
-        <div className="flex items-center gap-2">
+      <td className="px-4 py-2 align-middle">
+        <div className="flex min-w-0 items-center gap-2">
           <i
             aria-hidden="true"
             className="size-[5px] shrink-0 rounded-full"
             style={{ background: color, opacity: row.current ? 1 : 0.35 }}
           />
-          <span className="min-w-0 truncate">{row.name}</span>
+          <span className="min-w-0 flex-1 wrap-anywhere">{row.name}</span>
           {row.current ? null : (
             <span className="shrink-0 text-[11px] tabular-nums">
               {range}

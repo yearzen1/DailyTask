@@ -356,7 +356,7 @@ function TaskGroup({
                 }
               }}
               style={{ paddingLeft: 20 + depth * 16 }}
-              className="group flex h-[34px] cursor-pointer items-center gap-3 rounded-[var(--radius-control)] pr-2 hover:bg-[var(--state-hover)] active:bg-[var(--state-active)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
+              className="group flex min-h-[34px] cursor-pointer items-center gap-3 rounded-[var(--radius-control)] py-1 pr-2 hover:bg-[var(--state-hover)] active:bg-[var(--state-active)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
             >
               <CheckCell
                 state={row.state}
@@ -366,10 +366,10 @@ function TaskGroup({
               <span
                 className={
                   row.state === "skipped"
-                    ? "min-w-0 flex-1 truncate text-[var(--color-text-muted)] line-through"
+                    ? "min-w-0 flex-1 wrap-anywhere text-[var(--color-text-muted)] line-through"
                     : row.state === "done"
-                      ? "min-w-0 flex-1 truncate text-[var(--color-text-muted)]"
-                      : "min-w-0 flex-1 truncate"
+                      ? "min-w-0 flex-1 wrap-anywhere text-[var(--color-text-muted)]"
+                      : "min-w-0 flex-1 wrap-anywhere"
                 }
               >
                 {row.task.name}

@@ -875,8 +875,8 @@ function ManageTableRow({ row, today }: { row: ManageRow; today: string }) {
       data-status={row.status}
       className="border-b border-[var(--color-border)] last:border-b-0 hover:bg-[var(--state-hover)]"
     >
-      <td className="h-[38px] px-3">
-        <div className="flex items-center gap-2">
+      <td className="px-3 py-2 align-middle">
+        <div className="flex min-w-0 items-center gap-2">
           <i
             aria-hidden="true"
             className="size-[5px] shrink-0 rounded-full"
@@ -888,8 +888,8 @@ function ManageTableRow({ row, today }: { row: ManageRow; today: string }) {
           <span
             className={
               retired
-                ? "truncate text-[var(--color-text-muted)]"
-                : "truncate"
+                ? "min-w-0 flex-1 wrap-anywhere text-[var(--color-text-muted)]"
+                : "min-w-0 flex-1 wrap-anywhere"
             }
           >
             {row.task.name}
