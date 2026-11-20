@@ -1,0 +1,1003 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DailyTask · 右键复制与菜单关闭按钮</title>
+<link rel="stylesheet" href="./tokens.css">
+<style>
+  /* ============================================================
+     评审稿外壳
+     ============================================================ */
+  :root {
+    --canvas: #ECEDEF;
+    --canvas-text: #3A3A3A;
+    --canvas-muted: #7A7A7A;
+    --canvas-line: #D8DADF;
+  }
+  :root[data-theme="dark"] {
+    --canvas: #141414;
+    --canvas-text: #D8D8D8;
+    --canvas-muted: #8A8A8A;
+    --canvas-line: #2C2C2C;
+  }
+
+  * { box-sizing: border-box; }
+  html { height: 100%; }
+  body {
+    margin: 0;
+    min-height: 100%;
+    padding: var(--space-6);
+    background: var(--canvas);
+    color: var(--canvas-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+
+  .page-head {
+    display: flex; align-items: flex-end; gap: var(--space-3);
+    max-width: 1460px; margin: 0 auto var(--space-3);
+  }
+  .page-head h1 { margin: 0; font-size: var(--text-lg); font-weight: 600; }
+  .page-head p { margin: 4px 0 0; font-size: var(--text-xs); color: var(--canvas-muted); }
+  .page-head .tools { margin-left: auto; display: flex; align-items: center; gap: var(--space-2); }
+
+  .switch { display: flex; gap: 2px; padding: 3px; border-radius: var(--radius-pill); background: var(--canvas-line); }
+  .switch button {
+    border: 0; background: transparent;
+    padding: 4px 10px; border-radius: var(--radius-pill);
+    font-size: var(--text-xs); color: var(--canvas-muted);
+  }
+  .switch button.is-active { background: var(--canvas); color: var(--canvas-text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+
+  .scenario-bar {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+    max-width: 1460px; margin: 0 auto var(--space-4);
+  }
+  .scenario-bar .label { font-size: var(--text-xs); color: var(--canvas-muted); margin-right: 2px; }
+  .scenario {
+    border: 1px solid var(--canvas-line);
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+    padding: 5px 10px; border-radius: var(--radius-pill);
+    font-size: var(--text-xs);
+  }
+  .scenario:hover { background: var(--state-hover); }
+  .scenario.is-active {
+    border-color: var(--color-voluntary);
+    background: var(--state-selected);
+    color: var(--color-voluntary);
+    font-weight: 600;
+  }
+
+  /* ============================================================
+     窗口外壳
+     ============================================================ */
+  .stage {
+    display: flex; align-items: flex-start; gap: var(--space-6);
+    max-width: 1460px; margin: 0 auto;
+  }
+  .window {
+    position: relative;
+    width: 1040px; height: 680px; flex: none;
+    display: flex; flex-direction: column;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 24px 60px rgba(0,0,0,.16);
+  }
+  .titlebar {
+    height: var(--titlebar-height); flex: none;
+    display: flex; align-items: center; gap: var(--space-2);
+    padding: 0 var(--space-3) 0 var(--space-4);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    font-size: var(--text-xs); color: var(--color-text-muted);
+  }
+  .titlebar .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-voluntary); }
+  .win-ctrl { margin-left: auto; font-size: var(--text-2xs); letter-spacing: 1px; }
+
+  .app { flex: 1; display: flex; min-height: 0; }
+  .nav {
+    width: var(--nav-width); flex: none;
+    display: flex; flex-direction: column; gap: 2px;
+    padding: var(--space-3) var(--space-2);
+    background: var(--color-surface);
+    border-right: 1px solid var(--color-border);
+  }
+  .nav-item {
+    position: relative;
+    display: flex; align-items: center; gap: var(--space-2);
+    height: 36px; padding: 0 var(--space-2); border-radius: var(--radius-control);
+    font-size: var(--text-base); color: var(--color-text-muted);
+  }
+  .nav-item.is-active { background: var(--state-selected); color: var(--color-voluntary); font-weight: 600; }
+  .nav-item.is-active::before {
+    content: ""; position: absolute; left: -6px; top: 50%;
+    width: 3px; height: 16px; margin-top: -8px; border-radius: 2px;
+    background: var(--color-voluntary);
+  }
+  .nav-item .glyph { width: 16px; text-align: center; font-size: 13px; }
+
+  .content {
+    flex: 1; min-width: 0; min-height: 0;
+    display: flex; flex-direction: column; gap: var(--space-4);
+    padding: var(--space-6);
+    overflow: hidden;
+  }
+  .view-head { display: flex; align-items: baseline; gap: var(--space-3); flex: none; }
+  .view-head h1 { margin: 0; font-size: var(--text-lg); font-weight: 600; letter-spacing: .2px; }
+  .view-head .sub { font-size: var(--text-sm); color: var(--color-text-muted); }
+
+  .scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-4); padding-right: 2px; }
+  .scroll::-webkit-scrollbar { width: 4px; }
+  .scroll::-webkit-scrollbar-thumb { background: var(--color-border-strong); border-radius: 4px; }
+
+  .card {
+    flex: none;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+
+  /* ---------- 进度卡 ---------- */
+  .progress-card { display: flex; align-items: center; gap: var(--space-5); padding: var(--space-5) var(--space-6); }
+  .ring { position: relative; width: 76px; height: 76px; flex: none; border-radius: 50%; background: conic-gradient(var(--color-voluntary) 0 58%, var(--color-na) 58% 100%); }
+  .ring::after { content: ""; position: absolute; inset: 8px; border-radius: 50%; background: var(--color-surface); }
+  .ring span { position: absolute; inset: 0; display: grid; place-items: center; z-index: 1; font-size: var(--text-sm); font-weight: 600; }
+  .progress-copy { display: flex; flex-direction: column; gap: 4px; }
+  .progress-copy strong { font-size: var(--text-base); font-weight: 600; }
+  .progress-copy span { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .split-stats { margin-left: auto; display: flex; align-items: flex-start; gap: var(--space-6); }
+  .split { display: flex; flex-direction: column; gap: 4px; font-size: var(--text-xs); color: var(--color-text-muted); }
+  .split .label { display: flex; align-items: center; gap: 6px; }
+  .split .label i { width: 6px; height: 6px; border-radius: 50%; }
+  .split b { color: var(--color-text); font-size: var(--text-base); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+  /* ---------- 今日任务 ---------- */
+  .card-pad { padding: 8px; }
+  .group-head {
+    display: flex; align-items: center; gap: 8px;
+    height: 34px; padding: 0 8px;
+    border-radius: var(--radius-control);
+    font-size: var(--text-xs); font-weight: 600; color: var(--color-text-muted);
+  }
+  .group-head .bar { width: 3px; height: 12px; border-radius: 2px; }
+  .group-head .count { margin-left: auto; font-weight: 400; font-variant-numeric: tabular-nums; }
+  .group-head .caret { font-size: 10px; color: var(--color-text-tertiary); }
+
+  .task-row {
+    display: flex; align-items: center; gap: 12px;
+    min-height: 34px; padding: 4px 8px 4px 20px;
+    border-radius: var(--radius-control);
+    cursor: context-menu;
+  }
+  .task-row:hover, .todo-row:hover { background: var(--state-hover); }
+  .task-row.is-picked { background: var(--state-hover); box-shadow: inset 0 0 0 1px var(--color-border-strong); }
+  .check {
+    width: 22px; height: 22px; flex: none;
+    border: 1.5px solid var(--color-border-strong);
+    border-radius: 6px; display: grid; place-items: center;
+    font-size: 11px; color: transparent;
+  }
+  .check.done { border-color: var(--color-voluntary); background: var(--color-voluntary); color: #fff; }
+  .task-name { min-width: 0; flex: 1; font-size: var(--text-sm); overflow-wrap: anywhere; }
+  .task-name.done { color: var(--color-text-muted); text-decoration: line-through; }
+  .value {
+    flex: none; padding: 2px 6px; border-radius: var(--radius-pill);
+    background: var(--state-hover); color: var(--color-text-muted);
+    font-size: var(--text-xs); font-variant-numeric: tabular-nums;
+  }
+  .skip { border: 0; background: transparent; color: var(--color-text-muted); font-size: var(--text-xs); padding: 3px 6px; border-radius: var(--radius-control); }
+  .skip:hover { background: var(--state-active); }
+  .deadline { flex: none; }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    height: 18px; padding: 0 7px; border-radius: var(--radius-pill);
+    font-size: var(--text-2xs); font-weight: 600; white-space: nowrap;
+  }
+  .chip.warning { color: var(--color-warning); background: color-mix(in srgb, var(--color-warning) 12%, transparent); }
+  .chip.danger { color: var(--color-missed); background: color-mix(in srgb, var(--color-missed) 12%, transparent); }
+  .chip.neutral { color: var(--color-text-muted); background: var(--state-hover); }
+
+  /* ---------- 待办 ---------- */
+  .todo-head { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px; font-size: var(--text-xs); font-weight: 600; color: var(--color-text-muted); }
+  .todo-head .bar { width: 3px; height: 12px; border-radius: 2px; background: var(--color-warning); }
+  .todo-head .count { margin-left: auto; font-weight: 400; font-variant-numeric: tabular-nums; }
+  .todo-row {
+    display: flex; align-items: center; gap: 12px;
+    min-height: 34px; padding: 4px 10px;
+    border-radius: var(--radius-control);
+    cursor: context-menu;
+  }
+  .todo-check {
+    width: 18px; height: 18px; flex: none;
+    border: 1.5px solid var(--color-border-strong);
+    border-radius: 50%; display: grid; place-items: center;
+    font-size: 9px; color: transparent;
+  }
+  .todo-check.done { border-color: var(--color-voluntary); background: var(--color-voluntary); color: #fff; }
+  .todo-name { min-width: 0; flex: 1; font-size: var(--text-sm); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .todo-name.done { color: var(--color-text-muted); text-decoration: line-through; }
+
+  /* ============================================================
+     挂件
+     ============================================================ */
+  .widget {
+    position: relative;
+    width: 320px; height: 460px; flex: none;
+    padding: var(--space-3);
+    background: var(--color-bg);
+  }
+  .widget-card {
+    position: relative;
+    display: flex; flex-direction: column;
+    width: 100%; height: 100%;
+    padding: 12px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-widget);
+    box-shadow: var(--shadow-widget);
+    overflow: hidden;
+  }
+  .w-head { display: flex; align-items: center; height: 22px; flex: none; }
+  .w-title { font-size: 12.5px; font-weight: 600; min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .w-actions { display: flex; align-items: center; gap: 2px; flex: none; }
+  .w-action {
+    width: 18px; height: 18px; border: 0; border-radius: 4px;
+    background: transparent; color: var(--color-text-muted);
+    display: grid; place-items: center; font-size: 11px; line-height: 1;
+  }
+  .w-action:hover { background: var(--state-active); }
+
+  .w-progress { display: flex; align-items: center; gap: 10px; padding: 8px 0 7px; flex: none; }
+  .w-ring { position: relative; width: 42px; height: 42px; flex: none; border-radius: 50%; background: conic-gradient(var(--color-voluntary) 0 58%, var(--color-na) 58% 100%); }
+  .w-ring::after { content: ""; position: absolute; inset: 5px; border-radius: 50%; background: var(--color-surface); }
+  .w-ring span { position: absolute; inset: 0; display: grid; place-items: center; z-index: 1; font-size: 10.5px; font-weight: 600; }
+  .w-progress-copy { display: flex; flex-direction: column; gap: 1px; font-size: 10.5px; color: var(--color-text-muted); }
+  .w-progress-copy strong { color: var(--color-text); font-size: 11.5px; font-weight: 600; }
+  .w-splits { margin-left: auto; display: flex; flex-direction: column; gap: 2px; font-size: 9.5px; color: var(--color-text-muted); text-align: right; }
+  .w-splits b { color: var(--color-text); font-weight: 500; }
+
+  .w-scroll { flex: 1; min-height: 0; overflow-y: auto; padding-right: 2px; }
+  .w-scroll::-webkit-scrollbar { width: 4px; }
+  .w-scroll::-webkit-scrollbar-thumb { background: var(--color-border-strong); border-radius: 4px; }
+  .w-group {
+    display: flex; align-items: center; gap: 6px;
+    height: 20px; padding: 0 4px;
+    font-size: 10.5px; font-weight: 600; color: var(--color-text-muted);
+  }
+  .w-group .bar { width: 3px; height: 10px; border-radius: 2px; }
+  .w-group .caret { font-size: 9px; }
+  .w-group .count { margin-left: auto; font-weight: 400; font-variant-numeric: tabular-nums; }
+  .w-task {
+    display: flex; align-items: center; gap: 6px;
+    min-height: 26px; padding: 2px 4px;
+    border-radius: 5px; font-size: 11.5px;
+    cursor: context-menu;
+  }
+  .w-task:hover, .w-todo:hover { background: var(--state-hover); }
+  .w-task.is-picked, .w-todo.is-picked { background: var(--state-hover); box-shadow: inset 0 0 0 1px var(--color-border-strong); }
+  .w-check {
+    width: 17px; height: 17px; flex: none;
+    border: 1.4px solid var(--color-border-strong);
+    border-radius: 4px; display: grid; place-items: center;
+    font-size: 9px; color: transparent;
+  }
+  .w-check.done { border-color: var(--color-voluntary); background: var(--color-voluntary); color: #fff; }
+  .w-name { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+  .w-name.done { color: var(--color-text-muted); text-decoration: line-through; }
+  .w-value { flex: none; padding: 1px 5px; border-radius: var(--radius-pill); background: var(--state-hover); color: var(--color-text-muted); font-size: 9.5px; }
+  .w-todo {
+    display: flex; align-items: center; gap: 6px;
+    min-height: 26px; padding: 2px 4px;
+    border-radius: 5px; font-size: 11.5px;
+    cursor: context-menu;
+  }
+  .w-todo-check {
+    width: 12px; height: 12px; flex: none;
+    border: 1.4px solid var(--color-border-strong);
+    border-radius: 50%; display: grid; place-items: center;
+    font-size: 7px; color: transparent;
+  }
+  .w-todo-check.done { border-color: var(--color-voluntary); background: var(--color-voluntary); color: #fff; }
+  .w-todo-name { min-width: 0; flex: 1; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .w-todo-name.done { color: var(--color-text-muted); text-decoration: line-through; }
+  .w-due { flex: none; font-size: 9.5px; font-variant-numeric: tabular-nums; color: var(--color-text-muted); }
+  .w-due.danger { color: var(--color-missed); font-weight: 600; }
+
+  /* ============================================================
+     右键菜单
+     ============================================================ */
+  .scrim { position: fixed; inset: 0; z-index: 70; background: transparent; }
+  .menu {
+    position: fixed; z-index: 80;
+    width: 208px; padding: 6px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-popover);
+  }
+  .menu[hidden] { display: none; }
+  .menu-widget { width: 184px; }
+  .menu-head { display: flex; align-items: flex-start; gap: 4px; padding: 0 2px 4px 6px; }
+  .menu-title {
+    flex: 1; min-width: 0; margin: 0;
+    font-size: 11px; line-height: 1.5;
+    color: var(--color-text-secondary);
+    overflow-wrap: anywhere;
+  }
+  .menu-close {
+    width: 20px; height: 20px; flex: none;
+    display: grid; place-items: center;
+    margin-top: -2px;
+    border: 0; border-radius: 4px;
+    background: transparent;
+    color: var(--color-text-tertiary);
+    font-size: 12px; line-height: 1;
+  }
+  .menu-close:hover { background: var(--state-active); color: var(--color-text); }
+  .menu-close:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+  .menu-item {
+    display: flex; align-items: center; gap: 6px;
+    width: 100%; height: 28px; padding: 0 6px;
+    border: 0; border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--color-text); text-align: left;
+    font-size: 12px;
+  }
+  .menu-item:hover { background: var(--state-hover); }
+  .menu-item:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+  .menu-item .hint { margin-left: auto; font-size: 10px; color: var(--color-text-tertiary); }
+  .menu-sep { height: 1px; margin: 4px 2px; background: var(--color-divider); }
+  .menu-note { margin: 2px 6px 0; font-size: 10px; line-height: 1.45; color: var(--color-text-tertiary); }
+
+  .toast {
+    position: absolute; left: 50%; bottom: 16px; z-index: 90;
+    transform: translate(-50%, 6px);
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 11px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-pill);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-popover);
+    color: var(--color-text-secondary);
+    font-size: var(--text-xs);
+    white-space: nowrap;
+    opacity: 0; pointer-events: none;
+    transition: opacity .16s ease, transform .16s ease;
+  }
+  .toast.is-on { opacity: 1; transform: translate(-50%, 0); }
+  .toast .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-voluntary); }
+  .toast.is-error .dot { background: var(--color-missed); }
+  .widget .toast { bottom: 10px; font-size: 10.5px; padding: 5px 9px; }
+
+  /* ============================================================
+     标注区
+     ============================================================ */
+  .specs {
+    display: grid; grid-template-columns: 360px 1fr 1fr;
+    gap: var(--space-4);
+    max-width: 1460px; margin: var(--space-6) auto 0;
+  }
+  .panel {
+    padding: var(--space-4);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+  .panel h2 { margin: 0 0 4px; font-size: var(--text-sm); font-weight: 600; }
+  .panel .sub { margin: 0 0 var(--space-3); font-size: var(--text-2xs); color: var(--color-text-muted); }
+  .panel ol, .panel ul { margin: 0; padding-left: 18px; font-size: var(--text-xs); line-height: 1.75; color: var(--color-text-secondary); }
+  .panel li + li { margin-top: 3px; }
+  .panel code {
+    padding: 1px 4px; border-radius: 4px;
+    background: var(--color-surface-2);
+    font-family: var(--font-mono); font-size: 10.5px;
+    color: var(--color-text-tertiary);
+  }
+
+  .anatomy { position: relative; width: 232px; margin: 6px auto 8px; padding: 6px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-card); box-shadow: var(--shadow-popover); }
+  .a-head { display: flex; align-items: flex-start; gap: 4px; padding: 0 2px 4px 6px; }
+  .a-title { flex: 1; min-width: 0; font-size: 11px; line-height: 1.5; color: var(--color-text-secondary); }
+  .a-close { width: 20px; height: 20px; flex: none; display: grid; place-items: center; margin-top: -2px; border-radius: 4px; background: var(--state-active); color: var(--color-text); font-size: 12px; }
+  .a-item { display: flex; align-items: center; height: 28px; padding: 0 6px; border-radius: var(--radius-control); font-size: 12px; }
+  .a-item.is-copy { background: var(--state-selected); color: var(--color-voluntary); font-weight: 600; }
+  .a-item.is-muted { color: var(--color-text-muted); }
+  .a-sep { position: relative; height: 1px; margin: 4px 2px; background: var(--color-divider); }
+  .badge {
+    position: absolute;
+    display: grid; place-items: center;
+    width: 17px; height: 17px; border-radius: 50%;
+    background: var(--canvas-text); color: var(--canvas);
+    font-size: 10px; font-weight: 700;
+    box-shadow: 0 0 0 2px var(--color-surface);
+  }
+  .badge.n1 { top: 4px; left: -26px; }
+  .badge.n2 { top: 4px; right: -26px; }
+  .badge.n3 { top: 40px; right: -26px; }
+  .badge.n4 { top: 74px; left: -26px; }
+  .badge.n5 { top: 88px; right: -26px; }
+
+  .sample-row { display: flex; align-items: center; gap: var(--space-2); margin-top: 10px; }
+  .sample-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 10px; border: 1px solid var(--color-border);
+    border-radius: var(--radius-pill); background: var(--color-surface);
+    box-shadow: var(--shadow-card);
+    font-size: var(--text-xs); color: var(--color-text-secondary);
+  }
+  .sample-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-voluntary); }
+  .sample-pill.is-error .dot { background: var(--color-missed); }
+
+  .key-table { width: 100%; border-collapse: collapse; font-size: var(--text-xs); }
+  .key-table th, .key-table td { padding: 5px 0; border-bottom: 1px solid var(--color-divider); text-align: left; vertical-align: top; }
+  .key-table th { color: var(--color-text-muted); font-weight: 500; }
+  .key-table td { color: var(--color-text-secondary); }
+  .key-table tr:last-child th, .key-table tr:last-child td { border-bottom: 0; }
+  .key-table td:first-child { width: 92px; color: var(--color-text-tertiary); }
+
+  @media (max-width: 1460px) {
+    .stage { flex-direction: column; align-items: center; }
+    .window { width: 100%; max-width: 1040px; }
+    .widget { align-self: flex-end; }
+    .specs { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+  <header class="page-head">
+    <div>
+      <h1>右键复制与菜单关闭按钮</h1>
+      <p>今日页 / 挂件 · 设计评审稿 · 右键任务或待办查看菜单，点 × 或 Esc 关闭</p>
+    </div>
+    <div class="tools">
+      <div class="switch" id="theme-switch">
+        <button type="button" data-theme-btn="light" class="is-active">浅色</button>
+        <button type="button" data-theme-btn="dark">深色</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="scenario-bar">
+    <span class="label">预览</span>
+    <button type="button" class="scenario is-active" data-preset="both">并排展示</button>
+    <button type="button" class="scenario" data-preset="mainTask">今日 · 任务</button>
+    <button type="button" class="scenario" data-preset="mainTodo">今日 · 待办</button>
+    <button type="button" class="scenario" data-preset="widgetTask">挂件 · 任务</button>
+    <button type="button" class="scenario" data-preset="widgetTodo">挂件 · 待办</button>
+    <button type="button" class="scenario" data-preset="none">关闭全部</button>
+  </div>
+
+  <div class="stage">
+    <!-- ================= 主窗口 ================= -->
+    <div class="window" id="main-window">
+      <div class="titlebar">
+        <span class="dot"></span>
+        DailyTask
+        <span class="win-ctrl">—　□　×</span>
+      </div>
+      <div class="app">
+        <aside class="nav">
+          <div class="nav-item is-active"><span class="glyph">◉</span>今日</div>
+          <div class="nav-item"><span class="glyph">▦</span>任务表</div>
+          <div class="nav-item"><span class="glyph">☑</span>待办</div>
+          <div class="nav-item"><span class="glyph">☰</span>任务管理</div>
+          <div class="nav-item"><span class="glyph">◇</span>类型</div>
+          <div class="nav-item"><span class="glyph">▥</span>统计</div>
+          <div class="nav-item"><span class="glyph">⚙</span>设置</div>
+        </aside>
+
+        <main class="content">
+          <div class="view-head">
+            <h1>今日</h1>
+            <span class="sub">11/20 周四</span>
+          </div>
+
+          <div class="scroll">
+            <section class="card progress-card">
+              <div class="ring"><span>58%</span></div>
+              <div class="progress-copy">
+                <strong>已完成 4 / 7 项</strong>
+                <span>完成率 58% · 还剩 2 项</span>
+              </div>
+              <div class="split-stats">
+                <div class="split">
+                  <span class="label"><i style="background: var(--color-voluntary)"></i>自愿</span>
+                  <b>3 / 5</b>
+                </div>
+                <div class="split">
+                  <span class="label"><i style="background: var(--color-forced)"></i>被迫</span>
+                  <b>1 / 2</b>
+                </div>
+                <div class="split">
+                  <span class="label"><i style="background: var(--color-warning)"></i>待办</span>
+                  <b>1 / 3</b>
+                </div>
+              </div>
+            </section>
+
+            <section class="card card-pad">
+              <div class="group-head">
+                <span class="caret">▾</span>
+                <i class="bar" style="background: var(--color-voluntary)"></i>
+                自愿任务
+                <span class="count">2 / 4</span>
+              </div>
+
+              <div class="task-row" id="row-main-task" data-menu="mainTask" data-name="晨间拉伸与肩颈放松 15 分钟">
+                <span class="check"></span>
+                <span class="task-name">晨间拉伸与肩颈放松 15 分钟</span>
+                <span class="chip neutral deadline">11/22 · 还差 2 天</span>
+                <span class="value">3 组</span>
+                <button type="button" class="skip">今天不做</button>
+              </div>
+
+              <div class="task-row" data-menu="mainTask" data-name="阅读 30 页">
+                <span class="check done">✓</span>
+                <span class="task-name done">阅读 30 页</span>
+                <span class="value">30 页</span>
+                <button type="button" class="skip">今天不做</button>
+              </div>
+
+              <div class="task-row" data-menu="mainTask" data-name="喝够 2L 水">
+                <span class="check"></span>
+                <span class="task-name">喝够 2L 水</span>
+                <button type="button" class="skip">今天不做</button>
+              </div>
+
+              <div class="task-row" data-menu="mainTask" data-name="晚上十一点前上床睡觉">
+                <span class="check done">✓</span>
+                <span class="task-name done">晚上十一点前上床睡觉</span>
+                <button type="button" class="skip">今天不做</button>
+              </div>
+
+              <div class="group-head">
+                <span class="caret">▾</span>
+                <i class="bar" style="background: var(--color-forced)"></i>
+                被迫任务
+                <span class="count">1 / 2</span>
+              </div>
+
+              <div class="task-row" data-menu="mainTask" data-name="整理本周会议纪要">
+                <span class="check"></span>
+                <span class="task-name">整理本周会议纪要</span>
+                <span class="chip warning deadline">11/20 · 今天截止</span>
+                <button type="button" class="skip">今天不做</button>
+              </div>
+            </section>
+
+            <section class="card card-pad">
+              <div class="todo-head">
+                <i class="bar"></i>
+                今日到期待办
+                <span class="count">1 / 3</span>
+              </div>
+
+              <div class="todo-row" id="row-main-todo" data-menu="mainTodo" data-name="把设计稿发到群里确认">
+                <span class="todo-check"></span>
+                <span class="todo-name">把设计稿发到群里确认</span>
+                <span class="chip danger">11/18 · 逾期 2 天</span>
+              </div>
+
+              <div class="todo-row" data-menu="mainTodo" data-name="买猫粮">
+                <span class="todo-check"></span>
+                <span class="todo-name">买猫粮</span>
+                <span class="chip warning">11/20 · 今天</span>
+              </div>
+
+              <div class="todo-row" data-menu="mainTodo" data-name="交房租">
+                <span class="todo-check done">✓</span>
+                <span class="todo-name done">交房租</span>
+                <span class="chip neutral">11/15 · 已完成</span>
+              </div>
+            </section>
+          </div>
+        </main>
+      </div>
+      <div class="toast" id="toast-main" role="status" aria-live="polite"><span class="dot"></span><span class="toast-text">已复制</span></div>
+    </div>
+
+    <!-- ================= 挂件 ================= -->
+    <div class="widget" id="widget-window">
+      <div class="widget-card">
+        <div class="w-head">
+          <span class="w-title">今日 · 11/20</span>
+          <div class="w-actions">
+            <button type="button" class="w-action" aria-label="展开主窗口">↗</button>
+            <button type="button" class="w-action" aria-label="置顶">⌖</button>
+            <button type="button" class="w-action" aria-label="收起挂件">−</button>
+          </div>
+        </div>
+
+        <div class="w-progress">
+          <div class="w-ring"><span>58%</span></div>
+          <div class="w-progress-copy">
+            <strong>已完成 4 / 7</strong>
+            <span>还剩 2 项</span>
+          </div>
+          <div class="w-splits">
+            <span>自愿 <b>3 / 5</b></span>
+            <span>被迫 <b>1 / 2</b></span>
+            <span>待办 <b>1 / 3</b></span>
+          </div>
+        </div>
+
+        <div class="w-scroll">
+          <div class="w-group">
+            <span class="caret">▾</span>
+            <i class="bar" style="background: var(--color-voluntary)"></i>
+            自愿
+            <span class="count">2 / 4</span>
+          </div>
+          <div class="w-task" id="row-widget-task" data-menu="widgetTask" data-name="晨间拉伸与肩颈放松 15 分钟">
+            <span class="w-check"></span>
+            <span class="w-name">晨间拉伸与肩颈放松 15 分钟</span>
+            <span class="w-value">3 组</span>
+          </div>
+          <div class="w-task" data-menu="widgetTask" data-name="阅读 30 页">
+            <span class="w-check done">✓</span>
+            <span class="w-name done">阅读 30 页</span>
+          </div>
+          <div class="w-task" data-menu="widgetTask" data-name="喝够 2L 水">
+            <span class="w-check"></span>
+            <span class="w-name">喝够 2L 水</span>
+          </div>
+          <div class="w-task" data-menu="widgetTask" data-name="晚上十一点前上床睡觉">
+            <span class="w-check done">✓</span>
+            <span class="w-name done">晚上十一点前上床睡觉</span>
+          </div>
+
+          <div class="w-group">
+            <span class="caret">▾</span>
+            <i class="bar" style="background: var(--color-forced)"></i>
+            被迫
+            <span class="count">1 / 2</span>
+          </div>
+          <div class="w-task" data-menu="widgetTask" data-name="整理本周会议纪要">
+            <span class="w-check"></span>
+            <span class="w-name">整理本周会议纪要</span>
+          </div>
+
+          <div class="w-group" style="margin-top: 4px">
+            <span class="caret">▾</span>
+            <i class="bar" style="background: var(--color-warning)"></i>
+            今日到期待办
+            <span class="count">1 / 3</span>
+          </div>
+          <div class="w-todo" id="row-widget-todo" data-menu="widgetTodo" data-name="把设计稿发到群里确认">
+            <span class="w-todo-check"></span>
+            <span class="w-todo-name">把设计稿发到群里确认</span>
+            <span class="w-due danger">逾期 2 天</span>
+          </div>
+          <div class="w-todo" data-menu="widgetTodo" data-name="买猫粮">
+            <span class="w-todo-check"></span>
+            <span class="w-todo-name">买猫粮</span>
+            <span class="w-due">今天</span>
+          </div>
+          <div class="w-todo" data-menu="widgetTodo" data-name="交房租">
+            <span class="w-todo-check done">✓</span>
+            <span class="w-todo-name done">交房租</span>
+            <span class="w-due">已完成</span>
+          </div>
+        </div>
+      </div>
+      <div class="toast" id="toast-widget" role="status" aria-live="polite"><span class="dot"></span><span class="toast-text">已复制</span></div>
+    </div>
+  </div>
+
+  <!-- ================= 菜单层 ================= -->
+  <div class="scrim" id="scrim" hidden></div>
+
+  <div class="menu" id="menu-mainTask" role="menu" aria-label="任务操作" hidden>
+    <div class="menu-head">
+      <p class="menu-title">晨间拉伸与肩颈放松 15 分钟</p>
+      <button type="button" class="menu-close" aria-label="关闭菜单" data-close>✕</button>
+    </div>
+    <button type="button" class="menu-item" role="menuitem" data-copy="晨间拉伸与肩颈放松 15 分钟" data-toast="main">复制名字</button>
+  </div>
+
+  <div class="menu" id="menu-mainTodo" role="menu" aria-label="待办操作" hidden>
+    <div class="menu-head">
+      <p class="menu-title">把设计稿发到群里确认</p>
+      <button type="button" class="menu-close" aria-label="关闭菜单" data-close>✕</button>
+    </div>
+    <button type="button" class="menu-item" role="menuitem" data-copy="把设计稿发到群里确认" data-toast="main">复制名字</button>
+  </div>
+
+  <div class="menu menu-widget" id="menu-widgetTask" role="menu" aria-label="任务操作" hidden>
+    <div class="menu-head">
+      <p class="menu-title">晨间拉伸与肩颈放松 15 分钟</p>
+      <button type="button" class="menu-close" aria-label="关闭菜单" data-close>✕</button>
+    </div>
+    <button type="button" class="menu-item" role="menuitem" data-copy="晨间拉伸与肩颈放松 15 分钟" data-toast="widget">复制名字</button>
+    <div class="menu-sep"></div>
+    <button type="button" class="menu-item" role="menuitem">已完成</button>
+    <button type="button" class="menu-item" role="menuitem">未完成</button>
+    <button type="button" class="menu-item" role="menuitem">今天不做</button>
+    <button type="button" class="menu-item" role="menuitem">清除</button>
+  </div>
+
+  <div class="menu menu-widget" id="menu-widgetTodo" role="menu" aria-label="待办操作" hidden>
+    <div class="menu-head">
+      <p class="menu-title">把设计稿发到群里确认</p>
+      <button type="button" class="menu-close" aria-label="关闭菜单" data-close>✕</button>
+    </div>
+    <button type="button" class="menu-item" role="menuitem" data-copy="把设计稿发到群里确认" data-toast="widget">复制名字</button>
+  </div>
+
+  <!-- ================= 标注区 ================= -->
+  <div class="specs">
+    <section class="panel">
+      <h2>菜单结构</h2>
+      <p class="sub">关闭按钮固定在标题行右上角，标题换行也不会下移。</p>
+      <div class="anatomy">
+        <div class="a-head">
+          <span class="a-title">晨间拉伸与肩颈放松 15 分钟</span>
+          <span class="a-close">✕</span>
+        </div>
+        <div class="a-item is-copy">复制名字</div>
+        <div class="a-sep"></div>
+        <div class="a-item is-muted">已完成</div>
+        <div class="a-item is-muted">未完成</div>
+        <div class="a-item is-muted">今天不做</div>
+        <span class="badge n1">1</span>
+        <span class="badge n2">2</span>
+        <span class="badge n3">3</span>
+        <span class="badge n4">4</span>
+        <span class="badge n5">5</span>
+      </div>
+      <ol>
+        <li>标题：11px，最多不限行；长名字按 `overflow-wrap:anywhere` 换行</li>
+        <li>关闭：20×20 点击区，图标 12px，距菜单边 6px</li>
+        <li>复制项：28px 高，点击后关闭菜单并复制名字</li>
+        <li>分隔线：1px，仅任务菜单里分隔状态操作</li>
+        <li>状态项：沿用现有挂件菜单，文案和顺序不变</li>
+      </ol>
+    </section>
+
+    <section class="panel">
+      <h2>尺寸与状态</h2>
+      <p class="sub">主窗菜单 208px，挂件菜单 184px；无标题的菜单不显示关闭按钮。</p>
+      <table class="key-table">
+        <tr><td>菜单宽度</td><td>主窗 208px / 挂件 184px</td></tr>
+        <tr><td>菜单内边距</td><td>6px</td></tr>
+        <tr><td>标题行</td><td>11px / 行高 1.5 / 下方 4px</td></tr>
+        <tr><td>关闭按钮</td><td>20×20，hover 用 `state-active`</td></tr>
+        <tr><td>复制项</td><td>28px 高，圆角 6px</td></tr>
+        <tr><td>轻提示</td><td>底部居中，1.5 秒后消失</td></tr>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>复制反馈</h2>
+      <p class="sub">成功和失败都走同一个轻提示，不打断当前操作。</p>
+      <div class="sample-row">
+        <span class="sample-pill"><span class="dot"></span>已复制</span>
+        <span class="sample-pill is-error"><span class="dot"></span>复制失败</span>
+      </div>
+      <ul style="margin-top: 12px">
+        <li>右键只打开菜单，不改变完成 / 跳过状态</li>
+        <li>复制内容是纯名字，不带日期、倒计时、记录值</li>
+        <li>`×`、Esc、点遮罩、滚动都能关闭菜单</li>
+        <li>剪贴板不可用时回退到 `execCommand("copy")`</li>
+        <li>菜单标题沿用长名字换行口径，不截断</li>
+      </ul>
+      <div class="sample-row">
+        <button type="button" class="scenario" id="demo-fail">预览复制失败</button>
+      </div>
+    </section>
+  </div>
+
+<script>
+  (() => {
+    const menus = {
+      mainTask: document.getElementById("menu-mainTask"),
+      mainTodo: document.getElementById("menu-mainTodo"),
+      widgetTask: document.getElementById("menu-widgetTask"),
+      widgetTodo: document.getElementById("menu-widgetTodo"),
+    };
+    const anchors = {
+      mainTask: document.getElementById("row-main-task"),
+      mainTodo: document.getElementById("row-main-todo"),
+      widgetTask: document.getElementById("row-widget-task"),
+      widgetTodo: document.getElementById("row-widget-todo"),
+    };
+    const scrim = document.getElementById("scrim");
+    const scenarioButtons = Array.from(document.querySelectorAll("[data-preset]"));
+    const timers = new Map();
+
+    function setActivePreset(key) {
+      scenarioButtons.forEach((button) => {
+        button.classList.toggle("is-active", button.dataset.preset === key);
+      });
+    }
+
+    function hideMenus() {
+      Object.values(menus).forEach((menu) => { menu.hidden = true; });
+      scrim.hidden = true;
+      document.querySelectorAll(".is-picked").forEach((row) => row.classList.remove("is-picked"));
+    }
+
+    function setActive(preset) {
+      if (preset === "none") {
+        setActivePreset("none");
+      } else {
+        setActivePreset(preset);
+      }
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(Math.max(value, min), Math.max(min, max));
+    }
+
+    function setMenuName(key, name) {
+      const menu = menus[key];
+      menu.querySelector(".menu-title").textContent = name;
+      const copy = menu.querySelector("[data-copy]");
+      if (copy) {
+        copy.dataset.copy = name;
+      }
+    }
+
+    function openMenu(key, clientX, clientY, options = {}) {
+      if (!options.keep) {
+        hideMenus();
+      }
+      const menu = menus[key];
+      const anchor = options.row || anchors[key];
+      const container = anchor.closest(".window, .widget");
+      const box = container.getBoundingClientRect();
+      const pad = 8;
+
+      setMenuName(key, options.name || anchor.dataset.name);
+      menu.hidden = false;
+      const menuRect = menu.getBoundingClientRect();
+      const left = clamp(clientX, box.left + pad, box.right - menuRect.width - pad);
+      const top = clamp(clientY, box.top + pad, box.bottom - menuRect.height - pad);
+
+      menu.style.left = `${left}px`;
+      menu.style.top = `${top}px`;
+      scrim.hidden = false;
+      anchor.classList.add("is-picked");
+
+      if (options.preset) {
+        setActive(options.preset);
+      }
+    }
+
+    function openPreset(key) {
+      if (key === "both") {
+        const mainBox = anchors.mainTask.closest(".window").getBoundingClientRect();
+        const mainRect = anchors.mainTask.getBoundingClientRect();
+        const widgetBox = anchors.widgetTask.closest(".widget").getBoundingClientRect();
+        const widgetRect = anchors.widgetTask.getBoundingClientRect();
+        openMenu("mainTask", Math.min(mainRect.right - 36, mainBox.right - 240), mainRect.top + mainRect.height + 6, { preset: "both" });
+        openMenu("widgetTask", widgetBox.left + 74, widgetRect.top + 8, { keep: true, preset: "both" });
+        return;
+      }
+
+      const anchor = anchors[key];
+      const box = anchor.closest(".window, .widget").getBoundingClientRect();
+      const rect = anchor.getBoundingClientRect();
+      const x = key.startsWith("widget")
+        ? box.left + 74
+        : Math.min(rect.right - 36, box.right - 240);
+      const y = key.startsWith("widget")
+        ? rect.top + 8
+        : rect.top + rect.height + 6;
+
+      openMenu(key, x, y, { preset: key });
+    }
+
+    function showToast(target, message, isError = false) {
+      const toast = document.getElementById(target === "widget" ? "toast-widget" : "toast-main");
+      const text = toast.querySelector(".toast-text");
+      text.textContent = message;
+      toast.classList.toggle("is-error", isError);
+      toast.classList.add("is-on");
+      const previous = timers.get(target);
+      if (previous) window.clearTimeout(previous);
+      timers.set(target, window.setTimeout(() => {
+        toast.classList.remove("is-on");
+        timers.delete(target);
+      }, 1500));
+    }
+
+    async function copyName(name) {
+      try {
+        if (!navigator.clipboard || !navigator.clipboard.writeText) {
+          throw new Error("clipboard unavailable");
+        }
+        await navigator.clipboard.writeText(name);
+        return true;
+      } catch {
+        try {
+          const textarea = document.createElement("textarea");
+          textarea.value = name;
+          textarea.setAttribute("readonly", "");
+          textarea.style.position = "fixed";
+          textarea.style.opacity = "0";
+          document.body.appendChild(textarea);
+          textarea.select();
+          const ok = document.execCommand && document.execCommand("copy");
+          textarea.remove();
+          return Boolean(ok);
+        } catch {
+          return false;
+        }
+      }
+    }
+
+    document.querySelectorAll("[data-menu]").forEach((row) => {
+      row.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+        openMenu(row.dataset.menu, event.clientX, event.clientY, { row });
+        scenarioButtons.forEach((button) => button.classList.remove("is-active"));
+      });
+    });
+
+    document.querySelectorAll("[data-close]").forEach((button) => {
+      button.addEventListener("click", hideMenus);
+    });
+
+    scrim.addEventListener("click", hideMenus);
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        hideMenus();
+      }
+    });
+
+    window.addEventListener("scroll", hideMenus, true);
+    window.addEventListener("resize", hideMenus);
+
+    scenarioButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const preset = button.dataset.preset;
+        if (preset === "none") {
+          hideMenus();
+          setActivePreset("none");
+          return;
+        }
+        openPreset(preset);
+      });
+    });
+
+    document.querySelectorAll("[data-copy]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const valid = await copyName(button.dataset.copy);
+        hideMenus();
+        showToast(button.dataset.toast, valid ? "已复制" : "复制失败", !valid);
+      });
+    });
+
+    document.getElementById("demo-fail").addEventListener("click", () => {
+      showToast("main", "复制失败", true);
+    });
+
+    document.querySelectorAll("[data-theme-btn]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const theme = button.dataset.themeBtn;
+        document.documentElement.dataset.theme = theme;
+        document.querySelectorAll("[data-theme-btn]").forEach((item) => {
+          item.classList.toggle("is-active", item === button);
+        });
+        hideMenus();
+      });
+    });
+
+    // 首屏并排展示两个核心菜单，方便直接看关闭按钮和复制项。
+    window.addEventListener("load", () => {
+      window.requestAnimationFrame(() => openPreset("both"));
+    });
+  })();
+</script>
+</body>
+</html>
