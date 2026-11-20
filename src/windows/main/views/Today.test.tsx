@@ -310,4 +310,19 @@ describe("Today values", () => {
 
     expect(screen.getByText(/已完成 1 \/ 1/)).toBeInTheDocument();
   });
+
+  it("wraps a long task name and lets the row grow", () => {
+    const longName = "这是一个非常长的任务名称用于验证今日页换行显示";
+    useTasksStore.setState({ tasks: [{ ...task(), name: longName }] });
+
+    render(<Today />);
+
+    const name = screen.getByText(longName);
+    expect(name).toHaveClass("wrap-anywhere");
+    expect(name).not.toHaveClass("truncate");
+
+    const row = name.closest('[role="button"]') as HTMLElement;
+    expect(row).toHaveClass("min-h-[34px]");
+    expect(row).not.toHaveClass("h-[34px]");
+  });
 });

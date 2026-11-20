@@ -279,6 +279,53 @@ describe("Types", () => {
     expect(assignType).toHaveBeenCalledWith(["t3", "t4"], "work");
   });
 
+  it("wraps long task names in the dock, assign dialog and move-out chips", () => {
+    const dockName = "这是一个非常长的直属任务名称用于验证类型页换行";
+    const assignName = "这是一个非常长的待添加任务名称用于验证弹窗换行";
+    useTasksStore.setState({
+      tasks: [
+        task("t2", assignName, "work", 1),
+        task("t3", dockName, "voluntary", 2),
+      ],
+    });
+
+    const { container } = render(<Types />);
+    const dockText = screen.getByText(dockName);
+    expect(dockText).toHaveClass("wrap-anywhere");
+    expect(dockText).not.toHaveClass("truncate");
+    expect(dockText.closest("[data-dock-task]")).toHaveClass("min-h-[34px]");
+
+    fireEvent.click(
+      container.querySelector('[data-dock-action="add-task"]') as Element,
+    );
+    const assignDialog = screen.getByRole("dialog", {
+      name: "添加任务到「自愿」",
+    });
+    const assignText = within(assignDialog).getByText(assignName);
+    expect(assignText).toHaveClass("wrap-anywhere");
+    expect(assignText).not.toHaveClass("truncate");
+    fireEvent.click(
+      assignDialog.querySelector("[data-assign-cancel]") as Element,
+    );
+
+    fireEvent.click(
+      container.querySelector("[data-dock-select-all]") as Element,
+    );
+    fireEvent.click(
+      container.querySelector('[data-dock-action="move-out"]') as Element,
+    );
+    const moveDialog = screen.getByRole("dialog", {
+      name: "移出「自愿」的任务",
+    });
+    const chip = moveDialog.querySelector(
+      '[data-move-out-task="t3"]',
+    ) as HTMLElement;
+    expect(chip).toBeInTheDocument();
+    expect(chip).toHaveClass("min-h-6");
+    expect(chip).not.toHaveClass("h-6");
+    expect(within(chip).getByText(dockName)).toHaveClass("wrap-anywhere");
+  });
+
   it("disables moving tasks out when no target type exists", () => {
     useTaskTypesStore.setState({
       types: [type("voluntary", "自愿", null, 0, "voluntary")],

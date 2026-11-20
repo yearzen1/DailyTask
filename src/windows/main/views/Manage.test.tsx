@@ -252,6 +252,26 @@ describe("Manage", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("wraps a long task name and lets the row grow", () => {
+    const longName = "这是一个非常长的任务名称用于验证任务管理表格换行";
+    useTasksStore.setState({
+      tasks: useTasksStore
+        .getState()
+        .tasks.map((item) =>
+          item.id === "t1" ? { ...item, name: longName } : item,
+        ),
+    });
+
+    render(<Manage />);
+    const name = screen.getByText(longName);
+    expect(name).toHaveClass("wrap-anywhere");
+    expect(name).not.toHaveClass("truncate");
+
+    const cell = name.closest("td") as HTMLElement;
+    expect(cell).toHaveClass("py-2");
+    expect(cell).not.toHaveClass("h-[38px]");
+  });
+
   it("folds retired tasks into a collapsed group at the bottom", () => {
     const { container } = render(<Manage />);
 

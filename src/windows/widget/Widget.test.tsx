@@ -304,6 +304,34 @@ describe("Widget", () => {
     expect(scroller?.className).toContain("overflow-y-auto");
   });
 
+  it("wraps long task names and the task menu heading", () => {
+    const longName = "这是一个非常长的任务名称用于验证挂件换行显示";
+    useTasksStore.setState({
+      tasks: [task("t1", longName, "voluntary", 0)],
+    });
+    useCheckinsStore.setState({ byKey: new Map() });
+
+    render(<Widget />);
+
+    const name = screen.getByText(longName);
+    expect(name).toHaveClass("wrap-anywhere");
+    expect(name).not.toHaveClass("truncate");
+
+    const row = name.closest('[role="button"]') as HTMLElement;
+    expect(row).toHaveClass("min-h-[26px]");
+    expect(row).not.toHaveClass("h-[26px]");
+
+    fireEvent.contextMenu(
+      screen.getByRole("button", { name: `切换 ${longName} 状态` }),
+    );
+    const heading = (
+      document.querySelector("[data-widget-menu]") as HTMLElement
+    ).querySelector("p") as HTMLElement;
+    expect(heading).toHaveTextContent(longName);
+    expect(heading).toHaveClass("wrap-anywhere");
+    expect(heading).not.toHaveClass("truncate");
+  });
+
   it("collapses the three sections from their headers", () => {
     render(<Widget />);
 

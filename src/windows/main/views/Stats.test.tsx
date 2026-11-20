@@ -82,6 +82,22 @@ describe("Stats", () => {
     expect(meeting).toHaveTextContent("—");
   });
 
+  it("wraps a long task name and lets the row grow", () => {
+    const longName = "这是一个非常长的任务名称用于验证统计表格换行";
+    useTasksStore.setState({
+      tasks: [task("a", longName, 0), task("b", "开会", 1)],
+    });
+
+    render(<Stats />);
+    const name = screen.getByText(longName);
+    expect(name).toHaveClass("wrap-anywhere");
+    expect(name).not.toHaveClass("truncate");
+
+    const cell = name.closest("td") as HTMLElement;
+    expect(cell).toHaveClass("py-2");
+    expect(cell).not.toHaveClass("h-[38px]");
+  });
+
   it("explains the denominator and shows an empty state without tasks", () => {
     const { container } = render(<Stats />);
     expect(

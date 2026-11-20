@@ -445,6 +445,54 @@ describe("TaskGrid", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("wraps a long task name in the cell editor title", () => {
+    const longName = "这是一个非常长的任务名称用于验证编辑弹层标题换行";
+    useTasksStore.setState({
+      tasks: useTasksStore
+        .getState()
+        .tasks.map((item) =>
+          item.id === "t2" ? { ...item, name: longName } : item,
+        ),
+    });
+
+    const { container } = render(<TaskGrid />);
+    fireEvent.contextMenu(
+      container.querySelector(
+        '[data-task="t2"][data-date="2026-11-03"]',
+      ) as Element,
+    );
+
+    const title = container.querySelector(
+      "[data-cell-editor-title]",
+    ) as HTMLElement;
+    expect(title).toHaveTextContent(longName);
+    expect(title).toHaveClass("wrap-anywhere");
+    expect(title).not.toHaveClass("truncate");
+  });
+
+  it("wraps a long task name in the active filter chip", () => {
+    const longName = "这是一个非常长的任务名称用于验证筛选条件换行";
+    useTasksStore.setState({
+      tasks: useTasksStore
+        .getState()
+        .tasks.map((item) =>
+          item.id === "t1" ? { ...item, name: longName } : item,
+        ),
+    });
+    useUiStore.setState({
+      gridFilter: { typeId: null, taskId: "t1", from: null, to: null },
+    });
+
+    const { container } = render(<TaskGrid />);
+    const chip = container.querySelector(
+      '[data-filter-chip="task"]',
+    ) as HTMLElement;
+    expect(chip).toHaveTextContent(longName);
+    expect(chip).toHaveClass("min-h-6");
+    expect(chip).not.toHaveClass("h-6");
+    expect(chip.querySelector("span")).toHaveClass("wrap-anywhere");
+  });
+
   it("shows the value instead of the status symbol", () => {
     useCheckinsStore.setState({
       byKey: new Map([

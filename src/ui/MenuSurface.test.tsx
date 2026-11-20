@@ -34,4 +34,16 @@ describe("MenuSurface", () => {
       screen.getByTestId("menu").querySelector("[data-menu-separator]"),
     ).toBeInTheDocument();
   });
+
+  it("can wrap a long heading", () => {
+    render(
+      <MenuSurface label="任务操作">
+        <MenuHeading wrap>这是一个很长的任务名称</MenuHeading>
+      </MenuSurface>,
+    );
+
+    const heading = screen.getByText("这是一个很长的任务名称");
+    expect(heading).toHaveClass("wrap-anywhere");
+    expect(heading).not.toHaveClass("truncate");
+  });
 });
