@@ -22,13 +22,16 @@ import {
 } from "../../stores/selectors/today";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useTodosStore } from "../../stores/todosStore";
+import { CopyToast } from "../../ui/CopyToast";
 import {
   MenuHeading,
   MenuItem,
+  MenuSeparator,
   MenuSurface,
 } from "../../ui/MenuSurface";
 import { typeColorVar, typeDisplayName } from "../../ui/taskType";
 import { applyTheme } from "../../ui/theme";
+import { useCopyFeedback } from "../../ui/useCopyFeedback";
 import { useT } from "../../ui/useT";
 import {
   applyWidgetLayout,
@@ -43,6 +46,13 @@ import {
 const RING_RADIUS = 17;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 const TODOS_GROUP_KEY = "__todos";
+const MENU_WIDTH = 184;
+const TASK_MENU_HEIGHT = 204;
+const TODO_MENU_HEIGHT = 72;
+
+type WidgetMenu =
+  | { kind: "task"; row: TodayTask; x: number; y: number }
+  | { kind: "todo"; item: DueTodoItem; x: number; y: number };
 
 /**
  * 展开态与「今日」页内容一致：日期、完成率、自愿/被迫分项、全部任务、全部到期待办。
@@ -62,11 +72,8 @@ export function Widget() {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
     () => new Set(),
   );
-  const [menu, setMenu] = useState<{
-    row: TodayTask;
-    x: number;
-    y: number;
-  } | null>(null);
+  const [menu, setMenu] = useState<WidgetMenu | null>(null);
+  const { message: copyMessage, error: copyError, copy } = useCopyFeedback();
   const initialCollapsed = useRef(collapsed);
   const initialSide = useRef(side);
 
@@ -184,19 +191,49 @@ export function Widget() {
     void setTodoDone(item.todo.id, !item.todo.done);
   };
 
-  const openMenu = (row: TodayTask, event: ReactMouseEvent) => {
+  const openTaskMenu = (row: TodayTask, event: ReactMouseEvent) => {
     event.preventDefault();
-    const width = 148;
-    const height = 176;
     setMenu({
+      kind: "task",
       row,
-      x: Math.min(event.clientX, Math.max(8, window.innerWidth - width - 8)),
-      y: Math.min(event.clientY, Math.max(8, window.innerHeight - height - 8)),
+      x: Math.min(
+        event.clientX,
+        Math.max(8, window.innerWidth - MENU_WIDTH - 8),
+      ),
+      y: Math.min(
+        event.clientY,
+        Math.max(8, window.innerHeight - TASK_MENU_HEIGHT - 8),
+      ),
     });
   };
 
-  const applyStatus = (status: CheckinStatus | null) => {
+  const openTodoMenu = (item: DueTodoItem, event: ReactMouseEvent) => {
+    event.preventDefault();
+    setMenu({
+      kind: "todo",
+      item,
+      x: Math.min(
+        event.clientX,
+        Math.max(8, window.innerWidth - MENU_WIDTH - 8),
+      ),
+      y: Math.min(
+        event.clientY,
+        Math.max(8, window.innerHeight - TODO_MENU_HEIGHT - 8),
+      ),
+    });
+  };
+
+  const copyMenuName = () => {
     if (!menu) {
+      return;
+    }
+    const name = menu.kind === "task" ? menu.row.task.name : menu.item.todo.title;
+    setMenu(null);
+    void copy(name);
+  };
+
+  const applyStatus = (status: CheckinStatus | null) => {
+    if (!menu || menu.kind !== "task") {
       return;
     }
     const { row } = menu;
@@ -369,7 +406,7 @@ export function Widget() {
                   onToggle={() => toggleGroup(group.type.id)}
                   onCycle={cycle}
                   onValue={saveValue}
-                  onMenu={openMenu}
+                  onMenu={openTaskMenu}
                 />
               ))
             )}
@@ -409,6 +446,7 @@ export function Widget() {
                         key={item.todo.id}
                         item={item}
                         onToggle={() => toggleTodo(item)}
+                        onMenu={(event) => openTodoMenu(item, event)}
                       />
                     ))}
               </div>
@@ -421,53 +459,74 @@ export function Widget() {
         <>
           <button
             type="button"
-            aria-label={t("widget.menu.close")}
+            aria-label={t("common.close")}
             tabIndex={-1}
             onClick={() => setMenu(null)}
             className="fixed inset-0 z-40 cursor-default"
           />
           <MenuSurface
-            data-widget-menu
-            label={t("widget.menu")}
+            data-widget-menu={menu.kind}
+            label={t(menu.kind === "task" ? "widget.menu" : "todos.menu")}
             style={{ left: menu.x, top: menu.y }}
-            className="fixed flex w-[148px] flex-col gap-0.5"
+            className="fixed flex w-[184px] flex-col gap-0.5"
           >
-            <MenuHeading className="text-[10px]" wrap>
-              {menu.row.task.name}
+            <MenuHeading
+              className="text-[10px]"
+              wrap
+              onClose={() => setMenu(null)}
+            >
+              {menu.kind === "task" ? menu.row.task.name : menu.item.todo.title}
             </MenuHeading>
             <MenuItem
+              data-widget-copy
               className="h-6 px-1.5 text-[11px]"
-              onClick={() => applyStatus("done")}
+              onClick={copyMenuName}
             >
-              {t("checkin.done")}
+              {t("common.copyName")}
             </MenuItem>
-            <MenuItem
-              className="h-6 px-1.5 text-[11px]"
-              onClick={() => applyStatus("missed")}
-            >
-              {t("checkin.missed")}
-            </MenuItem>
-            <MenuItem
-              className="h-6 px-1.5 text-[11px]"
-              onClick={() =>
-                applyStatus(menu.row.state === "skipped" ? null : "skipped")
-              }
-            >
-              {t(
-                menu.row.state === "skipped"
-                  ? "today.unskip"
-                  : "checkin.skipped",
-              )}
-            </MenuItem>
-            <MenuItem
-              className="h-6 px-1.5 text-[11px]"
-              onClick={() => applyStatus(null)}
-            >
-              {t("widget.menu.clear")}
-            </MenuItem>
+            {menu.kind === "task" ? (
+              <>
+                <MenuSeparator />
+                <MenuItem
+                  className="h-6 px-1.5 text-[11px]"
+                  onClick={() => applyStatus("done")}
+                >
+                  {t("checkin.done")}
+                </MenuItem>
+                <MenuItem
+                  className="h-6 px-1.5 text-[11px]"
+                  onClick={() => applyStatus("missed")}
+                >
+                  {t("checkin.missed")}
+                </MenuItem>
+                <MenuItem
+                  className="h-6 px-1.5 text-[11px]"
+                  onClick={() =>
+                    applyStatus(menu.row.state === "skipped" ? null : "skipped")
+                  }
+                >
+                  {t(
+                    menu.row.state === "skipped"
+                      ? "today.unskip"
+                      : "checkin.skipped",
+                  )}
+                </MenuItem>
+                <MenuItem
+                  className="h-6 px-1.5 text-[11px]"
+                  onClick={() => applyStatus(null)}
+                >
+                  {t("widget.menu.clear")}
+                </MenuItem>
+              </>
+            ) : null}
           </MenuSurface>
         </>
       ) : null}
+      <CopyToast
+        message={copyMessage}
+        error={copyError}
+        placement="widget"
+      />
     </div>
   );
 }
@@ -895,9 +954,11 @@ function WidgetTaskRow({
 function WidgetTodoRow({
   item,
   onToggle,
+  onMenu,
 }: {
   item: DueTodoItem;
   onToggle: () => void;
+  onMenu: (event: ReactMouseEvent) => void;
 }) {
   const t = useT();
   const { todo, overdueDays } = item;
@@ -913,6 +974,7 @@ function WidgetTodoRow({
         title: todo.title,
       })}
       onClick={onToggle}
+      onContextMenu={onMenu}
       className="flex min-h-[26px] w-full items-center gap-1.5 rounded-[5px] px-1 py-0.5 text-left text-[11.5px] hover:bg-[var(--state-hover)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
     >
       <span

@@ -1,5 +1,10 @@
 import { format, parseISO } from "date-fns";
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 
 import { nextCellState } from "../../../domain/settle";
 import { useCheckinsStore } from "../../../stores/checkinsStore";
@@ -13,12 +18,24 @@ import {
 import { useTodosStore } from "../../../stores/todosStore";
 import { CheckCell } from "../../../ui/CheckCell";
 import { Chip } from "../../../ui/Chip";
+import { CopyToast } from "../../../ui/CopyToast";
+import { MenuHeading, MenuItem, MenuSurface } from "../../../ui/MenuSurface";
 import { ProgressRing } from "../../../ui/ProgressRing";
 import { typeColorVar, typeDisplayName } from "../../../ui/taskType";
+import { useCopyFeedback } from "../../../ui/useCopyFeedback";
 import { useT } from "../../../ui/useT";
 
 const CARD =
   "rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-card)]";
+const MENU_WIDTH = 208;
+const MENU_HEIGHT = 96;
+
+type TodayMenu = {
+  kind: "task" | "todo";
+  name: string;
+  x: number;
+  y: number;
+};
 
 export default function Today() {
   const t = useT();
@@ -27,7 +44,53 @@ export default function Today() {
   const setValue = useCheckinsStore((state) => state.setValue);
   const setTodoDone = useTodosStore((state) => state.setDone);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  const [menu, setMenu] = useState<TodayMenu | null>(null);
+  const { message: copyMessage, error: copyError, copy } = useCopyFeedback();
   const dueTodosCollapsed = collapsed.has("__todos");
+
+  const openMenu = (
+    kind: TodayMenu["kind"],
+    name: string,
+    event: ReactMouseEvent,
+  ) => {
+    event.preventDefault();
+    setMenu({
+      kind,
+      name,
+      x: Math.min(event.clientX, Math.max(8, window.innerWidth - MENU_WIDTH - 8)),
+      y: Math.min(
+        event.clientY,
+        Math.max(8, window.innerHeight - MENU_HEIGHT - 8),
+      ),
+    });
+  };
+
+  const copyMenuName = () => {
+    if (!menu) {
+      return;
+    }
+    const name = menu.name;
+    setMenu(null);
+    void copy(name);
+  };
+
+  useEffect(() => {
+    if (!menu) {
+      return;
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenu(null);
+      }
+    };
+    const onScroll = () => setMenu(null);
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", onScroll, true);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onScroll, true);
+    };
+  }, [menu]);
 
   const toggleSection = (key: string) => {
     setCollapsed((current) => {
@@ -134,6 +197,7 @@ export default function Today() {
               onToggleRow={toggle}
               onSkip={toggleSkip}
               onValue={saveValue}
+              onMenu={(row, event) => openMenu("task", row.task.name, event)}
             />
           ))
         )}
@@ -174,6 +238,7 @@ export default function Today() {
                   key={item.todo.id}
                   item={item}
                   onToggle={() => toggleTodo(item)}
+                  onMenu={(event) => openMenu("todo", item.todo.title, event)}
                 />
               ))}
               {data.todayTodos.map((item) => (
@@ -181,6 +246,7 @@ export default function Today() {
                   key={item.todo.id}
                   item={item}
                   onToggle={() => toggleTodo(item)}
+                  onMenu={(event) => openMenu("todo", item.todo.title, event)}
                 />
               ))}
             </>
@@ -188,6 +254,30 @@ export default function Today() {
         </section>
       ) : null}
       </div>
+
+      {menu ? (
+        <>
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label={t("common.close")}
+            onClick={() => setMenu(null)}
+            className="fixed inset-0 z-40 cursor-default"
+          />
+          <MenuSurface
+            data-today-menu={menu.kind}
+            label={t(menu.kind === "task" ? "today.menu.task" : "todos.menu")}
+            style={{ left: menu.x, top: menu.y }}
+            className="fixed w-[208px]"
+          >
+            <MenuHeading wrap onClose={() => setMenu(null)}>
+              {menu.name}
+            </MenuHeading>
+            <MenuItem onClick={copyMenuName}>{t("common.copyName")}</MenuItem>
+          </MenuSurface>
+        </>
+      ) : null}
+      <CopyToast message={copyMessage} error={copyError} />
     </>
   );
 }
@@ -196,9 +286,11 @@ export default function Today() {
 function DueTodoRow({
   item,
   onToggle,
+  onMenu,
 }: {
   item: DueTodoItem;
   onToggle: () => void;
+  onMenu: (event: ReactMouseEvent) => void;
 }) {
   const t = useT();
   const { todo, overdueDays } = item;
@@ -216,6 +308,7 @@ function DueTodoRow({
         title: todo.title,
       })}
       onClick={onToggle}
+      onContextMenu={onMenu}
       className={`relative flex min-h-[34px] w-full items-center gap-3 rounded-[var(--radius-control)] px-2 py-1 text-left hover:bg-[var(--state-hover)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] ${
         overdue
           ? "pl-5 before:absolute before:bottom-1.5 before:left-0 before:top-1.5 before:w-[3px] before:rounded-[2px] before:bg-[var(--color-missed)]"
@@ -289,6 +382,7 @@ function TaskGroup({
   onToggleRow,
   onSkip,
   onValue,
+  onMenu,
 }: {
   group: TodayTypeGroup;
   title: string;
@@ -299,6 +393,7 @@ function TaskGroup({
   onToggleRow: (row: TodayTask) => void;
   onSkip: (row: TodayTask) => void;
   onValue: (row: TodayTask, value: string) => void;
+  onMenu: (row: TodayTask, event: ReactMouseEvent) => void;
 }) {
   const t = useT();
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -349,6 +444,7 @@ function TaskGroup({
               tabIndex={0}
               data-status={row.state}
               onClick={() => onToggleRow(row)}
+              onContextMenu={(event) => onMenu(row, event)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();

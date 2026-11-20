@@ -42,6 +42,7 @@ export const en: Messages = {
   "today.unskip": "Undo",
   "today.addValue": "+ value",
   "today.editValue": "Record value",
+  "today.menu.task": "Task actions",
 
   "deadline.inDays": "{days} days left",
   "deadline.today": "Due today",
@@ -275,6 +276,10 @@ export const en: Messages = {
   "common.deleteTitle": "Delete \"{name}\"",
   "common.deleteHint": "This cannot be undone.",
   "common.deleteFailed": "Delete failed. Please try again.",
+  "common.copyName": "Copy name",
+  "common.copied": "Copied",
+  "common.copyFailed": "Copy failed",
+  "common.closeMenu": "Close menu",
 
   "date.placeholder": "yyyy/mm/dd",
   "date.calendar": "Choose date",

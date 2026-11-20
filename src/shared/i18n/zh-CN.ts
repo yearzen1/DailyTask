@@ -43,6 +43,7 @@ export const zhCN = {
   "today.unskip": "取消",
   "today.addValue": "＋值",
   "today.editValue": "记录值",
+  "today.menu.task": "任务操作",
 
   "deadline.inDays": "还差 {days} 天",
   "deadline.today": "今天截止",
@@ -276,6 +277,10 @@ export const zhCN = {
   "common.deleteTitle": "删除「{name}」",
   "common.deleteHint": "删除后不可恢复。",
   "common.deleteFailed": "删除失败，请重试。",
+  "common.copyName": "复制名字",
+  "common.copied": "已复制",
+  "common.copyFailed": "复制失败",
+  "common.closeMenu": "关闭菜单",
 
   "date.placeholder": "yyyy/mm/dd",
   "date.calendar": "选择日期",

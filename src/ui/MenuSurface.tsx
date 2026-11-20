@@ -5,6 +5,8 @@ import type {
   ReactNode,
 } from "react";
 
+import { useT } from "./useT";
+
 /**
  * 应用内浮层菜单的统一外壳：待办右键、挂件任务菜单共用。
  * 胶囊右键走系统原生菜单，不在这里。
@@ -38,21 +40,38 @@ export function MenuHeading({
   children,
   className,
   wrap = false,
+  onClose,
 }: {
   children: ReactNode;
   className?: string;
   wrap?: boolean;
+  onClose?: () => void;
 }) {
+  const t = useT();
+
   return (
-    <p
-      className={clsx(
-        "m-0 px-1 pb-1 text-[11px] text-[var(--color-text-muted)]",
-        wrap ? "wrap-anywhere" : "truncate",
-        className,
-      )}
-    >
-      {children}
-    </p>
+    <div className="flex items-start gap-1 px-1 pb-1">
+      <p
+        className={clsx(
+          "m-0 min-w-0 flex-1 text-[11px] text-[var(--color-text-muted)]",
+          wrap ? "wrap-anywhere" : "truncate",
+          className,
+        )}
+      >
+        {children}
+      </p>
+      {onClose ? (
+        <button
+          type="button"
+          data-menu-close
+          aria-label={t("common.closeMenu")}
+          onClick={onClose}
+          className="grid size-5 shrink-0 place-items-center rounded-[4px] text-xs leading-none text-[var(--color-text-tertiary)] hover:bg-[var(--state-active)] hover:text-[var(--color-text)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
+        >
+          ✕
+        </button>
+      ) : null}
+    </div>
   );
 }
 

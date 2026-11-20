@@ -182,7 +182,9 @@ export default function Todos() {
             style={{ left: menu.x, top: menu.y }}
             className="fixed w-[216px]"
           >
-            <MenuHeading>{menu.todo.title}</MenuHeading>
+            <MenuHeading onClose={() => setMenu(null)}>
+              {menu.todo.title}
+            </MenuHeading>
             <label className="flex items-center gap-1.5 px-1 text-[11px] text-[var(--color-text-muted)]">
               {t("todos.menu.date")}
               <DateField
