@@ -76,14 +76,23 @@
 
 菜单窗口只读挂件传来的 payload（文案、当前状态、落点信息），不打开数据库、不初始化 i18n；样式复用 `MenuSurface` / `MenuItem`，投影用 `--shadow-float`。
 
-**生命周期（决定弹出速度）**：
+**生命周期（速度 / 内存的一对权衡）**：
 
-1. 挂件挂载 1.2s 后调用 `ensure_widget_menu`：建一个 `visible:false` 的窗口把 WebView 跑热。
-2. 每次右键只写入新 payload 并 `emit widget-menu:open`，菜单窗口重渲染 → 量尺寸 → `place_widget_menu` 一次性 `set_size` / `set_position` / `show` / `set_focus`。
-3. 关闭走 `hide`，窗口常驻复用；只有挂件销毁或隐藏挂件时才 `destroy`。
+1. **展开态预热**：挂件挂载且为展开态时等 1.2s，或从胶囊展开时立刻调用 `ensure_widget_menu`，建一个 `visible:false` 的窗口把 WebView 跑热。
+2. 每次右键只写入新 payload 并 `emit widget-menu:open`，菜单重渲染 → 同步量尺寸 → `place_widget_menu` 一次性 `set_size` / `set_position` / `show` / `set_focus`。
+3. 关闭走 `hide` 复用；**收起成胶囊、5 分钟没有右键、或挂件销毁时 `destroy`**，把那一个渲染进程还给系统。
 4. 换显示器时先在隐藏状态把窗口挪到挂件所在显示器，保证 DPI 与尺寸换算一致。
 
-实测（开发构建、200% 缩放，右键到菜单窗口可见）：每次重建 WebView 约 **410ms**；预热复用后中位数 **39ms**（区间 24–51ms），重建后的第一次约 120ms。
+实测（开发构建、200% 缩放，右键到菜单窗口可见）：
+
+| 场景 | 耗时 |
+|---|---|
+| 冷启动，每次重建 WebView | 410 ms |
+| 预热后热打开 | **25 ms**（20–29 ms） |
+| 刚预热后的第一次 | 126 ms |
+| 闲置回收后第一次（重新建窗） | ~410 ms |
+
+内存（开发构建，含 DevTools）：胶囊态 3 个 WebView 渲染进程；展开并预热后 4 个，约 **+100 MB 私有提交**，收起胶囊即归还。
 
 ## 3. 托盘
 

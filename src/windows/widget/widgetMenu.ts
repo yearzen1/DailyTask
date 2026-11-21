@@ -103,6 +103,11 @@ export async function ensureWidgetMenu(): Promise<void> {
   await invoke("ensure_widget_menu");
 }
 
+/** 收起胶囊或闲置时直接销毁菜单窗口，回收它的渲染进程。 */
+export async function destroyWidgetMenu(): Promise<void> {
+  await invoke("destroy_widget_menu");
+}
+
 function menuRequestId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }

@@ -529,6 +529,71 @@ describe("Widget", () => {
     expect(invokeMock).toHaveBeenCalledWith("ensure_widget_menu");
   });
 
+  it("keeps the capsule free of a resident menu window", async () => {
+    localStorage.setItem(CAPSULE_STORAGE_KEY, "1");
+    render(<Widget />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+
+    expect(invokeMock).not.toHaveBeenCalledWith("ensure_widget_menu");
+    expect(invokeMock).toHaveBeenCalledWith("destroy_widget_menu");
+  });
+
+  it("prewarms on expand and destroys the menu window on collapse", async () => {
+    localStorage.setItem(CAPSULE_STORAGE_KEY, "1");
+    render(<Widget />);
+    await act(async () => undefined);
+    invokeMock.mockClear();
+
+    fireEvent.click(screen.getByRole("button", { name: /展开挂件/ }));
+    await act(async () => undefined);
+    expect(invokeMock).toHaveBeenCalledWith("ensure_widget_menu");
+
+    fireEvent.click(screen.getByRole("button", { name: "收起挂件" }));
+    await act(async () => undefined);
+    expect(invokeMock).toHaveBeenCalledWith("destroy_widget_menu");
+  });
+
+  it("recycles the menu window after five idle minutes", async () => {
+    render(<Widget />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1300);
+    });
+    invokeMock.mockClear();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+    });
+
+    expect(invokeMock).toHaveBeenCalledWith("destroy_widget_menu");
+  });
+
+  it("restarts the idle countdown every time the menu opens", async () => {
+    render(<Widget />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1300);
+    });
+
+    await act(async () => {
+      fireEvent.contextMenu(
+        screen.getByRole("button", { name: "切换 跑步 状态" }),
+      );
+    });
+    invokeMock.mockClear();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4 * 60 * 1000);
+    });
+    expect(invokeMock).not.toHaveBeenCalledWith("destroy_widget_menu");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(61 * 1000);
+    });
+    expect(invokeMock).toHaveBeenCalledWith("destroy_widget_menu");
+  });
+
   it("opens the separate menu window for tasks and todos", async () => {
     render(<Widget />);
     await act(async () => undefined);

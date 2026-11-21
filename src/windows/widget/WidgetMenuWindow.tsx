@@ -93,7 +93,7 @@ export function WidgetMenuWindow() {
     let frame = 0;
     let attempts = 0;
 
-    // 窗口复用后内容高度会变，每次打开都重新量；首帧排不出来时再等两帧。
+    // 窗口复用后内容高度会变，每次打开都重新量；先同步量一次，排不出来再等帧。
     const measure = () => {
       const node = card.current;
       if (!node || placedFor.current !== requestId) {
@@ -125,7 +125,7 @@ export function WidgetMenuWindow() {
       });
     };
 
-    frame = window.requestAnimationFrame(measure);
+    measure();
     return () => window.cancelAnimationFrame(frame);
   }, [payload]);
 

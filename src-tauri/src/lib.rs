@@ -371,6 +371,14 @@ fn close_widget_menu(app: AppHandle, state: tauri::State<'_, WidgetMenuState>) {
     }
 }
 
+/// 收起胶囊 / 闲置回收：直接销毁菜单窗口，把那一个渲染进程还给系统。
+#[tauri::command]
+fn destroy_widget_menu(app: AppHandle, state: tauri::State<'_, WidgetMenuState>) {
+    state.shown.store(false, Ordering::SeqCst);
+    state.focused.store(false, Ordering::SeqCst);
+    destroy_window(&app, WIDGET_MENU_WINDOW);
+}
+
 /// 菜单点完一项：先把动作转发给挂件窗口，再销毁菜单窗口。
 #[tauri::command]
 fn widget_menu_action(
@@ -597,6 +605,7 @@ pub fn run() {
             place_widget_menu,
             read_widget_menu,
             close_widget_menu,
+            destroy_widget_menu,
             widget_menu_action
         ])
         // 主窗关闭后销毁较大的主 WebView，但保留（或重建）桌面挂件。

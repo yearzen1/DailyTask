@@ -1,6 +1,7 @@
 import { PhysicalPosition, getCurrentWindow } from "@tauri-apps/api/window";
 import { format, parseISO } from "date-fns";
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -36,11 +37,19 @@ import {
   writeSidePreference,
   type WidgetSide,
 } from "./capsule";
-import { closeWidgetMenu, ensureWidgetMenu, openWidgetMenu } from "./widgetMenu";
+import {
+  closeWidgetMenu,
+  destroyWidgetMenu,
+  ensureWidgetMenu,
+  openWidgetMenu,
+} from "./widgetMenu";
 
 const RING_RADIUS = 17;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 const TODOS_GROUP_KEY = "__todos";
+/** 展开后等启动稳定再预热；闲置超过这个时间就把菜单窗口还给系统。 */
+const MENU_PREWARM_MS = 1200;
+const MENU_IDLE_MS = 5 * 60 * 1000;
 
 /**
  * 展开态与「今日」页内容一致：日期、完成率、自愿/被迫分项、全部任务、全部到期待办。
@@ -70,6 +79,40 @@ export function Widget() {
   notifyRef.current = notify;
   const setStatusRef = useRef(setStatus);
   setStatusRef.current = setStatus;
+  const menuIdle = useRef<number | null>(null);
+
+  const clearMenuIdle = useCallback(() => {
+    if (menuIdle.current !== null) {
+      window.clearTimeout(menuIdle.current);
+      menuIdle.current = null;
+    }
+  }, []);
+
+  const recycleMenu = useCallback(() => {
+    clearMenuIdle();
+    void destroyWidgetMenu().catch((error: unknown) => {
+      console.error("[widget] 回收菜单窗口失败", error);
+    });
+  }, [clearMenuIdle]);
+
+  /** 每次打开菜单都重新计时；长时间不右键就销毁窗口，不占那一个渲染进程。 */
+  const armMenuIdle = useCallback(() => {
+    clearMenuIdle();
+    menuIdle.current = window.setTimeout(() => {
+      menuIdle.current = null;
+      recycleMenu();
+    }, MENU_IDLE_MS);
+  }, [clearMenuIdle, recycleMenu]);
+
+  const prewarmMenu = useCallback(() => {
+    void ensureWidgetMenu()
+      .then(() => {
+        armMenuIdle();
+      })
+      .catch((error: unknown) => {
+        console.error("[widget] 预热菜单窗口失败", error);
+      });
+  }, [armMenuIdle]);
 
   useEffect(() => {
     void getCurrentWindow().setAlwaysOnTop(alwaysOnTop).catch((error: unknown) => {
@@ -93,15 +136,30 @@ export function Widget() {
     }
   }, []);
 
-  // 预热菜单窗口：把建 WebView 的几百毫秒挪到用户第一次右键之前。
+  // 展开态才预热；胶囊态不常驻菜单窗口。
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void ensureWidgetMenu().catch((error: unknown) => {
-        console.error("[widget] 预热菜单窗口失败", error);
-      });
-    }, 1200);
+    if (initialCollapsed.current) {
+      return;
+    }
+    const timer = window.setTimeout(prewarmMenu, MENU_PREWARM_MS);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [prewarmMenu]);
+
+  // 收起成胶囊或卸载时销毁菜单窗口，把那一个渲染进程还给系统。
+  useEffect(() => {
+    if (!collapsed) {
+      return;
+    }
+    recycleMenu();
+  }, [collapsed, recycleMenu]);
+
+  useEffect(
+    () => () => {
+      clearMenuIdle();
+      void destroyWidgetMenu().catch(() => undefined);
+    },
+    [clearMenuIdle],
+  );
 
   const toggleGroup = (key: string) => {
     setCollapsedGroups((current) => {
@@ -118,7 +176,12 @@ export function Widget() {
   const setCapsule = (next: boolean) => {
     writeCollapsedPreference(next);
     setCollapsed(next);
-    void closeWidgetMenu().catch(() => undefined);
+    if (next) {
+      // 先立刻收起菜单，随后的 collapsed effect 会销毁窗口。
+      void closeWidgetMenu().catch(() => undefined);
+    } else {
+      prewarmMenu();
+    }
     // 不记住分组折叠：每次从胶囊展开都回到全展开。
     setCollapsedGroups(new Set());
     void applyWidgetLayout(next, next ? undefined : side)
@@ -205,9 +268,13 @@ export function Widget() {
       theme,
       clientX: event.clientX,
       clientY: event.clientY,
-    }).catch((error: unknown) => {
-      console.error("[widget] 打开任务菜单失败", error);
-    });
+    })
+      .then(() => {
+        armMenuIdle();
+      })
+      .catch((error: unknown) => {
+        console.error("[widget] 打开任务菜单失败", error);
+      });
   };
 
   const openTodoMenu = (item: DueTodoItem, event: ReactMouseEvent) => {
@@ -220,9 +287,13 @@ export function Widget() {
       theme,
       clientX: event.clientX,
       clientY: event.clientY,
-    }).catch((error: unknown) => {
-      console.error("[widget] 打开待办菜单失败", error);
-    });
+    })
+      .then(() => {
+        armMenuIdle();
+      })
+      .catch((error: unknown) => {
+        console.error("[widget] 打开待办菜单失败", error);
+      });
   };
 
   // 菜单在独立窗口里：点完一项由 Rust 转发回来，这里只负责落库和提示。

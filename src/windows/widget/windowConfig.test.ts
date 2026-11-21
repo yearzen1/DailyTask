@@ -92,6 +92,7 @@ describe("widget window config", () => {
     // 窗口只建一次：预热时隐藏，之后复用并推送新数据。
     expect(rust).toContain(".visible(false)");
     expect(rust).toContain("fn ensure_widget_menu");
+    expect(rust).toContain("fn destroy_widget_menu");
     expect(rust).toContain("WIDGET_MENU_OPEN_EVENT");
   });
 });
