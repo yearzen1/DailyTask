@@ -71,10 +71,19 @@
 | 层级 | `alwaysOnTop`、`skipTaskbar`；打开后显示并聚焦 |
 | 落点 | 挂件右侧 8px → 左侧 8px → 光标右下 2px；纵向对齐被点行，下方不够就向上翻；最后夹进当前显示器工作区并留 8px |
 | 宽度 | 196px；标题最多 2 行，超出省略，`title` 保留全文 |
-| 关闭 | 失焦、`Esc`、`×`、点任一项、挂件滚动、挂件收起 / 销毁 |
+| 关闭 | 失焦、`Esc`、`×`、点任一项、点挂件、挂件滚动、挂件收起 / 销毁 |
 | 动作 | 复制在菜单窗口内完成；状态动作经 `widget:menu-action` 回传挂件写库 |
 
 菜单窗口只读挂件传来的 payload（文案、当前状态、落点信息），不打开数据库、不初始化 i18n；样式复用 `MenuSurface` / `MenuItem`，投影用 `--shadow-float`。
+
+**生命周期（决定弹出速度）**：
+
+1. 挂件挂载 1.2s 后调用 `ensure_widget_menu`：建一个 `visible:false` 的窗口把 WebView 跑热。
+2. 每次右键只写入新 payload 并 `emit widget-menu:open`，菜单窗口重渲染 → 量尺寸 → `place_widget_menu` 一次性 `set_size` / `set_position` / `show` / `set_focus`。
+3. 关闭走 `hide`，窗口常驻复用；只有挂件销毁或隐藏挂件时才 `destroy`。
+4. 换显示器时先在隐藏状态把窗口挪到挂件所在显示器，保证 DPI 与尺寸换算一致。
+
+实测（开发构建、200% 缩放，右键到菜单窗口可见）：每次重建 WebView 约 **410ms**；预热复用后中位数 **39ms**（区间 24–51ms），重建后的第一次约 120ms。
 
 ## 3. 托盘
 
@@ -122,6 +131,7 @@ export const Events = {
 | `settingsChanged` | `{ source }` | 主窗 | 挂件 |
 | `widgetExpand` | `{ source }` | 挂件 | 主窗 |
 | `widgetMenuAction` | `{ kind, id, action, status?, copied? }` | 菜单窗口（经 Rust） | 挂件 |
+| `widgetMenuOpen` | 菜单 payload | Rust | 菜单窗口 |
 
 规则：
 

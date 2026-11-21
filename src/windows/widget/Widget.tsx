@@ -36,7 +36,7 @@ import {
   writeSidePreference,
   type WidgetSide,
 } from "./capsule";
-import { closeWidgetMenu, openWidgetMenu } from "./widgetMenu";
+import { closeWidgetMenu, ensureWidgetMenu, openWidgetMenu } from "./widgetMenu";
 
 const RING_RADIUS = 17;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
@@ -91,6 +91,16 @@ export function Widget() {
         },
       );
     }
+  }, []);
+
+  // 预热菜单窗口：把建 WebView 的几百毫秒挪到用户第一次右键之前。
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void ensureWidgetMenu().catch((error: unknown) => {
+        console.error("[widget] 预热菜单窗口失败", error);
+      });
+    }, 1200);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const toggleGroup = (key: string) => {

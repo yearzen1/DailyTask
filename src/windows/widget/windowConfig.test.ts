@@ -89,6 +89,9 @@ describe("widget window config", () => {
     expect(rust).toContain(".transparent(true)");
     expect(rust).toContain(".always_on_top(true)");
     expect(rust).toContain(".skip_taskbar(true)");
-    expect(rust).toContain('WebviewUrl::App("index.html?window=widget-menu".into())');
+    // 窗口只建一次：预热时隐藏，之后复用并推送新数据。
+    expect(rust).toContain(".visible(false)");
+    expect(rust).toContain("fn ensure_widget_menu");
+    expect(rust).toContain("WIDGET_MENU_OPEN_EVENT");
   });
 });

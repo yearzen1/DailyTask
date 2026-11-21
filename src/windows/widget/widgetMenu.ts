@@ -24,6 +24,7 @@ export interface WidgetMenuLabels {
 
 /** 从挂件窗口交给菜单窗口的完整数据，菜单不读库、不初始化 i18n。 */
 export interface WidgetMenuPayload {
+  requestId: string;
   kind: WidgetMenuKind;
   id: string;
   name: string;
@@ -75,6 +76,7 @@ export async function openWidgetMenu(
 
   await invoke("open_widget_menu", {
     payload: {
+      requestId: menuRequestId(),
       kind: request.kind,
       id: request.id,
       name: request.name,
@@ -94,6 +96,15 @@ export async function openWidgetMenu(
 
 export async function closeWidgetMenu(): Promise<void> {
   await invoke("close_widget_menu");
+}
+
+/** 预建隐藏的菜单窗口，把建 WebView 的时间挪到第一次右键之前。 */
+export async function ensureWidgetMenu(): Promise<void> {
+  await invoke("ensure_widget_menu");
+}
+
+function menuRequestId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 export async function sendWidgetMenuAction(action: {

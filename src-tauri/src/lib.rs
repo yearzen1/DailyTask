@@ -22,6 +22,7 @@ const WIDGET_WINDOW: &str = "widget";
 const WIDGET_MENU_WINDOW: &str = "widget-menu";
 const WIDGET_EXPAND_EVENT: &str = "widget:expand";
 const WIDGET_MENU_ACTION_EVENT: &str = "widget:menu-action";
+const WIDGET_MENU_OPEN_EVENT: &str = "widget-menu:open";
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -58,6 +59,7 @@ struct WidgetMenuLabels {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct WidgetMenuPayload {
+    request_id: String,
     kind: String,
     id: String,
     name: String,
@@ -245,29 +247,13 @@ fn hide_widget(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// 打开挂件右键菜单：建一个独立透明窗口承载菜单。
-/// 必须用 async：同步命令跑在主线程上，`build()` 会等主线程处理窗口创建而死锁。
-#[tauri::command]
-async fn open_widget_menu(
-    app: AppHandle,
-    state: tauri::State<'_, WidgetMenuState>,
-    payload: WidgetMenuPayload,
+/// 创建并预热菜单窗口：先隐藏着把 WebView 跑起来，之后右键只更新内容并重新定位。
+fn create_widget_menu_window(
+    app: &AppHandle,
+    position: Option<PhysicalPosition<i32>>,
 ) -> Result<(), String> {
-    destroy_window(&app, WIDGET_MENU_WINDOW);
-    state.shown.store(false, Ordering::SeqCst);
-    state.focused.store(false, Ordering::SeqCst);
-
-    let widget_position = app
-        .get_webview_window(WIDGET_WINDOW)
-        .and_then(|window| window.outer_position().ok());
-
-    *state
-        .payload
-        .lock()
-        .map_err(|_| "widget menu payload lock poisoned".to_string())? = Some(payload);
-
     let window = WebviewWindowBuilder::new(
-        &app,
+        app,
         WIDGET_MENU_WINDOW,
         WebviewUrl::App("index.html?window=widget-menu".into()),
     )
@@ -280,6 +266,7 @@ async fn open_widget_menu(
     .skip_taskbar(true)
     .shadow(false)
     .focused(true)
+    .visible(false)
     .build()
     .map_err(|error| {
         eprintln!("[widget-menu] build failed: {error}");
@@ -287,11 +274,56 @@ async fn open_widget_menu(
     })?;
 
     // 先落在挂件所在显示器上，保证 DPI 与挂件窗口一致。
-    if let Some(position) = widget_position {
+    if let Some(position) = position {
         let _ = window.set_position(position);
     }
 
     Ok(())
+}
+
+/// 预热：挂件挂载后调用一次，把建窗口的几百毫秒挪到用户右键之前。
+#[tauri::command]
+async fn ensure_widget_menu(app: AppHandle) -> Result<(), String> {
+    if app.get_webview_window(WIDGET_MENU_WINDOW).is_some() {
+        return Ok(());
+    }
+    let position = app
+        .get_webview_window(WIDGET_WINDOW)
+        .and_then(|window| window.outer_position().ok());
+    create_widget_menu_window(&app, position)
+}
+
+/// 打开挂件右键菜单：窗口已预热时只更新数据 + 重新定位，不再重建 WebView。
+/// 必须用 async：同步命令跑在主线程上，`build()` 会等主线程处理窗口创建而死锁。
+#[tauri::command]
+async fn open_widget_menu(
+    app: AppHandle,
+    state: tauri::State<'_, WidgetMenuState>,
+    payload: WidgetMenuPayload,
+) -> Result<(), String> {
+    let widget_position = app
+        .get_webview_window(WIDGET_WINDOW)
+        .and_then(|window| window.outer_position().ok());
+
+    *state
+        .payload
+        .lock()
+        .map_err(|_| "widget menu payload lock poisoned".to_string())? =
+        Some(payload.clone());
+    state.shown.store(false, Ordering::SeqCst);
+    state.focused.store(false, Ordering::SeqCst);
+
+    if let Some(window) = app.get_webview_window(WIDGET_MENU_WINDOW) {
+        // 隐藏状态下先挪回挂件所在显示器，混合 DPI 时菜单才不会被拉伸。
+        if let Some(position) = widget_position {
+            let _ = window.set_position(position);
+        }
+        app.emit_to(WIDGET_MENU_WINDOW, WIDGET_MENU_OPEN_EVENT, payload)
+            .map_err(|error| error.to_string())?;
+        return Ok(());
+    }
+
+    create_widget_menu_window(&app, widget_position)
 }
 
 /// 菜单窗口测完自身尺寸后回报物理像素矩形，这里只负责摆好并显示。
@@ -333,7 +365,10 @@ fn read_widget_menu(
 #[tauri::command]
 fn close_widget_menu(app: AppHandle, state: tauri::State<'_, WidgetMenuState>) {
     state.shown.store(false, Ordering::SeqCst);
-    destroy_window(&app, WIDGET_MENU_WINDOW);
+    state.focused.store(false, Ordering::SeqCst);
+    if let Some(window) = app.get_webview_window(WIDGET_MENU_WINDOW) {
+        let _ = window.hide();
+    }
 }
 
 /// 菜单点完一项：先把动作转发给挂件窗口，再销毁菜单窗口。
@@ -557,6 +592,7 @@ pub fn run() {
             set_tray_progress,
             set_tray_labels,
             hide_widget,
+            ensure_widget_menu,
             open_widget_menu,
             place_widget_menu,
             read_widget_menu,
@@ -578,7 +614,12 @@ pub fn run() {
                                 state.focused.swap(false, Ordering::SeqCst);
                             if state.shown.load(Ordering::SeqCst) && focused_before {
                                 state.shown.store(false, Ordering::SeqCst);
-                                destroy_window(window.app_handle(), WIDGET_MENU_WINDOW);
+                                if let Some(menu) = window
+                                    .app_handle()
+                                    .get_webview_window(WIDGET_MENU_WINDOW)
+                                {
+                                    let _ = menu.hide();
+                                }
                             }
                         }
                         _ => {}

@@ -519,6 +519,16 @@ describe("Widget", () => {
     expect(setStatus).toHaveBeenCalledWith("t4", TODAY, null);
   });
 
+  it("prewarms the menu window so the first right-click is fast", async () => {
+    render(<Widget />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1300);
+    });
+
+    expect(invokeMock).toHaveBeenCalledWith("ensure_widget_menu");
+  });
+
   it("opens the separate menu window for tasks and todos", async () => {
     render(<Widget />);
     await act(async () => undefined);

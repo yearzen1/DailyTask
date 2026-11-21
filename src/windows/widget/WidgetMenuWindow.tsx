@@ -1,7 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 import type { CheckinStatus } from "../../domain/types";
+import { onWidgetMenuOpen } from "../../shared/events";
 import { copyText } from "../../ui/clipboard";
 import { MenuItem, MenuSeparator } from "../../ui/MenuSurface";
 import { applyTheme } from "../../ui/theme";
@@ -26,37 +33,70 @@ const STATUS_ICON: Record<string, string> = {
 export function WidgetMenuWindow() {
   const [payload, setPayload] = useState<WidgetMenuPayload | null>(null);
   const card = useRef<HTMLDivElement>(null);
-  const placed = useRef(false);
+  const lastRequest = useRef<string | null>(null);
+  const placedFor = useRef<string | null>(null);
 
+  const applyPayload = useCallback((next: WidgetMenuPayload) => {
+    if (lastRequest.current === next.requestId) {
+      return;
+    }
+    lastRequest.current = next.requestId;
+    applyTheme(next.theme);
+    setPayload(next);
+  }, []);
+
+  // 首次打开走挂载读取；之后窗口复用，由 Rust 推 `widget-menu:open`。
   useEffect(() => {
-    let cancelled = false;
+    let active = true;
     void invoke<WidgetMenuPayload | null>("read_widget_menu")
       .then((next) => {
-        if (cancelled || !next) {
-          return;
+        if (active && next) {
+          applyPayload(next);
         }
-        applyTheme(next.theme);
-        setPayload(next);
       })
       .catch((error: unknown) => {
         console.error("[widget-menu] 读取菜单数据失败", error);
       });
     return () => {
-      cancelled = true;
+      active = false;
     };
-  }, []);
+  }, [applyPayload]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    void onWidgetMenuOpen((next) => {
+      applyPayload(next);
+    })
+      .then((fn) => {
+        if (cancelled) {
+          fn();
+          return;
+        }
+        unlisten = fn;
+      })
+      .catch((error: unknown) => {
+        console.error("[widget-menu] 监听打开事件失败", error);
+      });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, [applyPayload]);
 
   useLayoutEffect(() => {
-    if (!payload || placed.current || !card.current) {
+    if (!payload || placedFor.current === payload.requestId) {
       return;
     }
+    const requestId = payload.requestId;
+    placedFor.current = requestId;
     let frame = 0;
     let attempts = 0;
 
-    // 窗口先以 visible(false) 创建，极少数环境下首帧还排不出尺寸：等两帧再量。
+    // 窗口复用后内容高度会变，每次打开都重新量；首帧排不出来时再等两帧。
     const measure = () => {
       const node = card.current;
-      if (!node) {
+      if (!node || placedFor.current !== requestId) {
         return;
       }
       const rect = node.getBoundingClientRect();
@@ -65,7 +105,6 @@ export function WidgetMenuWindow() {
         frame = window.requestAnimationFrame(measure);
         return;
       }
-      placed.current = true;
       const placement = computeMenuPlacement({
         menu: {
           width: rect.width >= 40 ? rect.width : 196,

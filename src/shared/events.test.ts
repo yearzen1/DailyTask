@@ -78,6 +78,7 @@ describe("events", () => {
       "settings:changed",
       "widget:expand",
       "widget:menu-action",
+      "widget-menu:open",
     ]);
   });
 

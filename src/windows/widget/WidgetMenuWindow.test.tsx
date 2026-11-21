@@ -5,6 +5,7 @@ import { WidgetMenuWindow } from "./WidgetMenuWindow";
 
 const holder = vi.hoisted(() => ({
   payload: null as unknown,
+  openHandler: null as null | ((payload: unknown) => void),
 }));
 
 const invokeMock = vi.hoisted(() =>
@@ -18,7 +19,15 @@ const invokeMock = vi.hoisted(() =>
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
 
+vi.mock("../../shared/events", () => ({
+  onWidgetMenuOpen: vi.fn(async (handler: (payload: unknown) => void) => {
+    holder.openHandler = handler;
+    return () => undefined;
+  }),
+}));
+
 const PAYLOAD = {
+  requestId: "req-1",
   kind: "task",
   id: "t1",
   name: "跑步",
@@ -50,6 +59,7 @@ let rectSpy: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
   holder.payload = PAYLOAD;
+  holder.openHandler = null;
   invokeMock.mockClear();
   document.documentElement.dataset.theme = "light";
   rectSpy = vi
@@ -97,6 +107,34 @@ describe("WidgetMenuWindow", () => {
         width: 196 + 24,
         height: 220 + 24,
       }),
+    );
+  });
+
+  it("re-renders and re-places when a reused window gets a new open payload", async () => {
+    await renderMenu();
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith(
+        "place_widget_menu",
+        expect.anything(),
+      ),
+    );
+    invokeMock.mockClear();
+
+    await act(async () => {
+      holder.openHandler?.({
+        ...PAYLOAD,
+        requestId: "req-2",
+        id: "t2",
+        name: "开会",
+      });
+    });
+
+    expect(await screen.findByText("开会")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith(
+        "place_widget_menu",
+        expect.objectContaining({ width: 220, height: 244 }),
+      ),
     );
   });
 

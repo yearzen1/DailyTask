@@ -2,6 +2,7 @@ import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import type { CheckinStatus } from "../domain/types";
+import type { WidgetMenuPayload } from "../windows/widget/widgetMenu";
 
 /**
  * 全项目唯一允许 import @tauri-apps/api/event 的文件。
@@ -15,6 +16,7 @@ export const Events = {
   settingsChanged: "settings:changed",
   widgetExpand: "widget:expand",
   widgetMenuAction: "widget:menu-action",
+  widgetMenuOpen: "widget-menu:open",
 } as const;
 
 export type EventSource = "main" | "widget";
@@ -140,6 +142,15 @@ export function onWidgetMenuAction(
   handler: (payload: WidgetMenuAction) => void,
 ): Promise<UnlistenFn> {
   return listen<WidgetMenuAction>(Events.widgetMenuAction, (event) => {
+    handler(event.payload);
+  });
+}
+
+/** 菜单窗口复用后，每次打开由 Rust 把新数据推过去。 */
+export function onWidgetMenuOpen(
+  handler: (payload: WidgetMenuPayload) => void,
+): Promise<UnlistenFn> {
+  return listen<WidgetMenuPayload>(Events.widgetMenuOpen, (event) => {
     handler(event.payload);
   });
 }
