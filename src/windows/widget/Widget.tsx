@@ -10,8 +10,8 @@ import {
 } from "react";
 
 import { nextCellState } from "../../domain/settle";
-import type { CellState, CheckinStatus } from "../../domain/types";
-import { emitWidgetExpand } from "../../shared/events";
+import type { CellState } from "../../domain/types";
+import { emitWidgetExpand, onWidgetMenuAction } from "../../shared/events";
 import { useCheckinsStore } from "../../stores/checkinsStore";
 import {
   useTodayData,
@@ -23,12 +23,6 @@ import {
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useTodosStore } from "../../stores/todosStore";
 import { CopyToast } from "../../ui/CopyToast";
-import {
-  MenuHeading,
-  MenuItem,
-  MenuSeparator,
-  MenuSurface,
-} from "../../ui/MenuSurface";
 import { typeColorVar, typeDisplayName } from "../../ui/taskType";
 import { applyTheme } from "../../ui/theme";
 import { useCopyFeedback } from "../../ui/useCopyFeedback";
@@ -42,17 +36,11 @@ import {
   writeSidePreference,
   type WidgetSide,
 } from "./capsule";
+import { closeWidgetMenu, openWidgetMenu } from "./widgetMenu";
 
 const RING_RADIUS = 17;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 const TODOS_GROUP_KEY = "__todos";
-const MENU_WIDTH = 184;
-const TASK_MENU_HEIGHT = 204;
-const TODO_MENU_HEIGHT = 72;
-
-type WidgetMenu =
-  | { kind: "task"; row: TodayTask; x: number; y: number }
-  | { kind: "todo"; item: DueTodoItem; x: number; y: number };
 
 /**
  * 展开态与「今日」页内容一致：日期、完成率、自愿/被迫分项、全部任务、全部到期待办。
@@ -72,10 +60,16 @@ export function Widget() {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
     () => new Set(),
   );
-  const [menu, setMenu] = useState<WidgetMenu | null>(null);
-  const { message: copyMessage, error: copyError, copy } = useCopyFeedback();
+  const { message: copyMessage, error: copyError, notify } = useCopyFeedback();
   const initialCollapsed = useRef(collapsed);
   const initialSide = useRef(side);
+  const today = data.today;
+  const todayRef = useRef(today);
+  todayRef.current = today;
+  const notifyRef = useRef(notify);
+  notifyRef.current = notify;
+  const setStatusRef = useRef(setStatus);
+  setStatusRef.current = setStatus;
 
   useEffect(() => {
     void getCurrentWindow().setAlwaysOnTop(alwaysOnTop).catch((error: unknown) => {
@@ -100,7 +94,6 @@ export function Widget() {
   }, []);
 
   const toggleGroup = (key: string) => {
-    setMenu(null);
     setCollapsedGroups((current) => {
       const next = new Set(current);
       if (next.has(key)) {
@@ -115,6 +108,7 @@ export function Widget() {
   const setCapsule = (next: boolean) => {
     writeCollapsedPreference(next);
     setCollapsed(next);
+    void closeWidgetMenu().catch(() => undefined);
     // 不记住分组折叠：每次从胶囊展开都回到全展开。
     setCollapsedGroups(new Set());
     void applyWidgetLayout(next, next ? undefined : side)
@@ -193,75 +187,86 @@ export function Widget() {
 
   const openTaskMenu = (row: TodayTask, event: ReactMouseEvent) => {
     event.preventDefault();
-    setMenu({
+    void openWidgetMenu({
       kind: "task",
-      row,
-      x: Math.min(
-        event.clientX,
-        Math.max(8, window.innerWidth - MENU_WIDTH - 8),
-      ),
-      y: Math.min(
-        event.clientY,
-        Math.max(8, window.innerHeight - TASK_MENU_HEIGHT - 8),
-      ),
+      id: row.task.id,
+      name: row.task.name,
+      state: row.state,
+      theme,
+      clientX: event.clientX,
+      clientY: event.clientY,
+    }).catch((error: unknown) => {
+      console.error("[widget] 打开任务菜单失败", error);
     });
   };
 
   const openTodoMenu = (item: DueTodoItem, event: ReactMouseEvent) => {
     event.preventDefault();
-    setMenu({
+    void openWidgetMenu({
       kind: "todo",
-      item,
-      x: Math.min(
-        event.clientX,
-        Math.max(8, window.innerWidth - MENU_WIDTH - 8),
-      ),
-      y: Math.min(
-        event.clientY,
-        Math.max(8, window.innerHeight - TODO_MENU_HEIGHT - 8),
-      ),
+      id: item.todo.id,
+      name: item.todo.title,
+      state: "none",
+      theme,
+      clientX: event.clientX,
+      clientY: event.clientY,
+    }).catch((error: unknown) => {
+      console.error("[widget] 打开待办菜单失败", error);
     });
   };
 
-  const copyMenuName = () => {
-    if (!menu) {
-      return;
-    }
-    const name = menu.kind === "task" ? menu.row.task.name : menu.item.todo.title;
-    setMenu(null);
-    void copy(name);
-  };
-
-  const applyStatus = (status: CheckinStatus | null) => {
-    if (!menu || menu.kind !== "task") {
-      return;
-    }
-    const { row } = menu;
-    setMenu(null);
-    void setStatus(row.task.id, data.today, status).catch(
-      (error: unknown) => {
-        console.error("[widget] 更新任务状态失败", error);
-      },
-    );
-  };
-
+  // 菜单在独立窗口里：点完一项由 Rust 转发回来，这里只负责落库和提示。
   useEffect(() => {
-    if (!menu) {
-      return;
-    }
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setMenu(null);
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    void onWidgetMenuAction((action) => {
+      if (action.action === "copy") {
+        notifyRef.current(action.copied === true);
+        return;
       }
-    };
-    const onScroll = () => setMenu(null);
-    window.addEventListener("keydown", onKey);
-    window.addEventListener("scroll", onScroll, true);
+      if (action.kind === "task" && action.action === "status") {
+        void setStatusRef
+          .current(action.id, todayRef.current, action.status ?? null)
+          .catch((error: unknown) => {
+            console.error("[widget] 更新任务状态失败", error);
+          });
+      }
+    })
+      .then((fn) => {
+        if (cancelled) {
+          fn();
+          return;
+        }
+        unlisten = fn;
+      })
+      .catch((error: unknown) => {
+        console.error("[widget] 监听任务菜单失败", error);
+      });
     return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("scroll", onScroll, true);
+      cancelled = true;
+      unlisten?.();
     };
-  }, [menu]);
+  }, []);
+
+  // 挂件滚动或卸载时菜单就失效了：它画在窗口外，不会跟着内容一起动。
+  useEffect(() => {
+    const close = () => {
+      void closeWidgetMenu().catch(() => undefined);
+    };
+    const scroller = document.querySelector("[data-widget-scroll]");
+    scroller?.addEventListener("scroll", close, { passive: true });
+    window.addEventListener("scroll", close, true);
+    // 菜单拿不到前台焦点时收不到 blur，这里再兜一层：点挂件 / 按 Esc 都关。
+    window.addEventListener("pointerdown", close, true);
+    window.addEventListener("keydown", close);
+    return () => {
+      scroller?.removeEventListener("scroll", close);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("pointerdown", close, true);
+      window.removeEventListener("keydown", close);
+      close();
+    };
+  }, [collapsed]);
 
   if (collapsed) {
     return (
@@ -455,73 +460,6 @@ export function Widget() {
         </div>
       </section>
 
-      {menu ? (
-        <>
-          <button
-            type="button"
-            aria-label={t("common.close")}
-            tabIndex={-1}
-            onClick={() => setMenu(null)}
-            className="fixed inset-0 z-40 cursor-default"
-          />
-          <MenuSurface
-            data-widget-menu={menu.kind}
-            label={t(menu.kind === "task" ? "widget.menu" : "todos.menu")}
-            style={{ left: menu.x, top: menu.y }}
-            className="fixed flex w-[184px] flex-col gap-0.5"
-          >
-            <MenuHeading
-              className="text-[10px]"
-              wrap
-              onClose={() => setMenu(null)}
-            >
-              {menu.kind === "task" ? menu.row.task.name : menu.item.todo.title}
-            </MenuHeading>
-            <MenuItem
-              data-widget-copy
-              className="h-6 px-1.5 text-[11px]"
-              onClick={copyMenuName}
-            >
-              {t("common.copyName")}
-            </MenuItem>
-            {menu.kind === "task" ? (
-              <>
-                <MenuSeparator />
-                <MenuItem
-                  className="h-6 px-1.5 text-[11px]"
-                  onClick={() => applyStatus("done")}
-                >
-                  {t("checkin.done")}
-                </MenuItem>
-                <MenuItem
-                  className="h-6 px-1.5 text-[11px]"
-                  onClick={() => applyStatus("missed")}
-                >
-                  {t("checkin.missed")}
-                </MenuItem>
-                <MenuItem
-                  className="h-6 px-1.5 text-[11px]"
-                  onClick={() =>
-                    applyStatus(menu.row.state === "skipped" ? null : "skipped")
-                  }
-                >
-                  {t(
-                    menu.row.state === "skipped"
-                      ? "today.unskip"
-                      : "checkin.skipped",
-                  )}
-                </MenuItem>
-                <MenuItem
-                  className="h-6 px-1.5 text-[11px]"
-                  onClick={() => applyStatus(null)}
-                >
-                  {t("widget.menu.clear")}
-                </MenuItem>
-              </>
-            ) : null}
-          </MenuSurface>
-        </>
-      ) : null}
       <CopyToast
         message={copyMessage}
         error={copyError}

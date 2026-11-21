@@ -77,6 +77,7 @@ describe("events", () => {
       "todos:changed",
       "settings:changed",
       "widget:expand",
+      "widget:menu-action",
     ]);
   });
 

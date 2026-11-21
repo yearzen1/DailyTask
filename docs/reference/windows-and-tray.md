@@ -49,7 +49,7 @@
 
 - 单击任务行：按今日页规则循环 `pending/skipped → done → missed → 清除`
 - 值 chip：点击进入行内编辑，`Enter` / 失焦保存，`Esc` 取消
-- 右键或 `⋯`：任务菜单（复制名字 / 完成 / 未完成 / 跳过 / 清除）；标题右上角 `×` 可关闭
+- 右键或 `⋯`：任务菜单（复制名字 / 今日状态：已完成 / 未完成 / 今天不做 / 清除）；标题右上角 `×` 可关闭
 - 右键待办行：待办菜单，提供「复制名字」
 - 复制成功底部显示「已复制」，失败显示「复制失败」
 - 点待办行：完成 / 取消完成
@@ -59,6 +59,22 @@
 - 悬停标题区：展开主窗、置顶、收起
 - 胶囊右键：系统原生菜单，提供「展开挂件 / 隐藏挂件」
 - 无最小化按钮；隐藏挂件走托盘或胶囊右键，二者都销毁挂件窗口
+
+### 2.3 右键菜单窗口
+
+挂件只有 260×360，HTML 菜单画在窗口里一定会被裁掉，所以任务 / 待办菜单改由独立窗口承载：
+
+| 项 | 值 |
+|---|---|
+| 尺寸 | 菜单内容 + 四周 12px 透明投影边距 |
+| 装饰 | `decorations:false`、`transparent:true`、`shadow:false`、`resizable:false` |
+| 层级 | `alwaysOnTop`、`skipTaskbar`；打开后显示并聚焦 |
+| 落点 | 挂件右侧 8px → 左侧 8px → 光标右下 2px；纵向对齐被点行，下方不够就向上翻；最后夹进当前显示器工作区并留 8px |
+| 宽度 | 196px；标题最多 2 行，超出省略，`title` 保留全文 |
+| 关闭 | 失焦、`Esc`、`×`、点任一项、挂件滚动、挂件收起 / 销毁 |
+| 动作 | 复制在菜单窗口内完成；状态动作经 `widget:menu-action` 回传挂件写库 |
+
+菜单窗口只读挂件传来的 payload（文案、当前状态、落点信息），不打开数据库、不初始化 i18n；样式复用 `MenuSurface` / `MenuItem`，投影用 `--shadow-float`。
 
 ## 3. 托盘
 
@@ -93,6 +109,7 @@ export const Events = {
   todosChanged: "todos:changed",
   settingsChanged: "settings:changed",
   widgetExpand: "widget:expand",
+  widgetMenuAction: "widget:menu-action",
 } as const;
 ```
 
@@ -104,10 +121,12 @@ export const Events = {
 | `todosChanged` | `{ source }` | 主窗/挂件 | 另一窗口 |
 | `settingsChanged` | `{ source }` | 主窗 | 挂件 |
 | `widgetExpand` | `{ source }` | 挂件 | 主窗 |
+| `widgetMenuAction` | `{ kind, id, action, status?, copied? }` | 菜单窗口（经 Rust） | 挂件 |
 
 规则：
 
 - payload 只做失效信号，不带全量数据
+- 例外：`widgetMenuAction` 是菜单动作回传，带 `id / action / status`
 - 监听方收到后自己重查
 - `source` 由窗口 label 推导，丢弃自己发出的事件
 - 写库成功后再发事件
@@ -118,10 +137,12 @@ export const Events = {
 主窗 X          → destroy WebView + 同步托盘文案
 托盘切换主窗     → destroy / 按需创建 + sync
 托盘切换挂件     → destroy / 按需创建 + sync
-胶囊右键隐藏     → invoke hide_widget → destroy + sync
+胶囊右键隐藏     → invoke hide_widget → destroy 挂件与菜单 + sync
 挂件展开按钮     → emit widget:expand → 创建主窗并保留挂件
 托盘左键         → 同时显示主窗与挂件
 单实例第二次启动 → 同时显示主窗与挂件
+挂件销毁         → 一并销毁菜单窗口
+菜单失焦         → 销毁菜单窗口
 ```
 
 ## 6. 跨日刷新

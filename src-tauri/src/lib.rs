@@ -1,9 +1,14 @@
-use std::sync::Mutex;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Mutex,
+};
 
+use serde::{Deserialize, Serialize};
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Listener, Manager, WebviewUrl, WebviewWindowBuilder,
+    AppHandle, Emitter, Listener, Manager, PhysicalPosition, PhysicalSize,
+    WebviewUrl, WebviewWindowBuilder,
 };
 use tauri_plugin_sql::{Migration, MigrationKind};
 
@@ -14,7 +19,74 @@ const TRAY_PROGRESS: &str = "tray:progress";
 const TRAY_QUIT: &str = "tray:quit";
 const MAIN_WINDOW: &str = "main";
 const WIDGET_WINDOW: &str = "widget";
+const WIDGET_MENU_WINDOW: &str = "widget-menu";
 const WIDGET_EXPAND_EVENT: &str = "widget:expand";
+const WIDGET_MENU_ACTION_EVENT: &str = "widget:menu-action";
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MenuPoint {
+    x: f64,
+    y: f64,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MenuRect {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WidgetMenuLabels {
+    menu: String,
+    copy: String,
+    status: String,
+    done: String,
+    missed: String,
+    skipped: String,
+    unskip: String,
+    clear: String,
+    close: String,
+}
+
+/// 挂件窗口交给菜单窗口的数据：文案、当前状态和落点信息都由挂件算好，
+/// 菜单窗口不读库，也不初始化 i18n。
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WidgetMenuPayload {
+    kind: String,
+    id: String,
+    name: String,
+    current: Option<String>,
+    theme: String,
+    labels: WidgetMenuLabels,
+    anchor: MenuPoint,
+    widget: MenuRect,
+    work_area: MenuRect,
+    scale_factor: f64,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WidgetMenuAction {
+    kind: String,
+    id: String,
+    action: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    status: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    copied: Option<bool>,
+}
+
+struct WidgetMenuState {
+    payload: Mutex<Option<WidgetMenuPayload>>,
+    shown: AtomicBool,
+    focused: AtomicBool,
+}
 
 #[derive(Clone)]
 struct TrayLabels {
@@ -168,8 +240,115 @@ fn destroy_window(app: &AppHandle, label: &str) {
 #[tauri::command]
 fn hide_widget(app: AppHandle) -> Result<(), String> {
     destroy_window(&app, WIDGET_WINDOW);
+    destroy_window(&app, WIDGET_MENU_WINDOW);
     sync_tray_labels(&app);
     Ok(())
+}
+
+/// 打开挂件右键菜单：建一个独立透明窗口承载菜单。
+/// 必须用 async：同步命令跑在主线程上，`build()` 会等主线程处理窗口创建而死锁。
+#[tauri::command]
+async fn open_widget_menu(
+    app: AppHandle,
+    state: tauri::State<'_, WidgetMenuState>,
+    payload: WidgetMenuPayload,
+) -> Result<(), String> {
+    destroy_window(&app, WIDGET_MENU_WINDOW);
+    state.shown.store(false, Ordering::SeqCst);
+    state.focused.store(false, Ordering::SeqCst);
+
+    let widget_position = app
+        .get_webview_window(WIDGET_WINDOW)
+        .and_then(|window| window.outer_position().ok());
+
+    *state
+        .payload
+        .lock()
+        .map_err(|_| "widget menu payload lock poisoned".to_string())? = Some(payload);
+
+    let window = WebviewWindowBuilder::new(
+        &app,
+        WIDGET_MENU_WINDOW,
+        WebviewUrl::App("index.html?window=widget-menu".into()),
+    )
+    .title("DailyTask 菜单")
+    .inner_size(220.0, 260.0)
+    .resizable(false)
+    .decorations(false)
+    .transparent(true)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .shadow(false)
+    .focused(true)
+    .build()
+    .map_err(|error| {
+        eprintln!("[widget-menu] build failed: {error}");
+        error.to_string()
+    })?;
+
+    // 先落在挂件所在显示器上，保证 DPI 与挂件窗口一致。
+    if let Some(position) = widget_position {
+        let _ = window.set_position(position);
+    }
+
+    Ok(())
+}
+
+/// 菜单窗口测完自身尺寸后回报物理像素矩形，这里只负责摆好并显示。
+#[tauri::command]
+fn place_widget_menu(
+    app: AppHandle,
+    state: tauri::State<'_, WidgetMenuState>,
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+) -> Result<(), String> {
+    let window = app
+        .get_webview_window(WIDGET_MENU_WINDOW)
+        .ok_or_else(|| "widget menu window missing".to_string())?;
+    window
+        .set_size(PhysicalSize::new(width, height))
+        .map_err(|error| error.to_string())?;
+    window
+        .set_position(PhysicalPosition::new(x, y))
+        .map_err(|error| error.to_string())?;
+    window.show().map_err(|error| error.to_string())?;
+    window.set_focus().map_err(|error| error.to_string())?;
+    state.shown.store(true, Ordering::SeqCst);
+    Ok(())
+}
+
+#[tauri::command]
+fn read_widget_menu(
+    state: tauri::State<'_, WidgetMenuState>,
+) -> Option<WidgetMenuPayload> {
+    state
+        .payload
+        .lock()
+        .ok()
+        .and_then(|payload| payload.clone())
+}
+
+#[tauri::command]
+fn close_widget_menu(app: AppHandle, state: tauri::State<'_, WidgetMenuState>) {
+    state.shown.store(false, Ordering::SeqCst);
+    destroy_window(&app, WIDGET_MENU_WINDOW);
+}
+
+/// 菜单点完一项：先把动作转发给挂件窗口，再销毁菜单窗口。
+#[tauri::command]
+fn widget_menu_action(
+    app: AppHandle,
+    state: tauri::State<'_, WidgetMenuState>,
+    action: WidgetMenuAction,
+) -> Result<(), String> {
+    let emitted = app
+        .emit_to(WIDGET_WINDOW, WIDGET_MENU_ACTION_EVENT, action)
+        .map_err(|error| error.to_string());
+    state.shown.store(false, Ordering::SeqCst);
+    destroy_window(&app, WIDGET_MENU_WINDOW);
+    emitted
 }
 
 /// 显示主窗口时保留挂件，避免桌面快捷入口消失。
@@ -329,6 +508,12 @@ pub fn run() {
                 labels: Mutex::new(TrayLabels::default()),
             });
 
+            app.manage(WidgetMenuState {
+                payload: Mutex::new(None),
+                shown: AtomicBool::new(false),
+                focused: AtomicBool::new(false),
+            });
+
             if let Some(icon) = app.default_window_icon().cloned() {
                 // dev 配置把 productName 改成 “DailyTask Dev”，托盘提示也随之区分。
                 let product = app
@@ -371,10 +556,41 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             set_tray_progress,
             set_tray_labels,
-            hide_widget
+            hide_widget,
+            open_widget_menu,
+            place_widget_menu,
+            read_widget_menu,
+            close_widget_menu,
+            widget_menu_action
         ])
         // 主窗关闭后销毁较大的主 WebView，但保留（或重建）桌面挂件。
         .on_window_event(|window, event| {
+            // 菜单窗口失焦即关闭：点桌面、点别的窗口都算。
+            if window.label() == WIDGET_MENU_WINDOW {
+                if let Some(state) = window.try_state::<WidgetMenuState>() {
+                    match event {
+                        tauri::WindowEvent::Focused(true) => {
+                            state.focused.store(true, Ordering::SeqCst);
+                        }
+                        tauri::WindowEvent::Focused(false) => {
+                            // 有些场景窗口拿不到前台焦点，别把刚弹出的菜单直接关掉。
+                            let focused_before =
+                                state.focused.swap(false, Ordering::SeqCst);
+                            if state.shown.load(Ordering::SeqCst) && focused_before {
+                                state.shown.store(false, Ordering::SeqCst);
+                                destroy_window(window.app_handle(), WIDGET_MENU_WINDOW);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            // 挂件被销毁时菜单不能留在桌面上。
+            if window.label() == WIDGET_WINDOW
+                && matches!(event, tauri::WindowEvent::Destroyed)
+            {
+                destroy_window(window.app_handle(), WIDGET_MENU_WINDOW);
+            }
             if matches!(event, tauri::WindowEvent::Focused(true)) {
                 sync_tray_labels(window.app_handle());
             }

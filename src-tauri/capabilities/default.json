@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main and widget windows",
-  "windows": ["main", "widget"],
+  "description": "Capability for the main, widget and widget menu windows",
+  "windows": ["main", "widget", "widget-menu"],
   "permissions": [
     "core:default",
     "core:window:allow-show",

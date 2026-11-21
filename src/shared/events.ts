@@ -1,6 +1,8 @@
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
+import type { CheckinStatus } from "../domain/types";
+
 /**
  * 全项目唯一允许 import @tauri-apps/api/event 的文件。
  * payload 只做失效信号，监听方收到后自己重查。
@@ -12,6 +14,7 @@ export const Events = {
   todosChanged: "todos:changed",
   settingsChanged: "settings:changed",
   widgetExpand: "widget:expand",
+  widgetMenuAction: "widget:menu-action",
 } as const;
 
 export type EventSource = "main" | "widget";
@@ -39,6 +42,15 @@ export interface SettingsChanged {
 
 export interface WidgetExpand {
   source: EventSource;
+}
+
+/** 挂件菜单窗口点完一项后回传的动作；不是失效信号，但同样集中在这里收发。 */
+export interface WidgetMenuAction {
+  kind: "task" | "todo";
+  id: string;
+  action: "copy" | "status";
+  status?: CheckinStatus | null;
+  copied?: boolean;
 }
 
 export function currentSource(): EventSource {
@@ -119,6 +131,15 @@ export function onWidgetExpand(
   handler: (payload: WidgetExpand) => void,
 ): Promise<UnlistenFn> {
   return listen<WidgetExpand>(Events.widgetExpand, (event) => {
+    handler(event.payload);
+  });
+}
+
+/** 挂件菜单在独立窗口里，点完一项由 Rust 转发到这里。 */
+export function onWidgetMenuAction(
+  handler: (payload: WidgetMenuAction) => void,
+): Promise<UnlistenFn> {
+  return listen<WidgetMenuAction>(Events.widgetMenuAction, (event) => {
     handler(event.payload);
   });
 }

@@ -17,6 +17,7 @@ import { useTodosStore } from "./stores/todosStore";
 import { applyTheme } from "./ui/theme";
 import { windowTarget } from "./windows/windowTarget";
 import { Widget } from "./windows/widget/Widget";
+import { WidgetMenuWindow } from "./windows/widget/WidgetMenuWindow";
 import "./styles.css";
 
 function hydrate(data: AppData): void {
@@ -33,11 +34,20 @@ if (target === "widget") {
   // 每次启动都从胶囊开始；停靠侧仍读上次记住的值。
   prepareWidgetStartup();
 }
+if (target === "widget-menu") {
+  document.documentElement.dataset.window = "widget-menu";
+}
 
 // 开发构建带 Dev 后缀，任务栏里能和安装版区分开。
 if (import.meta.env.DEV) {
   void getCurrentWindow()
-    .setTitle(target === "widget" ? "DailyTask Dev Widget" : "DailyTask Dev")
+    .setTitle(
+      target === "widget"
+        ? "DailyTask Dev Widget"
+        : target === "widget-menu"
+          ? "DailyTask Dev Menu"
+          : "DailyTask Dev",
+    )
     .catch(() => undefined);
 }
 
@@ -45,39 +55,48 @@ const root = ReactDOM.createRoot(
   document.getElementById("root") as HTMLElement,
 );
 
-root.render(
-  <main className="flex h-full items-center justify-center text-sm text-stone-500">
-    {t("app.loading")}
-  </main>,
-);
+// 菜单窗口只画菜单：不初始化数据库、不注册跨窗同步。数据由挂件窗口通过 Rust 带过来。
+if (target === "widget-menu") {
+  root.render(
+    <React.StrictMode>
+      <WidgetMenuWindow />
+    </React.StrictMode>,
+  );
+} else {
+  root.render(
+    <main className="flex h-full items-center justify-center text-sm text-stone-500">
+      {t("app.loading")}
+    </main>,
+  );
 
-void initApp()
-  .then((data) => {
-    hydrate(data);
-    setLocale(data.settings.language);
-    applyTheme(data.settings.theme);
-    // 跨日后各窗口自己把「今天」推到新的一天，不依赖任何点击。
-    startDayRollover();
-    void (target === "widget" ? Promise.resolve() : rotateDailyBackup()).catch(
-      (error: unknown) => {
-        console.error("[backup] 每日备份失败", error);
-      },
-    );
-    void startCrossWindowSync().catch((error: unknown) => {
-      console.error("[sync] 跨窗口同步启动失败", error);
+  void initApp()
+    .then((data) => {
+      hydrate(data);
+      setLocale(data.settings.language);
+      applyTheme(data.settings.theme);
+      // 跨日后各窗口自己把「今天」推到新的一天，不依赖任何点击。
+      startDayRollover();
+      void (target === "widget" ? Promise.resolve() : rotateDailyBackup()).catch(
+        (error: unknown) => {
+          console.error("[backup] 每日备份失败", error);
+        },
+      );
+      void startCrossWindowSync().catch((error: unknown) => {
+        console.error("[sync] 跨窗口同步启动失败", error);
+      });
+      root.render(
+        <React.StrictMode>
+          {target === "widget" ? <Widget /> : <App />}
+        </React.StrictMode>,
+      );
+    })
+    .catch((error: unknown) => {
+      console.error("[init] 初始化失败", error);
+      root.render(
+        <main className="flex h-full flex-col items-center justify-center gap-2 text-sm text-red-600">
+          <p>{t("app.initFailed")}</p>
+          <p className="text-stone-500">{t("app.initFailedHint")}</p>
+        </main>,
+      );
     });
-    root.render(
-      <React.StrictMode>
-        {target === "widget" ? <Widget /> : <App />}
-      </React.StrictMode>,
-    );
-  })
-  .catch((error: unknown) => {
-    console.error("[init] 初始化失败", error);
-    root.render(
-      <main className="flex h-full flex-col items-center justify-center gap-2 text-sm text-red-600">
-        <p>{t("app.initFailed")}</p>
-        <p className="text-stone-500">{t("app.initFailedHint")}</p>
-      </main>,
-    );
-  });
+}

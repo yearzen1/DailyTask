@@ -302,6 +302,7 @@ export const en: Messages = {
   "widget.menu": "Task actions",
   "widget.menu.open": "Open task actions: {task}",
   "widget.menu.close": "Close task menu",
+  "widget.menu.status": "Today",
   "widget.menu.clear": "Clear",
 
   "grid.title": "Task grid",

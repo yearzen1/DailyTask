@@ -1,0 +1,952 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DailyTask · 挂件右键菜单浮出窗口</title>
+<link rel="stylesheet" href="./tokens.css">
+<style>
+  /* ============================================================
+     评审稿外壳
+     ============================================================ */
+  :root {
+    --canvas: #ECEDEF;
+    --canvas-text: #3A3A3A;
+    --canvas-muted: #7A7A7A;
+    --canvas-line: #D8DADF;
+
+    /* [新增] 浮层投影：近距接触 + 中距 + 远距，白底白卡也能看出凸起 */
+    --shadow-float:
+      0 1px 2px rgba(26, 26, 26, .10),
+      0 8px 20px rgba(26, 26, 26, .12),
+      0 20px 48px rgba(26, 26, 26, .16);
+  }
+  :root[data-theme="dark"] {
+    --canvas: #141414;
+    --canvas-text: #D8D8D8;
+    --canvas-muted: #8A8A8A;
+    --canvas-line: #2C2C2C;
+
+    --shadow-float:
+      0 0 0 1px rgba(0, 0, 0, .45),
+      0 10px 28px rgba(0, 0, 0, .55),
+      0 28px 64px rgba(0, 0, 0, .55);
+  }
+
+  * { box-sizing: border-box; }
+  html { height: 100%; }
+  body {
+    margin: 0;
+    min-height: 100%;
+    padding: var(--space-6);
+    background: var(--canvas);
+    color: var(--canvas-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+
+  .page-head {
+    display: flex; align-items: flex-end; gap: var(--space-3);
+    max-width: 1460px; margin: 0 auto var(--space-3);
+  }
+  .page-head h1 { margin: 0; font-size: var(--text-lg); font-weight: 600; }
+  .page-head p { margin: 4px 0 0; font-size: var(--text-xs); color: var(--canvas-muted); }
+  .page-head .tools { margin-left: auto; display: flex; align-items: center; gap: var(--space-2); }
+
+  .switch { display: flex; gap: 2px; padding: 3px; border-radius: var(--radius-pill); background: var(--canvas-line); }
+  .switch button {
+    border: 0; background: transparent;
+    padding: 4px 10px; border-radius: var(--radius-pill);
+    font-size: var(--text-xs); color: var(--canvas-muted);
+  }
+  .switch button.is-active { background: var(--canvas); color: var(--canvas-text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+
+  .scenario-bar {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+    max-width: 1460px; margin: 0 auto var(--space-4);
+  }
+  .scenario-bar .label { font-size: var(--text-xs); color: var(--canvas-muted); margin-right: 2px; }
+  .scenario {
+    border: 1px solid var(--canvas-line);
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+    padding: 5px 10px; border-radius: var(--radius-pill);
+    font-size: var(--text-xs);
+  }
+  .scenario:hover { background: var(--state-hover); }
+  .scenario.is-active {
+    border-color: var(--color-voluntary);
+    background: var(--state-selected);
+    color: var(--color-voluntary);
+    font-weight: 600;
+  }
+
+  /* ============================================================
+     桌面 + 挂件（1:1 真实尺寸 260×360）
+     ============================================================ */
+  .stage {
+    max-width: 1460px; margin: 0 auto;
+  }
+
+  .desk {
+    position: relative;
+    width: 100%; height: 520px;
+    overflow: hidden;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, .06);
+    background:
+      radial-gradient(120% 90% at 18% 8%, #2b3138 0%, #1b1f23 46%, #121518 100%);
+    box-shadow: 0 18px 44px rgba(0, 0, 0, .22);
+  }
+  :root[data-theme="dark"] .desk {
+    background:
+      radial-gradient(120% 90% at 18% 8%, #23272b 0%, #17191c 46%, #0e1012 100%);
+  }
+  .desk-legend {
+    position: absolute; left: 14px; top: 12px; z-index: 5;
+    display: flex; flex-direction: column; gap: 4px;
+    font-size: 10px; line-height: 1.5; color: rgba(255, 255, 255, .46);
+    pointer-events: none;
+  }
+  .desk-legend b { color: rgba(255, 255, 255, .72); font-weight: 600; font-size: 10.5px; }
+  .desk-legend .kbd {
+    display: inline-block; padding: 0 4px; border-radius: 3px;
+    border: 1px dashed rgba(255, 255, 255, .3); color: rgba(255, 255, 255, .6);
+  }
+
+  /* 挂件窗口：虚线 = 260×360 的窗口边界，菜单允许跨出去 */
+  .widget-frame {
+    position: absolute; right: 44px; bottom: 44px;
+    width: 260px; height: 360px;
+    border-radius: 18px;
+    outline: 1px dashed rgba(120, 214, 165, .45);
+    outline-offset: 0;
+  }
+  .widget-frame::after {
+    content: "挂件窗口 260×360";
+    position: absolute; left: 0; top: -16px;
+    font-size: 9.5px; letter-spacing: .02em;
+    color: rgba(120, 214, 165, .75);
+    white-space: nowrap;
+  }
+
+  /* 挂件换到屏幕中间：菜单优先挂到窗口右侧 */
+  .desk.is-center .widget-frame {
+    right: auto; left: 50%; margin-left: -130px;
+  }
+
+  .widget-card {
+    position: absolute; inset: 8px;
+    display: flex; flex-direction: column;
+    padding: 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-widget);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-widget);
+    color: var(--color-text);
+    overflow: hidden;
+  }
+
+  .w-head { position: relative; display: flex; align-items: center; height: 22px; flex: none; }
+  .w-title { min-width: 0; flex: 1; font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .w-actions { display: flex; gap: 1px; flex: none; }
+  .w-act {
+    width: 18px; height: 18px; border: 0; border-radius: 4px;
+    background: transparent; color: var(--color-text-muted);
+    display: grid; place-items: center; font-size: 11px; line-height: 1;
+  }
+  .w-act:hover { background: var(--state-active); color: var(--color-text); }
+
+  .w-progress { display: flex; align-items: center; gap: 10px; margin: 4px 0; flex: none; }
+  .w-ring {
+    position: relative; width: 40px; height: 40px; flex: none; border-radius: 50%;
+    background: conic-gradient(var(--color-voluntary) 0 63%, color-mix(in srgb, var(--color-text) 12%, transparent) 63% 100%);
+  }
+  .w-ring::after { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: var(--color-surface); }
+  .w-progress-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  .w-line { display: flex; align-items: baseline; gap: 5px; font-size: 10px; color: var(--color-text-muted); }
+  .w-line b { font-size: 13px; color: var(--color-text); font-variant-numeric: tabular-nums; }
+  .w-cats { display: flex; flex-wrap: wrap; gap: 1px 8px; font-size: 9.5px; color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+  .w-cats span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .w-cats i { width: 6px; height: 6px; border-radius: 50%; background: var(--c, var(--color-text-muted)); }
+
+  .w-scroll {
+    flex: 1; min-height: 0; overflow-y: auto; padding-right: 2px;
+    /* 菜单是独立窗口，滚动时由宿主主动关闭 */
+  }
+  .w-scroll::-webkit-scrollbar { width: 4px; }
+  .w-scroll::-webkit-scrollbar-thumb { background: var(--color-border-strong); border-radius: 4px; }
+
+  .w-group { display: flex; align-items: center; gap: 5px; height: 20px; padding: 0 4px; font-size: 10.5px; font-weight: 600; color: var(--color-text-muted); }
+  .w-group .bar { width: 3px; height: 10px; border-radius: 2px; background: var(--c, var(--color-text-muted)); }
+  .w-group .count { margin-left: auto; font-weight: 400; font-variant-numeric: tabular-nums; }
+
+  .w-task {
+    display: flex; align-items: center; gap: 6px;
+    min-height: 26px; padding: 2px 4px; border-radius: 5px;
+    font-size: 11.5px; cursor: context-menu;
+  }
+  .w-task:hover { background: var(--state-hover); }
+  .w-task.is-picked { background: var(--state-hover); box-shadow: inset 0 0 0 1px var(--color-border-strong); }
+  .w-check {
+    width: 17px; height: 17px; flex: none;
+    display: grid; place-items: center;
+    border: 1.4px solid var(--color-border-strong); border-radius: 4px;
+    font-size: 9px; line-height: 1; color: transparent;
+  }
+  .w-check.done { background: var(--color-voluntary); border-color: var(--color-voluntary); color: #fff; }
+  .w-name { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+  .w-name.done { color: var(--color-text-muted); text-decoration: line-through; }
+
+  .w-todo {
+    display: flex; align-items: center; gap: 6px;
+    min-height: 26px; padding: 2px 4px; border-radius: 5px;
+    font-size: 11.5px; cursor: context-menu;
+  }
+  .w-todo:hover { background: var(--state-hover); }
+  .w-todo-check {
+    width: 12px; height: 12px; flex: none;
+    border: 1.4px solid var(--color-border-strong); border-radius: 50%;
+    display: grid; place-items: center; font-size: 7px; color: transparent;
+  }
+  .w-todo-name { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+  .w-due { flex: none; font-size: 9.5px; color: var(--color-warning); font-weight: 600; white-space: nowrap; }
+  .w-due.danger { color: var(--color-missed); }
+
+  /* 光标锚点 */
+  .anchor {
+    position: absolute; z-index: 20; width: 13px; height: 13px;
+    margin: -7px 0 0 -7px; border-radius: 50%;
+    border: 1px solid rgba(120, 214, 165, .9);
+    box-shadow: 0 0 0 3px rgba(120, 214, 165, .18);
+    pointer-events: none;
+  }
+  .anchor[hidden] { display: none; }
+
+  /* ============================================================
+     右键菜单（独立浮层，可以越出挂件窗口）
+     ============================================================ */
+  .menu {
+    position: absolute; z-index: 30;
+    width: 196px; padding: 6px;
+    border-radius: var(--radius-card);
+    border: 1px solid color-mix(in srgb, var(--color-text) 14%, var(--color-border));
+    background: var(--color-surface);
+    box-shadow: var(--shadow-float);
+    transform-origin: var(--origin, top left);
+    animation: menu-in .12s cubic-bezier(.2, 0, 0, 1);
+  }
+  :root[data-theme="dark"] .menu {
+    background: color-mix(in srgb, var(--color-surface) 92%, #fff);
+    border-color: color-mix(in srgb, #fff 12%, var(--color-border));
+  }
+  .menu[hidden] { display: none; }
+  @keyframes menu-in {
+    from { opacity: 0; transform: translateY(1px) scale(.985); }
+    to { opacity: 1; transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .menu { animation: none; }
+  }
+
+  .menu-head { display: flex; align-items: flex-start; gap: 4px; padding: 0 2px 5px 6px; }
+  .menu-title {
+    flex: 1; min-width: 0; margin: 0;
+    font-size: 11px; line-height: 1.5;
+    color: var(--color-text-secondary);
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+  .menu-close {
+    width: 20px; height: 20px; flex: none; margin-top: -2px;
+    display: grid; place-items: center;
+    border: 0; border-radius: 4px; background: transparent;
+    color: var(--color-text-tertiary); font-size: 12px; line-height: 1;
+  }
+  .menu-close:hover { background: var(--state-active); color: var(--color-text); }
+  .menu-close:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+  .menu-sep { height: 1px; margin: 4px 2px; background: var(--color-divider); }
+
+  .menu-label {
+    display: flex; align-items: center; gap: 5px;
+    padding: 3px 6px 2px;
+    font-size: 9.5px; font-weight: 600; letter-spacing: .04em;
+    color: var(--color-text-tertiary);
+  }
+  .menu-label i { width: 5px; height: 5px; border-radius: 50%; background: var(--color-text-tertiary); }
+
+  .menu-item {
+    display: flex; align-items: center; gap: 7px;
+    width: 100%; height: 28px; padding: 0 6px;
+    border: 0; border-radius: var(--radius-control);
+    background: transparent; color: var(--color-text);
+    font-size: 12px; text-align: left;
+  }
+  .menu-item:hover, .menu-item.is-hover { background: var(--state-hover); }
+  .menu-item:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+  .menu-item .ico {
+    width: 14px; height: 14px; flex: none;
+    display: grid; place-items: center;
+    border: 1.4px solid var(--color-border-strong); border-radius: 4px;
+    font-size: 8.5px; font-weight: 700; line-height: 1; color: transparent;
+  }
+  .menu-item[data-state="done"] .ico { background: var(--color-voluntary); border-color: var(--color-voluntary); color: #fff; }
+  .menu-item[data-state="missed"] .ico { border-color: var(--color-missed); color: var(--color-missed); }
+  .menu-item[data-state="skipped"] .ico { border-style: dashed; background: var(--color-na); color: var(--color-text-muted); font-weight: 500; }
+  .menu-item[data-state="clear"] .ico { border-style: dashed; opacity: .7; }
+  .menu-item .cur {
+    margin-left: auto; font-size: 10px; color: var(--color-voluntary);
+    opacity: 0; transition: opacity .1s;
+  }
+  .menu-item[data-current] { font-weight: 600; }
+  .menu-item[data-current] .cur { opacity: 1; }
+  .menu-item.is-danger { color: var(--color-missed); }
+  .menu-item.is-muted { color: var(--color-text-muted); }
+
+  /* 菜单越大，阴影越收：菜单自己带一档比挂件更重的投影 */
+
+  /* ============================================================
+     下方标注区
+     ============================================================ */
+  .specs {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-4); max-width: 1460px; margin: var(--space-6) auto 0;
+  }
+  .specs.wide { grid-template-columns: 1.15fr 1fr 1fr; }
+  .panel {
+    padding: var(--space-4);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+  .panel h2 { margin: 0 0 4px; font-size: var(--text-sm); font-weight: 600; }
+  .panel .sub { margin: 0 0 var(--space-3); font-size: var(--text-2xs); line-height: 1.6; color: var(--color-text-muted); }
+  .panel ol, .panel ul { margin: 0; padding-left: 18px; font-size: var(--text-xs); line-height: 1.8; color: var(--color-text-secondary); }
+  .panel li + li { margin-top: 2px; }
+  .panel b { color: var(--color-text); }
+  .panel code {
+    padding: 1px 4px; border-radius: 4px;
+    background: var(--color-surface-2);
+    font-family: var(--font-mono); font-size: 10.5px;
+    color: var(--color-text-tertiary);
+  }
+
+  /* 层次图 */
+  .layers { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 12px; }
+  .layer {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 8px; border-radius: var(--radius-control);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    font-size: var(--text-xs); color: var(--color-text-secondary);
+  }
+  .layer .tag {
+    width: 20px; height: 18px; flex: none; display: grid; place-items: center;
+    border-radius: 4px; background: var(--color-na);
+    font-size: 9.5px; font-weight: 700; color: var(--color-text-muted);
+  }
+  .layer .val { margin-left: auto; font-family: var(--font-mono); font-size: 10px; color: var(--color-text-tertiary); }
+  .layer.z3 { box-shadow: var(--shadow-float); border-color: color-mix(in srgb, var(--color-text) 12%, var(--color-border)); }
+  .layer.z2 { margin: 0 6px; box-shadow: var(--shadow-widget); }
+  .layer.z1 { margin: 0 12px; background: var(--color-surface-2); }
+
+  /* 结构图 */
+  .anatomy {
+    position: relative; width: 196px; margin: 4px auto 10px;
+    padding: 6px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-float);
+  }
+  .a-head { display: flex; align-items: flex-start; gap: 4px; padding: 0 2px 5px 6px; }
+  .a-title { flex: 1; min-width: 0; font-size: 11px; line-height: 1.5; color: var(--color-text-secondary); }
+  .a-close { width: 20px; height: 20px; flex: none; display: grid; place-items: center; margin-top: -2px; border-radius: 4px; background: var(--state-active); color: var(--color-text); font-size: 12px; }
+  .a-sep { height: 1px; margin: 4px 2px; background: var(--color-divider); }
+  .a-label { padding: 3px 6px 2px; font-size: 9.5px; font-weight: 600; letter-spacing: .04em; color: var(--color-text-tertiary); }
+  .a-item { display: flex; align-items: center; gap: 7px; height: 28px; padding: 0 6px; border-radius: var(--radius-control); font-size: 12px; }
+  .a-item .ico { width: 14px; height: 14px; flex: none; border: 1.4px solid var(--color-border-strong); border-radius: 4px; display: grid; place-items: center; font-size: 8.5px; font-weight: 700; color: transparent; }
+  .a-item[data-state="done"] .ico { background: var(--color-voluntary); border-color: var(--color-voluntary); color: #fff; }
+  .a-item[data-state="missed"] .ico { border-color: var(--color-missed); color: var(--color-missed); }
+  .a-item[data-state="skipped"] .ico { border-style: dashed; background: var(--color-na); color: var(--color-text-muted); }
+  .a-item.is-copy { background: var(--state-selected); color: var(--color-voluntary); font-weight: 600; }
+  .a-item.is-muted { color: var(--color-text-muted); }
+  .a-item .cur { margin-left: auto; font-size: 10px; color: var(--color-voluntary); }
+  .badge {
+    position: absolute; display: grid; place-items: center;
+    width: 17px; height: 17px; border-radius: 50%;
+    background: var(--canvas-text); color: var(--canvas);
+    font-size: 10px; font-weight: 700;
+    box-shadow: 0 0 0 2px var(--color-surface);
+  }
+  .badge.n1 { top: 4px; left: -26px; }
+  .badge.n2 { top: 4px; right: -26px; }
+  .badge.n3 { top: 36px; right: -26px; }
+  .badge.n4 { top: 72px; left: -26px; }
+  .badge.n5 { top: 110px; right: -26px; }
+
+  /* 现状 / 改后 对比 */
+  .compare { display: flex; gap: var(--space-3); }
+  .cmp { flex: 1; min-width: 0; margin: 0; }
+  .cmp-screen {
+    position: relative; height: 148px;
+    border-radius: 8px; background: #171a1d;
+    border: 1px solid rgba(255, 255, 255, .06);
+  }
+  .cmp-win {
+    position: absolute; right: 14px; top: 14px;
+    width: 116px; height: 100px;
+    outline: 1px dashed rgba(120, 214, 165, .45);
+    border-radius: 8px;
+  }
+  .cmp.is-clip .cmp-win { overflow: hidden; }
+  .cmp-card {
+    position: absolute; inset: 4px;
+    border-radius: 6px; background: var(--color-surface);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, .35);
+  }
+  .cmp-menu {
+    position: absolute; left: 6px; top: 44px; z-index: 2;
+    width: 96px; min-height: 84px; padding: 4px;
+    border-radius: 5px; background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+  }
+  .cmp:not(.is-clip) .cmp-menu { box-shadow: 0 8px 20px rgba(0, 0, 0, .5); }
+  .cmp-menu .l { height: 4px; border-radius: 2px; background: var(--color-border-strong); margin-bottom: 3px; }
+  .cmp-menu .l.short { width: 60%; }
+  .cmp-menu .i { height: 7px; border-radius: 2px; background: var(--color-divider); margin-top: 2px; }
+  .cmp-menu .bad { color: #D9534F; font-size: 8px; line-height: 1; }
+  .cmp figcaption { margin-top: 6px; font-size: var(--text-2xs); color: var(--color-text-muted); line-height: 1.5; }
+  .cmp figcaption b { color: var(--color-text); }
+
+  /* 表格 */
+  .key-table { width: 100%; border-collapse: collapse; font-size: var(--text-xs); }
+  .key-table th, .key-table td { padding: 5px 0; border-bottom: 1px solid var(--color-divider); text-align: left; vertical-align: top; }
+  .key-table th { color: var(--color-text-muted); font-weight: 500; }
+  .key-table td { color: var(--color-text-secondary); }
+  .key-table tr:last-child th, .key-table tr:last-child td { border-bottom: 0; }
+  .key-table td:first-child { width: 88px; color: var(--color-text-tertiary); }
+
+  @media (max-width: 1240px) {
+    .specs, .specs.wide { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+  <header class="page-head">
+    <div>
+      <h1>挂件右键菜单 · 浮出挂件窗口</h1>
+      <p>1:1 真实尺寸（挂件 260×360）· 右键任务行查看 · 菜单可越出窗口边界，并与挂件拉开层级</p>
+    </div>
+    <div class="tools">
+      <div class="switch" id="theme-switch">
+        <button type="button" data-theme-btn="light" class="is-active">浅色</button>
+        <button type="button" data-theme-btn="dark">深色</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="scenario-bar">
+    <span class="label">预览</span>
+    <button type="button" class="scenario is-active" data-preset="bottom">贴底行（关键场景）</button>
+    <button type="button" class="scenario" data-preset="right">贴右边缘 · 外挂左侧</button>
+    <button type="button" class="scenario" data-preset="long">超长任务名</button>
+    <button type="button" class="scenario" data-preset="hover">菜单项 hover</button>
+    <button type="button" class="scenario" data-preset="todo">待办菜单</button>
+    <button type="button" class="scenario" data-preset="none">关闭菜单</button>
+    <span class="label" style="margin-left: 6px">挂件位置</span>
+    <div class="switch" id="dock-switch">
+      <button type="button" data-dock="right" class="is-active">贴右</button>
+      <button type="button" data-dock="center">居中</button>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="desk" id="desk">
+      <div class="desk-legend">
+        <b>桌面（示意）</b>
+        <span>绿色虚线 = <span class="kbd">挂件窗口边界</span></span>
+        <span>菜单是独立浮层，不受 260×360 裁切</span>
+      </div>
+
+      <div class="widget-frame" id="widget-frame">
+        <div class="widget-card">
+          <div class="w-head">
+            <span class="w-title">今日 · 11/21 星期六</span>
+            <div class="w-actions">
+              <button type="button" class="w-act" aria-label="展开主窗口">⤢</button>
+              <button type="button" class="w-act" aria-label="置顶">⌖</button>
+              <button type="button" class="w-act" aria-label="收起挂件">›</button>
+            </div>
+          </div>
+
+          <div class="w-progress">
+            <div class="w-ring"></div>
+            <div class="w-progress-copy">
+              <div class="w-line"><b>17 / 27</b><span>63% · 还剩 10 项</span></div>
+              <div class="w-cats">
+                <span><i style="--c: var(--color-missed)"></i>日常 5 / 8</span>
+                <span><i style="--c: var(--type-color-teal)"></i>形象 3 / 3</span>
+                <span><i style="--c: var(--color-warning)"></i>头脑 3 / 4</span>
+                <span><i style="--c: var(--type-color-purple)"></i>身体 4 / 4</span>
+                <span><i style="--c: var(--color-forced)"></i>被迫 0 / 2</span>
+                <span><i style="--c: var(--color-warning)"></i>待办 2 / 6</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="w-scroll" id="w-scroll">
+            <div class="w-group"><i class="bar" style="--c: var(--color-missed)"></i>日常<span class="count">5 / 8</span></div>
+
+            <div class="w-task" data-menu="task" data-name="和 playwright 重构 agv 的 ui">
+              <span class="w-check"></span>
+              <span class="w-name">和 playwright 重构 agv 的 ui</span>
+            </div>
+            <div class="w-task" data-menu="task" data-name="agv 侧边栏支持关闭">
+              <span class="w-check done">✓</span>
+              <span class="w-name done">agv 侧边栏支持关闭</span>
+            </div>
+            <div class="w-task" data-menu="task" data-name="仿真实验，加入回放功能，自定义倍数">
+              <span class="w-check done">✓</span>
+              <span class="w-name done">仿真实验，加入回放功能，自定义倍数</span>
+            </div>
+            <div class="w-task" id="row-map" data-menu="task" data-name="任务集加任务，应该看着地图加把，不然怎么知道怎么任务起点终点">
+              <span class="w-check"></span>
+              <span class="w-name">任务集加任务，应该看着地图加把，不然怎么知道怎么任务起点终点</span>
+            </div>
+            <div class="w-task" data-menu="task" data-name="怎么看任务起点和终点">
+              <span class="w-check"></span>
+              <span class="w-name">怎么看任务起点和终点</span>
+            </div>
+
+            <div class="w-group" style="margin-top: 3px"><i class="bar" style="--c: var(--color-warning)"></i>头脑<span class="count">3 / 4</span></div>
+            <div class="w-task" data-menu="task" data-name="拿快递">
+              <span class="w-check"></span>
+              <span class="w-name">拿快递</span>
+            </div>
+
+            <div class="w-group" style="margin-top: 3px"><i class="bar" style="--c: var(--color-warning)"></i>今日到期待办<span class="count">2 / 6</span></div>
+            <div class="w-todo" data-menu="todo" data-name="把设计稿发到群里确认">
+              <span class="w-todo-check"></span>
+              <span class="w-todo-name">把设计稿发到群里确认</span>
+              <span class="w-due danger">逾期 2 天</span>
+            </div>
+            <div class="w-todo" data-menu="todo" data-name="买猫粮">
+              <span class="w-todo-check"></span>
+              <span class="w-todo-name">买猫粮</span>
+              <span class="w-due">今天</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <span class="anchor" id="anchor" hidden></span>
+
+      <!-- 任务菜单 -->
+      <div class="menu" id="menu-task" role="menu" aria-label="任务操作" hidden>
+        <div class="menu-head">
+          <p class="menu-title">任务名</p>
+          <button type="button" class="menu-close" aria-label="关闭菜单" data-close>✕</button>
+        </div>
+        <button type="button" class="menu-item" role="menuitem" data-copy>复制名字</button>
+        <div class="menu-sep"></div>
+        <div class="menu-label"><i></i>今日状态</div>
+        <button type="button" class="menu-item" role="menuitem" data-state="done">
+          <span class="ico" aria-hidden="true">✓</span>已完成<span class="cur" aria-hidden="true">✓</span>
+        </button>
+        <button type="button" class="menu-item" role="menuitem" data-state="missed">
+          <span class="ico" aria-hidden="true">✗</span>未完成<span class="cur" aria-hidden="true">✓</span>
+        </button>
+        <button type="button" class="menu-item" role="menuitem" data-state="skipped">
+          <span class="ico" aria-hidden="true">–</span>今天不做<span class="cur" aria-hidden="true">✓</span>
+        </button>
+        <button type="button" class="menu-item is-muted" role="menuitem" data-state="clear">
+          <span class="ico" aria-hidden="true"></span>清除<span class="cur" aria-hidden="true">✓</span>
+        </button>
+      </div>
+
+      <!-- 待办菜单 -->
+      <div class="menu" id="menu-todo" role="menu" aria-label="待办操作" hidden>
+        <div class="menu-head">
+          <p class="menu-title">待办标题</p>
+          <button type="button" class="menu-close" aria-label="关闭菜单" data-close>✕</button>
+        </div>
+        <button type="button" class="menu-item" role="menuitem" data-copy>复制名字</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 标注 ================= -->
+  <div class="specs wide">
+    <section class="panel">
+      <h2>层次：三层投影把菜单顶起来</h2>
+      <p class="sub">投影随层级递增，菜单最重；同时用 1px 定边把菜单从深色壁纸上「切」出来。</p>
+      <div class="layers">
+        <div class="layer z3"><span class="tag">3</span>右键菜单<span class="val">shadow-float</span></div>
+        <div class="layer z2"><span class="tag">2</span>挂件卡片<span class="val">shadow-widget</span></div>
+        <div class="layer z1"><span class="tag">1</span>桌面壁纸<span class="val">—</span></div>
+      </div>
+      <ol>
+        <li>菜单投影 = <b>1px 2px</b> 接触 + <b>8px 20px</b> 中距 + <b>20px 48px</b> 环境</li>
+        <li>白底白卡靠 <b>1px 深边框</b>（文字色 14% 混边）分界；深色下菜单面提亮约 8%</li>
+        <li>菜单与挂件窗口留 <b>8px</b>；与屏幕边缘留 <b>8px</b>，不贴边</li>
+        <li>入场 120ms：<code>opacity 0→1</code> + <code>scale .985→1</code>，收起不做反向动画</li>
+        <li>挂件卡片投影不变，菜单永远压在它上面</li>
+      </ol>
+    </section>
+
+    <section class="panel">
+      <h2>结构：标题 / 复制 / 状态三组</h2>
+      <p class="sub">状态项前置图标与行内勾选框同形，眼睛不用二次学习。</p>
+      <div class="anatomy">
+        <div class="a-head">
+          <span class="a-title">任务集加任务，应该看着地图加把…</span>
+          <span class="a-close">✕</span>
+        </div>
+        <div class="a-item is-copy">复制名字</div>
+        <div class="a-sep"></div>
+        <div class="a-label">今日状态</div>
+        <div class="a-item" data-state="done"><span class="ico">✓</span>已完成<span class="cur">✓</span></div>
+        <div class="a-item" data-state="missed"><span class="ico">✗</span>未完成</div>
+        <div class="a-item" data-state="skipped"><span class="ico">–</span>今天不做</div>
+        <div class="a-item is-muted" data-state="clear"><span class="ico"></span>清除</div>
+        <span class="badge n1">1</span>
+        <span class="badge n2">2</span>
+        <span class="badge n3">3</span>
+        <span class="badge n4">4</span>
+        <span class="badge n5">5</span>
+      </div>
+      <ol>
+        <li>标题 11px，<b>最多 2 行</b>，超出省略；全文走 <code>title</code> 提示</li>
+        <li>关闭 20×20 固定在右上，标题换行也不动</li>
+        <li>复制项 28px，点击即复制并关闭</li>
+        <li>分组标题 9.5px：把状态四项和复制项分开，不再靠一条分隔线硬切</li>
+        <li>当前状态项右侧打 ✓ 并加粗，不用回看挂件行</li>
+      </ol>
+    </section>
+
+    <section class="panel">
+      <h2>出窗口：先翻转，再夹紧</h2>
+      <p class="sub">菜单尺寸由内容决定；优先挂到窗口外侧，贴边时才回到光标。</p>
+      <div class="compare" style="margin-bottom: 10px">
+        <figure class="cmp is-clip">
+          <div class="cmp-screen">
+            <div class="cmp-win">
+              <div class="cmp-card"></div>
+              <div class="cmp-menu">
+                <div class="l"></div><div class="l short"></div>
+                <div class="i"></div><div class="i"></div><div class="i"></div>
+              </div>
+            </div>
+          </div>
+          <figcaption><b>现状</b> · 菜单被 260×360 裁切</figcaption>
+        </figure>
+        <figure class="cmp">
+          <div class="cmp-screen">
+            <div class="cmp-win">
+              <div class="cmp-card"></div>
+              <div class="cmp-menu">
+                <div class="l"></div><div class="l short"></div>
+                <div class="i"></div><div class="i"></div><div class="i"></div>
+              </div>
+            </div>
+          </div>
+          <figcaption><b>改后</b> · 完整浮在窗口外</figcaption>
+        </figure>
+      </div>
+      <ul>
+        <li>定位顺序：<b>挂件右侧外挂 8px</b> → <b>左侧外挂 8px</b> → 光标锚点</li>
+        <li>纵向对齐被点的行；下方不够 → 整体向上翻</li>
+        <li>仍越界 → 夹到<b>当前显示器工作区</b>，四周留 8px</li>
+        <li>能外挂就不遮住挂件：进度、其它任务继续可读</li>
+        <li>挂件滚动、换日、Esc、点空白、失焦 → 立即关闭</li>
+        <li>操作后回传结果给挂件，挂件窗口本身不重建、不位移</li>
+      </ul>
+    </section>
+  </div>
+
+  <div class="specs">
+    <section class="panel">
+      <h2>尺寸</h2>
+      <p class="sub">沿用现有挂件菜单观感，只加宽 12px 容纳状态图标。</p>
+      <table class="key-table">
+        <tr><td>菜单宽</td><td>196px（原 184px）</td></tr>
+        <tr><td>内边距</td><td>6px</td></tr>
+        <tr><td>项高</td><td>28px / 圆角 6px</td></tr>
+        <tr><td>标题</td><td>11px · 行高 1.5 · 2 行封顶</td></tr>
+        <tr><td>状态图标</td><td>14×14 · 1.4px 描边 · 圆角 4</td></tr>
+        <tr><td>间距</td><td>图标与文字 7px</td></tr>
+        <tr><td>投影</td><td><code>--shadow-float</code> [新增]</td></tr>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>实现建议（Tauri）</h2>
+      <p class="sub">菜单必须能被系统画到挂件窗口之外，只能换个宿主。</p>
+      <ul>
+        <li>新增窗口 <code>widget-menu</code>：<code>decorations:false</code>、<code>transparent:true</code>、<code>alwaysOnTop</code>、<code>skipTaskbar</code>、<code>resizable:false</code></li>
+        <li>打开：挂件 invoke <code>open_widget_menu</code>（光标坐标 + 名称 + 当前状态）→ 后端测量后 <code>setSize</code> / <code>setPosition</code></li>
+        <li>动作：菜单 emit <code>widget:menu-action</code> → 挂件监听后写库并发原有事件</li>
+        <li>样式直接复用 <code>MenuSurface</code> / <code>MenuItem</code>，不另起一套</li>
+        <li>备选（不采纳）：原生 popup（无层次、不可控）；临时放大挂件窗口（卡片会位移）</li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h2>待确认</h2>
+      <p class="sub">这三条会改到文档与测试，先定再实现。</p>
+      <ul>
+        <li>标题 <b>2 行封顶</b> vs 不限行（现状不限行，长名字会把状态项挤下去）</li>
+        <li>宽度 <b>196px</b> vs 维持 184px（维持则图标列要压到 12px）</li>
+        <li>待办菜单是否补「标记完成 / 取消完成」；现在只有「复制名字」</li>
+        <li>「清除」是否跟其他状态同层级，或单独一条分隔线</li>
+      </ul>
+    </section>
+  </div>
+
+<script>
+(() => {
+  const desk = document.getElementById("desk");
+  const frame = document.getElementById("widget-frame");
+  const anchor = document.getElementById("anchor");
+  const menus = {
+    task: document.getElementById("menu-task"),
+    todo: document.getElementById("menu-todo"),
+  };
+  const rows = Array.from(document.querySelectorAll("[data-menu]"));
+  const presets = Array.from(document.querySelectorAll("[data-preset]"));
+  const dockButtons = Array.from(document.querySelectorAll("[data-dock]"));
+  const PAD = 8;
+  const GAP = 8;
+  let lastPreset = "bottom";
+
+  function setActivePreset(key) {
+    presets.forEach((b) => b.classList.toggle("is-active", b.dataset.preset === key));
+  }
+
+  function hideMenus() {
+    Object.values(menus).forEach((m) => { m.hidden = true; });
+    anchor.hidden = true;
+    document.querySelectorAll(".is-picked").forEach((r) => r.classList.remove("is-picked"));
+  }
+
+  function menuFor(kind, name) {
+    const menu = menus[kind];
+    menu.querySelector(".menu-title").textContent = name;
+    menu.querySelector(".menu-title").title = name;
+    if (kind === "task") {
+      menu.dataset.current = "none";
+      menu.querySelectorAll(".menu-item[data-state]").forEach((item) => {
+        item.removeAttribute("data-current");
+      });
+    }
+    return menu;
+  }
+
+  function openMenu(kind, name, row, x, y, current) {
+    hideMenus();
+    const menu = menuFor(kind, name);
+    menu.hidden = false;
+
+    if (current) {
+      menu.dataset.current = current;
+      const item = menu.querySelector(`[data-state="${current}"]`);
+      if (item) item.setAttribute("data-current", "");
+    }
+
+    const mw = menu.offsetWidth;
+    const mh = menu.offsetHeight;
+    const deskRect = desk.getBoundingClientRect();
+    const frameRect = frame.getBoundingClientRect();
+    const fLeft = frameRect.left - deskRect.left;
+    const fRight = frameRect.right - deskRect.left;
+    const minLeft = PAD;
+    const maxLeft = deskRect.width - mw - PAD;
+    const minTop = PAD;
+    const maxTop = deskRect.height - mh - PAD;
+
+    // 1) 优先完全落到挂件窗口外侧：右侧 8px，其次左侧 8px
+    let left = null;
+    let origin = "top left";
+    if (fRight + GAP + mw <= deskRect.width - PAD) {
+      left = fRight + GAP;
+    } else if (fLeft - GAP - mw >= PAD) {
+      left = fLeft - GAP - mw;
+      origin = "top right";
+    }
+
+    // 2) 外侧都放不下：回退到光标，左右翻转
+    if (left === null) {
+      left = x + 2;
+      if (left + mw > deskRect.width - PAD) {
+        left = x - mw - 2;
+        origin = "top right";
+      }
+    }
+
+    // 3) 纵向对齐被点的行，放不下就向上翻
+    let top = y - 12;
+    if (top + mh > deskRect.height - PAD) {
+      top = y - mh + 12;
+      origin = origin.replace("top", "bottom");
+    }
+
+    // 4) 夹到工作区
+    left = Math.min(Math.max(left, minLeft), Math.max(minLeft, maxLeft));
+    top = Math.min(Math.max(top, minTop), Math.max(minTop, maxTop));
+
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+    menu.style.setProperty("--origin", origin);
+
+    anchor.style.left = `${x}px`;
+    anchor.style.top = `${y}px`;
+    anchor.hidden = false;
+
+    if (row) row.classList.add("is-picked");
+  }
+
+  function pointInDesk(el, ax, ay) {
+    const rect = el.getBoundingClientRect();
+    const deskRect = desk.getBoundingClientRect();
+    return {
+      x: rect.left - deskRect.left + (ax ?? rect.width / 2),
+      y: rect.top - deskRect.top + (ay ?? rect.height - 4),
+    };
+  }
+
+  function openFromRow(row, clientX, clientY) {
+    const deskRect = desk.getBoundingClientRect();
+    const kind = row.dataset.menu;
+    openMenu(
+      kind,
+      row.dataset.name,
+      row,
+      clientX - deskRect.left,
+      clientY - deskRect.top,
+      kind === "task" && row.querySelector(".w-check.done") ? "done" : null,
+    );
+  }
+
+  rows.forEach((row) => {
+    row.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      setActivePreset("");
+      openFromRow(row, event.clientX, event.clientY);
+    });
+  });
+
+  function preset(key) {
+    lastPreset = key;
+    const rowMap = document.getElementById("row-map");
+    const rowDone = rows.find((r) => r.dataset.name.startsWith("仿真实验"));
+    const rowTodo = rows.find((r) => r.dataset.menu === "todo");
+    const rowFirst = rows[0];
+
+    if (key === "none") { hideMenus(); return; }
+    if (key === "bottom") {
+      const p = pointInDesk(rowMap, 168, rowMap.offsetHeight - 6);
+      openMenu("task", rowMap.dataset.name, rowMap, p.x, p.y, "none");
+      return;
+    }
+    if (key === "right") {
+      const p = pointInDesk(rowDone, 190, 12);
+      openMenu("task", rowDone.dataset.name, rowDone, p.x, p.y, "done");
+      return;
+    }
+    if (key === "long") {
+      const p = pointInDesk(rowMap, 176, 10);
+      openMenu("task", rowMap.dataset.name, rowMap, p.x, p.y, "none");
+      return;
+    }
+    if (key === "hover") {
+      const p = pointInDesk(rowFirst, 120, rowFirst.offsetHeight - 4);
+      openMenu("task", rowFirst.dataset.name, rowFirst, p.x, p.y, "none");
+      const done = menus.task.querySelector('[data-state="done"]');
+      done.classList.add("is-hover");
+      return;
+    }
+    if (key === "todo") {
+      const p = pointInDesk(rowTodo, 150, 14);
+      openMenu("todo", rowTodo.dataset.name, rowTodo, p.x, p.y, null);
+    }
+  }
+
+  presets.forEach((button) => {
+    button.addEventListener("click", () => {
+      const key = button.dataset.preset;
+      setActivePreset(key);
+      preset(key);
+    });
+  });
+
+  document.querySelectorAll("[data-close]").forEach((button) => {
+    button.addEventListener("click", hideMenus);
+  });
+
+  dockButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      dockButtons.forEach((b) => b.classList.toggle("is-active", b === button));
+      desk.classList.toggle("is-center", button.dataset.dock === "center");
+      window.requestAnimationFrame(() => {
+        preset(lastPreset === "none" ? "bottom" : lastPreset);
+      });
+    });
+  });
+
+  Object.values(menus).forEach((menu) => {
+    menu.addEventListener("click", (event) => {
+      const item = event.target.closest(".menu-item");
+      if (!item) return;
+      const menuEl = item.closest(".menu");
+      if (menuEl === menus.task && item.dataset.state) {
+        menuEl.dataset.current = item.dataset.state;
+        menuEl.querySelectorAll(".menu-item[data-state]").forEach((el) => {
+          el.toggleAttribute("data-current", el === item);
+        });
+      }
+      window.setTimeout(hideMenus, 90);
+    });
+  });
+
+  desk.addEventListener("pointerdown", (event) => {
+    if (!event.target.closest(".menu")) hideMenus();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") { hideMenus(); setActivePreset("none"); }
+  });
+  document.getElementById("w-scroll").addEventListener("scroll", hideMenus, true);
+  window.addEventListener("resize", () => {
+    if (lastPreset === "none") hideMenus();
+    else preset(lastPreset);
+  });
+
+  document.querySelectorAll("[data-theme-btn]").forEach((button) => {
+    button.addEventListener("click", () => {
+      document.documentElement.dataset.theme = button.dataset.themeBtn;
+      document.querySelectorAll("[data-theme-btn]").forEach((item) => {
+        item.classList.toggle("is-active", item === button);
+      });
+      hideMenus();
+    });
+  });
+
+  if (new URLSearchParams(location.search).get("theme") === "dark") {
+    document.documentElement.dataset.theme = "dark";
+    document.querySelectorAll("[data-theme-btn]").forEach((item) => {
+      item.classList.toggle("is-active", item.dataset.themeBtn === "dark");
+    });
+  }
+
+  // 首屏直接展示关键场景：贴底行右键，菜单整体越出窗口。
+  window.addEventListener("load", () => {
+    requestAnimationFrame(() => preset("bottom"));
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { checkinKey } from "../../domain/keys";
@@ -48,6 +48,11 @@ const menuApi = vi.hoisted(() => {
 
 const invokeMock = vi.hoisted(() => vi.fn(async () => undefined));
 
+const menuActionApi = vi.hoisted(() => ({
+  handler: null as null | ((action: unknown) => void),
+  unlisten: vi.fn(),
+}));
+
 const monitorApi = vi.hoisted(() => ({
   currentMonitor: vi.fn(async () => ({
     size: { width: 1920, height: 1080 },
@@ -86,6 +91,12 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
 
 vi.mock("../../shared/events", () => ({
   emitWidgetExpand: vi.fn(async () => undefined),
+  onWidgetMenuAction: vi.fn(
+    async (handler: (action: unknown) => void) => {
+      menuActionApi.handler = handler;
+      return menuActionApi.unlisten;
+    },
+  ),
 }));
 
 const NOW = new Date(2026, 10, 2, 9, 0, 0);
@@ -178,6 +189,8 @@ describe("Widget", () => {
     menuApi.itemNew.mockClear();
     menuApi.menuNew.mockClear();
     invokeMock.mockClear();
+    menuActionApi.handler = null;
+    menuActionApi.unlisten.mockClear();
     localStorage.removeItem(CAPSULE_STORAGE_KEY);
     localStorage.removeItem(CAPSULE_SIDE_KEY);
     useDayStore.setState({ now: null });
@@ -313,7 +326,7 @@ describe("Widget", () => {
     expect(scroller?.className).toContain("overflow-y-auto");
   });
 
-  it("wraps long task names and the task menu heading", () => {
+  it("wraps long task names and hands the full name to the menu window", async () => {
     const longName = "这是一个非常长的任务名称用于验证挂件换行显示";
     useTasksStore.setState({
       tasks: [task("t1", longName, "voluntary", 0)],
@@ -330,15 +343,19 @@ describe("Widget", () => {
     expect(row).toHaveClass("min-h-[26px]");
     expect(row).not.toHaveClass("h-[26px]");
 
-    fireEvent.contextMenu(
-      screen.getByRole("button", { name: `切换 ${longName} 状态` }),
-    );
-    const heading = (
-      document.querySelector("[data-widget-menu]") as HTMLElement
-    ).querySelector("p") as HTMLElement;
-    expect(heading).toHaveTextContent(longName);
-    expect(heading).toHaveClass("wrap-anywhere");
-    expect(heading).not.toHaveClass("truncate");
+    await act(async () => {
+      fireEvent.contextMenu(
+        screen.getByRole("button", { name: `切换 ${longName} 状态` }),
+      );
+    });
+
+    expect(invokeMock).toHaveBeenCalledWith("open_widget_menu", {
+      payload: expect.objectContaining({
+        kind: "task",
+        id: "t1",
+        name: longName,
+      }),
+    });
   });
 
   it("collapses the three sections from their headers", () => {
@@ -502,90 +519,121 @@ describe("Widget", () => {
     expect(setStatus).toHaveBeenCalledWith("t4", TODAY, null);
   });
 
-  it("marks missed, skipped and cleared from the task menu", () => {
+  it("opens the separate menu window for tasks and todos", async () => {
+    render(<Widget />);
+    await act(async () => undefined);
+
+    await act(async () => {
+      fireEvent.contextMenu(
+        screen.getByRole("button", { name: "切换 跑步 状态" }),
+      );
+    });
+
+    expect(invokeMock).toHaveBeenCalledWith("open_widget_menu", {
+      payload: expect.objectContaining({
+        kind: "task",
+        id: "t1",
+        name: "跑步",
+        current: null,
+        labels: expect.objectContaining({
+          copy: "复制名字",
+          status: "今日状态",
+          done: "已完成",
+          missed: "未完成",
+        }),
+      }),
+    });
+
+    await act(async () => {
+      fireEvent.contextMenu(screen.getByText("买猫粮"));
+    });
+
+    expect(invokeMock).toHaveBeenLastCalledWith("open_widget_menu", {
+      payload: expect.objectContaining({
+        kind: "todo",
+        id: "买猫粮",
+        name: "买猫粮",
+        current: null,
+      }),
+    });
+    // 菜单不在挂件窗口里渲染，窗口内不应出现 menu 角色。
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("applies the status chosen in the separate menu window", async () => {
     const setStatus = vi.fn(async () => undefined);
     useCheckinsStore.setState({ setStatus });
     render(<Widget />);
+    await act(async () => undefined);
 
-    fireEvent.contextMenu(
-      screen.getByRole("button", { name: "切换 跑步 状态" }),
-    );
-    expect(screen.getByRole("menu", { name: "任务操作" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("menuitem", { name: "未完成" }));
+    act(() => {
+      menuActionApi.handler?.({
+        kind: "task",
+        id: "t1",
+        action: "status",
+        status: "missed",
+      });
+    });
     expect(setStatus).toHaveBeenCalledWith("t1", TODAY, "missed");
 
-    fireEvent.contextMenu(
-      screen.getByRole("button", { name: "切换 跑步 状态" }),
-    );
-    fireEvent.click(screen.getByRole("menuitem", { name: "清除" }));
-    expect(setStatus).toHaveBeenCalledWith("t1", TODAY, null);
+    act(() => {
+      menuActionApi.handler?.({
+        kind: "task",
+        id: "t2",
+        action: "status",
+        status: null,
+      });
+    });
+    expect(setStatus).toHaveBeenCalledWith("t2", TODAY, null);
 
-    // 已完成行也能打开菜单，改成跳过。
-    fireEvent.contextMenu(screen.getByText("开会"));
-    fireEvent.click(screen.getByRole("menuitem", { name: "今天不做" }));
-    expect(setStatus).toHaveBeenCalledWith("t2", TODAY, "skipped");
-
-    // 已跳过行显示「取消」，点清除写 null。
-    fireEvent.contextMenu(screen.getByText("背单词"));
-    fireEvent.click(screen.getByRole("menuitem", { name: "取消" }));
-    expect(setStatus).toHaveBeenCalledWith("t3", TODAY, null);
+    // 待办菜单只回传复制，不写打卡。
+    setStatus.mockClear();
+    act(() => {
+      menuActionApi.handler?.({
+        kind: "todo",
+        id: "买猫粮",
+        action: "status",
+        status: "done",
+      });
+    });
+    expect(setStatus).not.toHaveBeenCalled();
   });
 
-  it("copies task and todo names from the widget menus", async () => {
-    const writeText = vi.fn(async () => undefined);
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { writeText },
-    });
-    const setStatus = vi.fn(async () => undefined);
-    const setDone = vi.fn(async () => undefined);
-    useCheckinsStore.setState({ setStatus });
-    useTodosStore.setState({ setDone });
-
+  it("shows the copy result reported by the menu window", async () => {
     render(<Widget />);
+    await act(async () => undefined);
 
-    fireEvent.contextMenu(
-      screen.getByRole("button", { name: "切换 跑步 状态" }),
-    );
-    const taskMenu = screen.getByRole("menu", { name: "任务操作" });
-    expect(
-      within(taskMenu).getByRole("menuitem", { name: "已完成" }),
-    ).toBeInTheDocument();
-
-    await act(async () => {
-      fireEvent.click(
-        within(taskMenu).getByRole("menuitem", { name: "复制名字" }),
-      );
-      await Promise.resolve();
+    act(() => {
+      menuActionApi.handler?.({
+        kind: "task",
+        id: "t1",
+        action: "copy",
+        copied: true,
+      });
     });
-
-    expect(writeText).toHaveBeenCalledWith("跑步");
-    expect(setStatus).not.toHaveBeenCalled();
     expect(screen.getByRole("status")).toHaveTextContent("已复制");
 
-    fireEvent.contextMenu(screen.getByText("买猫粮"));
-    const todoMenu = screen.getByRole("menu", { name: "待办操作" });
-    await act(async () => {
-      fireEvent.click(
-        within(todoMenu).getByRole("menuitem", { name: "复制名字" }),
-      );
-      await Promise.resolve();
+    act(() => {
+      menuActionApi.handler?.({
+        kind: "task",
+        id: "t1",
+        action: "copy",
+        copied: false,
+      });
     });
-
-    expect(writeText).toHaveBeenCalledWith("买猫粮");
-    expect(setDone).not.toHaveBeenCalled();
+    expect(screen.getByRole("status")).toHaveTextContent("复制失败");
   });
 
-  it("closes the widget task menu from the close button", () => {
+  it("closes the separate menu when the widget scrolls", async () => {
     render(<Widget />);
+    await act(async () => undefined);
+    invokeMock.mockClear();
 
-    fireEvent.contextMenu(
-      screen.getByRole("button", { name: "切换 跑步 状态" }),
-    );
-    expect(screen.getByRole("menu", { name: "任务操作" })).toBeInTheDocument();
+    const scroller = document.querySelector("[data-widget-scroll]") as HTMLElement;
+    fireEvent.scroll(scroller);
+    await act(async () => undefined);
 
-    fireEvent.click(screen.getByRole("button", { name: "关闭菜单" }));
-    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(invokeMock).toHaveBeenCalledWith("close_widget_menu");
   });
 
   it("asks the main window to expand and collapses the widget", async () => {

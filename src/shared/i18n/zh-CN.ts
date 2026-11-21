@@ -303,6 +303,7 @@ export const zhCN = {
   "widget.menu": "任务操作",
   "widget.menu.open": "打开任务操作：{task}",
   "widget.menu.close": "关闭任务菜单",
+  "widget.menu.status": "今日状态",
   "widget.menu.clear": "清除",
 
   "grid.title": "任务表",

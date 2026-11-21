@@ -66,7 +66,7 @@ describe("widget window config", () => {
     expect(rust).toContain(".skip_taskbar(true)");
   });
 
-  it("grants the widget window the same capabilities as main", () => {
+  it("grants the widget and menu windows the same capabilities as main", () => {
     const capabilities = JSON.parse(
       readFileSync(
         resolve(process.cwd(), "src-tauri/capabilities/default.json"),
@@ -74,6 +74,21 @@ describe("widget window config", () => {
       ),
     ) as { windows: string[] };
 
-    expect(capabilities.windows).toEqual(["main", "widget"]);
+    expect(capabilities.windows).toEqual(["main", "widget", "widget-menu"]);
+  });
+
+  it("keeps the widget menu in its own transparent window", () => {
+    const rust = readFileSync(
+      resolve(process.cwd(), "src-tauri/src/lib.rs"),
+      "utf8",
+    ).replace(/\r\n/g, "\n");
+
+    expect(rust).toContain(
+      'WebviewUrl::App("index.html?window=widget-menu".into())',
+    );
+    expect(rust).toContain(".transparent(true)");
+    expect(rust).toContain(".always_on_top(true)");
+    expect(rust).toContain(".skip_taskbar(true)");
+    expect(rust).toContain('WebviewUrl::App("index.html?window=widget-menu".into())');
   });
 });

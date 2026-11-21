@@ -24,6 +24,13 @@
     overflow: hidden;
   }
 
+  /* 右键菜单是独立窗口：窗口比菜单大一圈，留给投影，其余全透明。 */
+  :root[data-window="widget-menu"],
+  :root[data-window="widget-menu"] body {
+    background: transparent;
+    overflow: hidden;
+  }
+
   button {
     font: inherit;
     color: inherit;
@@ -61,6 +68,147 @@
     background: color-mix(in srgb, var(--color-text) 18%, transparent);
     border: 0;
     border-radius: var(--radius-pill);
+  }
+
+  /* 挂件右键菜单：卡片比普通浮层多压一档投影，白底压白卡也能看出层次。
+     深色下把菜单面提亮约 8%，保持“越靠上越亮”。 */
+  .widget-menu-card {
+    width: 196px;
+    padding: 6px;
+    border: 1px solid color-mix(in srgb, var(--color-text) 14%, var(--color-border));
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-float);
+    color: var(--color-text);
+    animation: widget-menu-in 120ms cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  :root[data-theme="dark"] .widget-menu-card {
+    background: color-mix(in srgb, var(--color-surface) 92%, #fff);
+    border-color: color-mix(in srgb, #fff 12%, var(--color-border));
+  }
+
+  @keyframes widget-menu-in {
+    from {
+      opacity: 0;
+      transform: translateY(1px) scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .widget-menu-card {
+      animation: none;
+    }
+  }
+
+  .widget-menu-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 0 2px 5px 6px;
+  }
+
+  .widget-menu-title {
+    display: -webkit-box;
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--color-text-secondary);
+  }
+
+  .widget-menu-close {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 20px;
+    height: 20px;
+    margin-top: -2px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--color-text-tertiary);
+    font-size: 12px;
+    line-height: 1;
+  }
+
+  .widget-menu-close:hover {
+    background: var(--state-active);
+    color: var(--color-text);
+  }
+
+  .widget-menu-close:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+
+  .widget-menu-group {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 6px 2px;
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--color-text-tertiary);
+  }
+
+  .widget-menu-group i {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--color-text-tertiary);
+  }
+
+  .widget-menu-icon {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 14px;
+    height: 14px;
+    border: 1.4px solid var(--color-border-strong);
+    border-radius: 4px;
+    font-size: 8.5px;
+    font-weight: 700;
+    line-height: 1;
+    color: transparent;
+  }
+
+  .widget-menu-icon[data-state="done"] {
+    border-color: var(--color-voluntary);
+    background: var(--color-voluntary);
+    color: #fff;
+  }
+
+  .widget-menu-icon[data-state="missed"] {
+    border-color: var(--color-missed);
+    color: var(--color-missed);
+  }
+
+  .widget-menu-icon[data-state="skipped"] {
+    border-style: dashed;
+    background: var(--color-na);
+    color: var(--color-text-muted);
+    font-weight: 500;
+  }
+
+  .widget-menu-icon[data-state="clear"] {
+    border-style: dashed;
+    opacity: 0.7;
+  }
+
+  .widget-menu-current {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--color-voluntary);
   }
 
   /* 设置页主题缩略图：只做视觉预览，不参与主题切换逻辑。 */

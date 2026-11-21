@@ -1,8 +1,13 @@
-export type WindowTarget = "main" | "widget";
+export type WindowTarget = "main" | "widget" | "widget-menu";
 
-/** 两个窗口共用同一份 index.html，用查询参数区分渲染入口。 */
+/** 三个窗口共用同一份 index.html，用查询参数区分渲染入口。 */
 export function windowTarget(search: string): WindowTarget {
-  return new URLSearchParams(search).get("window") === "widget"
-    ? "widget"
-    : "main";
+  const target = new URLSearchParams(search).get("window");
+  if (target === "widget") {
+    return "widget";
+  }
+  if (target === "widget-menu") {
+    return "widget-menu";
+  }
+  return "main";
 }
